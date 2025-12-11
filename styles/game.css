@@ -1,0 +1,189 @@
+.game-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.game-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-btn {
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #1f2937;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.game-title {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.game-area {
+  background: #0f172a;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.game-canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid #1f2937;
+  background: #0b0f1a;
+}
+
+.info-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.touch-btn {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 14px;
+  border: 1px solid #1f2937;
+  min-width: 48px;
+}
+
+.touch-btn:active {
+  transform: translateY(1px);
+}
+
+.game-flex {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.tetris-flex {
+  align-items: stretch;
+}
+
+.control-row {
+  display: flex;
+  gap: 8px;
+}
+
+.tetris-controls {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.control-grid {
+  width: 180px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 6px;
+  justify-items: center;
+  align-items: center;
+}
+
+.grid-2048 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.tile {
+  height: 68px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 20px;
+  color: #0f172a;
+}
+
+.tile-empty {
+  background: #111827;
+}
+
+.tile-2,
+.tile-4,
+.tile-8,
+.tile-16,
+.tile-32,
+.tile-64,
+.tile-128,
+.tile-256,
+.tile-512,
+.tile-1024,
+.tile-2048 {
+  background: #22d3ee;
+  color: #0f172a;
+}
+
+.match3-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+
+.match3-cell {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+}
+
+.match3-cell.selected {
+  border-color: #e0f2fe;
+}
+
+.sokoban-board {
+  display: grid;
+  grid-template-columns: repeat(7, 36px);
+  gap: 2px;
+}
+
+.soko-cell {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: #111827;
+  border: 1px solid #1f2937;
+}
+
+.soko-cell.wall {
+  background: #0b0f1a;
+}
+
+.soko-cell.goal {
+  background: #083344;
+  border-color: #0ea5e9;
+}
+
+.soko-cell.box {
+  background: #f59e0b;
+}
+
+.soko-cell.player {
+  outline: 2px solid #38bdf8;
+}
+
+.tetris-canvas {
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 10 / 20;
+  height: auto;
+  max-height: 70vh;
+  align-self: center;
+  image-rendering: pixelated;
+}

@@ -1,0 +1,49 @@
+.hub-hero {
+  margin: 12px 0 16px;
+}
+
+.hub-heading {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.hub-subtitle {
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.hub-card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  color: inherit;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.hub-card:active {
+  transform: translateY(1px);
+}
+
+.hub-card-icon {
+  font-size: 28px;
+}
+
+.hub-card-title {
+  font-weight: 700;
+}
+
+.hub-card-desc {
+  color: #9ca3af;
+  font-size: 13px;
+}

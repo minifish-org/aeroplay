@@ -1,0 +1,15 @@
+{
+  "name": "AeroPlay FlightMode Games",
+  "short_name": "AeroPlay",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#0d0d0d",
+  "icons": [
+    {
+      "src": "/assets/icon.svg",
+      "sizes": "128x128",
+      "type": "image/svg+xml"
+    }
+  ]
+}
