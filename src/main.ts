@@ -5,7 +5,8 @@ import game2048 from './games/game2048';
 import flappy from './games/flappy';
 import maze from './games/maze';
 import match3 from './games/match3';
-import sokoban from './games/sokoban';
+import sudoku from './games/sudoku';
+import lightsOut from './games/lightsout';
 
 const games: GameModule[] = [
   snake,
@@ -14,7 +15,8 @@ const games: GameModule[] = [
   flappy,
   maze,
   match3,
-  sokoban
+  sudoku,
+  lightsOut
 ];
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
