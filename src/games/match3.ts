@@ -8,6 +8,8 @@ const SIZE = 8;
 const COLORS = ['#f97316', '#38bdf8', '#a855f7', '#22c55e', '#f59e0b'];
 const storage = namespace('match3');
 
+const CELL_PX = 44; // tile size + gap for drop animation
+
 const match3: GameModule = {
   id: 'match3',
   name: 'Match-3',
@@ -32,13 +34,16 @@ const match3: GameModule = {
     let score = 0;
     let best = storage.load('best', 0);
     let selected: { x: number; y: number } | null = null;
+    let isResolving = false;
+
+    const key = (x: number, y: number) => `${x}-${y}`;
 
     const updateUI = () => {
       scoreEl.textContent = `Score: ${score}`;
       bestEl.textContent = `Best: ${best}`;
     };
 
-    const render = () => {
+    const render = (animations?: RenderAnimations) => {
       boardEl.innerHTML = '';
       grid.forEach((row, y) => {
         row.forEach((cell, x) => {
@@ -48,6 +53,17 @@ const match3: GameModule = {
           tile.dataset.x = String(x);
           tile.dataset.y = String(y);
           tile.classList.toggle('selected', selected?.x === x && selected?.y === y);
+          const drop = animations?.drops?.[key(x, y)];
+          if (drop) {
+            tile.style.setProperty('--fall-distance', `${drop}px`);
+            tile.classList.add('match3-fall');
+          }
+          if (animations?.newTiles?.has(key(x, y))) {
+            tile.classList.add('match3-new');
+          }
+          if (animations?.clearing?.has(key(x, y))) {
+            tile.classList.add('match3-clearing');
+          }
           tile.addEventListener('click', onSelect);
           tile.addEventListener('touchend', onSelect);
           boardEl.appendChild(tile);
@@ -56,7 +72,8 @@ const match3: GameModule = {
       updateUI();
     };
 
-    const onSelect = (e: Event) => {
+    const onSelect = async (e: Event) => {
+      if (isResolving) return;
       e.preventDefault();
       const target = e.currentTarget as HTMLElement;
       const x = Number(target.dataset.x);
@@ -65,7 +82,7 @@ const match3: GameModule = {
         selected = { x, y };
       } else {
         if (isNeighbor(selected, { x, y })) {
-          attemptSwap(selected, { x, y });
+          await attemptSwap(selected, { x, y });
           selected = null;
         } else {
           selected = { x, y };
@@ -74,22 +91,62 @@ const match3: GameModule = {
       render();
     };
 
-    const attemptSwap = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+    const attemptSwap = async (a: { x: number; y: number }, b: { x: number; y: number }) => {
       swap(grid, a, b);
-      const cleared = resolveBoard(grid);
+      render();
+      const cleared = await resolveBoardAnimated();
       if (!cleared) {
         swap(grid, a, b);
+        render();
       } else {
         score += cleared;
         best = Math.max(best, score);
         storage.save('best', best);
+        render();
       }
     };
 
-    // ensure starting board has a move
+    const resolveBoardAnimated = async () => {
+      if (isResolving) return 0;
+      isResolving = true;
+      let totalCleared = 0;
+
+      while (true) {
+        const matches = findMatches(grid);
+        if (!matches.length) break;
+
+        const clearing = new Set(matches.map((m) => key(m.x, m.y)));
+        render({ clearing });
+        await sleep(120);
+
+        matches.forEach(({ x, y }) => {
+          grid[y][x] = -1;
+        });
+
+        const moves = applyGravityWithMoves(grid);
+        const drops: Record<string, number> = {};
+        const newTiles = new Set<string>();
+        moves.forEach((m) => {
+          const distance = m.to - m.from;
+          drops[key(m.x, m.to)] = distance * CELL_PX;
+          if (m.isNew) newTiles.add(key(m.x, m.to));
+        });
+
+        render({ drops, newTiles });
+        await sleep(220);
+
+        totalCleared += matches.length * 10;
+      }
+
+      isResolving = false;
+      render();
+      return totalCleared;
+    };
+
+    // ensure starting board has a move then resolve initial matches with animations
     ensureResolvable(grid);
-    resolveBoard(grid);
     render();
+    void resolveBoardAnimated();
 
     return () => {};
   }
@@ -111,20 +168,6 @@ function swap(grid: Cell[][], a: { x: number; y: number }, b: { x: number; y: nu
   const tmp = grid[a.y][a.x];
   grid[a.y][a.x] = grid[b.y][b.x];
   grid[b.y][b.x] = tmp;
-}
-
-function resolveBoard(grid: Cell[][]): number {
-  let totalCleared = 0;
-  while (true) {
-    const matches = findMatches(grid);
-    if (!matches.length) break;
-    matches.forEach(({ x, y }) => {
-      grid[y][x] = -1;
-    });
-    totalCleared += matches.length * 10;
-    applyGravity(grid);
-  }
-  return totalCleared;
 }
 
 function findMatches(grid: Cell[][]): { x: number; y: number }[] {
@@ -160,19 +203,36 @@ function findMatches(grid: Cell[][]): { x: number; y: number }[] {
   return found;
 }
 
-function applyGravity(grid: Cell[][]) {
+function applyGravityWithMoves(
+  grid: Cell[][]
+): { x: number; from: number; to: number; isNew: boolean }[] {
+  const moves: { x: number; from: number; to: number; isNew: boolean }[] = [];
+
   for (let x = 0; x < SIZE; x++) {
+    const column: Cell[] = Array(SIZE).fill(-1);
     let write = SIZE - 1;
+
     for (let y = SIZE - 1; y >= 0; y--) {
       if (grid[y][x] !== -1) {
-        grid[write][x] = grid[y][x];
+        column[write] = grid[y][x];
+        if (write !== y) {
+          moves.push({ x, from: y, to: write, isNew: false });
+        }
         write--;
       }
     }
+
     for (let y = write; y >= 0; y--) {
-      grid[y][x] = Math.floor(Math.random() * COLORS.length);
+      column[y] = Math.floor(Math.random() * COLORS.length);
+      moves.push({ x, from: -1, to: y, isNew: true });
+    }
+
+    for (let y = 0; y < SIZE; y++) {
+      grid[y][x] = column[y];
     }
   }
+
+  return moves;
 }
 
 function ensureResolvable(grid: Cell[][]) {
@@ -207,5 +267,15 @@ function hasMove(grid: Cell[][]): boolean {
   }
   return false;
 }
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type RenderAnimations = {
+  drops?: Record<string, number>;
+  newTiles?: Set<string>;
+  clearing?: Set<string>;
+};
 
 export default match3;

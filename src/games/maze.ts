@@ -32,6 +32,58 @@ const maze: GameModule = {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas missing');
 
+    const controlsWrapper = document.createElement('div');
+    controlsWrapper.className = 'control-row';
+    controlsWrapper.style.justifyContent = 'space-between';
+    controlsWrapper.style.alignItems = 'center';
+    controlsWrapper.style.gap = '16px';
+    controlsWrapper.style.width = '100%';
+    controlsWrapper.style.maxWidth = '520px';
+    controlsWrapper.style.margin = '0 auto';
+
+    const makeBtn = (label: string, onPress: () => void) => {
+      const btn = document.createElement('button');
+      btn.className = 'touch-btn';
+      btn.textContent = label;
+      btn.addEventListener('click', onPress);
+      return btn;
+    };
+    const spacer = () => {
+      const s = document.createElement('div');
+      s.style.height = '48px';
+      return s;
+    };
+
+    const controls = document.createElement('div');
+    controls.className = 'control-grid';
+    controls.append(
+      spacer(),
+      makeBtn('↑', () => move('up')),
+      spacer(),
+      makeBtn('←', () => move('left')),
+      spacer(),
+      makeBtn('→', () => move('right')),
+      spacer(),
+      makeBtn('↓', () => move('down')),
+      spacer()
+    );
+
+    const leftBlock = document.createElement('div');
+    leftBlock.style.display = 'flex';
+    leftBlock.style.justifyContent = 'flex-start';
+    leftBlock.style.flex = '1';
+    leftBlock.appendChild(controls);
+
+    const resetButton = makeBtn('Reset', () => reset());
+    const rightBlock = document.createElement('div');
+    rightBlock.style.display = 'flex';
+    rightBlock.style.justifyContent = 'flex-end';
+    rightBlock.style.flex = '1';
+    rightBlock.appendChild(resetButton);
+
+    controlsWrapper.append(leftBlock, rightBlock);
+    area.appendChild(controlsWrapper);
+
     let grid = generateMaze();
     let player = { x: 0, y: 0 };
     let startedAt = performance.now();
@@ -54,6 +106,7 @@ const maze: GameModule = {
           if (cell.walls.left) drawLine(ctx, px, py, px, py + CELL_SIZE);
         }
       }
+      ctx.stroke();
       ctx.fillStyle = '#34d399';
       ctx.fillRect(
         COLS * CELL_SIZE - CELL_SIZE + 5,
