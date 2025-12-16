@@ -38,6 +38,12 @@ npm run preview -- --host 0.0.0.0 --port 4173
 - Offline: service worker + manifest; localStorage per-game saves.
 - Mobile UX: touch controls, double-tap zoom disabled, overscroll reduced.
 
+## Deploying to Cloudflare Pages
+- Recommended: use the included workflow `.github/workflows/deploy-cloudflare-pages.yml`.
+- In repo secrets add `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (Pages:Edit scope), and `CLOUDFLARE_PAGES_PROJECT` (your Pages project name).
+- Trigger on push to `main` (or manual dispatch); the workflow runs `npm ci`, `npm run build`, and publishes `dist` via `cloudflare/pages-action@v1`.
+- If configuring in the Cloudflare UI instead, set build command to `npm run build`, output directory to `dist`, and Node 20.
+
 ## Repo Structure (key parts)
 - `src/core`: shared engine loop, UI helpers, storage wrapper.
 - `src/games`: individual game modules.
