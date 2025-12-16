@@ -1,6 +1,6 @@
 # AeroPlay — FlightMode Offline Game Hub
 
-A lightweight, offline-first collection of mini games (Snake, Tetris, 2048, Flappy Bird, Maze, Match-3, Sokoban) built with HTML/CSS/TypeScript and Vite. Designed for mobile, touch-friendly play in airplane mode with add-to-homescreen support.
+A lightweight, offline-first collection of mini games (Snake, Tetris, 2048, Flappy Bird, Maze, Match-3, Sudoku, Lights Out) built with HTML/CSS/TypeScript and Vite. Designed for mobile, touch-friendly play in airplane mode with add-to-homescreen support.
 
 ## Quick Start (desktop)
 ```bash
@@ -31,7 +31,8 @@ npm run preview -- --host 0.0.0.0 --port 4173
 - Flappy Bird: Tap to flap; slowed pace; offline-ready.
 - Maze: Swipe to move; timer; random mazes.
 - Match-3: Tap two adjacent tiles to swap; clears with gravity.
-- Sokoban: Arrow buttons + swipe; multi-level; progress saved.
+- Sudoku: Tap cells; toggles for numbers/notes; local save.
+- Lights Out: Tap tiles to toggle neighbors; clear the board.
 
 ## Tech Notes
 - Pure frontend: no external CDN/assets; all local.
