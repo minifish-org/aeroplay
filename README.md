@@ -2,6 +2,11 @@
 
 A lightweight, offline-first collection of mini games (Snake, Tetris, 2048, Flappy Bird, Maze, Match-3, Sudoku, Lights Out) built with HTML/CSS/TypeScript and Vite. Designed for mobile, touch-friendly play in airplane mode with add-to-homescreen support.
 
+**Use this as a template:** In GitHub, click “Use this template” to bootstrap a new repo without inheriting issues or history. Keep `main` clean (no build artifacts) for easy forking.
+
+## About
+AeroPlay is a pure-frontend, mobile-first game hub optimized for flight-mode usage. All assets are local, no network calls, and games save progress with `localStorage`. A service worker and manifest enable add-to-homescreen behavior and offline play.
+
 ## Quick Start (desktop)
 ```bash
 npm install
