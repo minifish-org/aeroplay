@@ -45,3 +45,30 @@ Original prompt: Revisit all games in this project and make them more fun to pla
 - No deployment or commit performed.
 - Remaining external QA: physical iPhone Safari and Home Screen installation. WebKit mobile emulation was tested, but does not replace device testing.
 - Optional future work: additional Sudoku puzzle packs and more game modes after player feedback.
+
+## Second pass: 3D expansion
+- User authorized committing/pushing the first pass, breaking compatibility, adding frameworks and new games.
+- First pass committed and pushed to main as 52510b5.
+- Add Three.js-based Sky Rush (arcade flight) and Pocket Cargo (Sokoban diorama puzzles).
+- Add lazy game loading, shared 3D resource management, synthesized optional audio, game-specific goals and feedback.
+- Keep all runtime resources bundled and precached for offline play.
+
+### 3D implementation and early checks
+- Added Three.js 0.186, lazy registry and versioned precaching of all output/public assets, including the solver worker.
+- Sky Rush: smooth lane steering, reachable ring routes, boost meter, combo multipliers, shield, sector progression, local record, synthesized optional sound, and pause/results.
+- Pocket Cargo: twelve solver-validated levels, minimum-push par, animated diorama, undo/restart, corner warnings, background-worker hints, star records and saved runs.
+- Shared renderer caps pixel ratio and disposes scene geometry/materials/context on navigation.
+- Required browser client rendered both 3D games; first screenshots were opened and inspected.
+- Optimized runway markings with instanced rendering.
+- Updated browser test polling to support asynchronous game imports while deterministic animation frames are paused.
+
+
+### 3D final validation
+- Chromium and WebKit pass the complete 3D suite: a full flight sector, ring/boost scoring, pauses, next sector, crashes/retry, all 12 Cargo levels, worker hints, undo, star records, save/reload, and mobile layouts.
+- Simulated graphics context loss pauses Sky Rush; context restoration and resume were verified.
+- The eight original games pass the existing regression suite after lazy-loading migration.
+- Offline production suite passes with 23 precached resources, all ten game mounts, worker hints, and real touch swipes in Snake, 2048, Sky Rush, and Pocket Cargo. No external requests or browser errors.
+- Required browser client rerun for both final 3D games. Gameplay, hints, results, mobile and WebKit screenshots were inspected.
+- Hub entry JavaScript is about 9 KB (4 KB gzip); Three.js is a separate approximately 529 KB chunk (132 KB gzip), precached for offline use. The build's 500 KB chunk advisory refers to this intentionally shared renderer.
+- Physical iPhone Safari/Home Screen testing remains external QA; WebKit mobile testing passed.
+- Latest local production preview: http://127.0.0.1:4174/

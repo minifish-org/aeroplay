@@ -19,6 +19,9 @@ const context = await browser.newContext({
   deviceScaleFactor: 1
 });
 const page = await context.newPage();
+const waitForFunction = page.waitForFunction.bind(page);
+page.waitForFunction = (fn, arg, options) =>
+  waitForFunction(fn, arg, { polling: 20, ...options });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.addInitScript(() => {
@@ -83,11 +86,11 @@ const keyFor = (dx, dy) =>
 
 try {
   await page.goto(base);
-  assert.equal(await page.locator('.hub-card').count(), 8);
+  assert.equal(await page.locator('.hub-card').count(), 10);
   await button('Arcade').click();
-  assert.equal(await page.locator('.hub-card').count(), 3);
+  assert.equal(await page.locator('.hub-card').count(), 4);
   await button('Puzzles').click();
-  assert.equal(await page.locator('.hub-card').count(), 5);
+  assert.equal(await page.locator('.hub-card').count(), 6);
   await button('All games').click();
   await layout();
   await shot('hub-mobile');
@@ -522,7 +525,7 @@ try {
   }
   await button('Back').tap();
   await page.waitForSelector('.hub-card');
-  assert.equal(await page.locator('.hub-card').count(), 8);
+  assert.equal(await page.locator('.hub-card').count(), 10);
   assert.equal(
     await page.evaluate(() => typeof window.render_game_to_text),
     'undefined'

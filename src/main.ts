@@ -1,28 +1,10 @@
-import { GameModule } from './games/gameTypes';
-import snake from './games/snake';
-import tetris from './games/tetris';
-import game2048 from './games/game2048';
-import flappy from './games/flappy';
-import maze from './games/maze';
-import match3 from './games/match3';
-import sudoku from './games/sudoku';
-import lightsOut from './games/lightsout';
+import { games } from './games/registry';
 import { load, save, namespace } from './core/storage';
-
-const games: GameModule[] = [
-  snake,
-  tetris,
-  game2048,
-  flappy,
-  maze,
-  match3,
-  sudoku,
-  lightsOut
-];
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
 let teardown: (() => void) | null = null;
+let navigationVersion = 0;
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -33,6 +15,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 }
 
 function renderHub() {
+  navigationVersion++;
   teardown?.();
   teardown = null;
   document.title = 'AeroPlay Hub';
@@ -52,11 +35,16 @@ function renderHub() {
   const hero = document.createElement('div');
   hero.className = 'hub-hero';
   hero.innerHTML = `
-    <div class="hub-eyebrow">A little escape, wherever you are</div>
-    <h1 class="hub-heading">Less scrolling.<br>More playing.</h1>
-    <div class="hub-subtitle">Eight little worlds to get lost in. Chase a record, solve a puzzle, or just enjoy the journey.</div>
+    <div class="hub-eyebrow">AEROPLAY ORIGINALS · NOW IN 3D</div>
+    <h1 class="hub-heading">A bigger world.<br>In your pocket.</h1>
+    <div class="hub-subtitle">Fly above the clouds. Deliver a little joy. Discover two new 3D adventures, alongside eight pocket classics.</div>
   `;
-  const last = games.find((g) => g.id === load('last-game', 'snake')) ?? snake;
+  const last = games.find((g) => g.id === load('last-game', 'sky')) ?? games[0];
+  const artwork = document.createElement('img');
+  artwork.src = '/assets/sky-rush.svg';
+  artwork.alt = '';
+  artwork.className = 'hero-art';
+  hero.append(artwork);
   const resume = document.createElement('button');
   resume.className = 'hub-play';
   resume.textContent = `Play ${last.name} ↗`;
@@ -73,27 +61,20 @@ function renderHub() {
   section.append(filters);
   const grid = document.createElement('div');
   grid.className = 'hub-grid';
-  const arcade = ['snake', 'tetris', 'flappy'];
-  const accents = [
-    '#a9dfba',
-    '#c2b1ef',
-    '#a4d6e5',
-    '#f2d495',
-    '#a4d8bf',
-    '#d4b4ed',
-    '#adcaeb',
-    '#ecd196'
-  ];
   function record(id: string) {
     const store = namespace(id === '2048' ? 'game2048' : id);
     if (id === 'maze') return `Expedition ${store.load('level', 1)}`;
     if (id === 'lightsout')
       return `Puzzle ${store.load<{ level: number }>('state-v2', { level: 1 }).level}`;
     if (id === 'sudoku') return 'Take your time';
+    if (id === 'cargo') {
+      const stars = store.load<Record<string, number>>('stars', {});
+      return `${Object.keys(stars).length}/12 islands delivered`;
+    }
     const best = store.load<number>('best', 0);
     return best
       ? `Best ${best.toLocaleString()}`
-      : arcade.includes(id)
+      : games.find((g) => g.id === id)?.category === 'Arcade'
         ? 'Chase a high score'
         : 'Make your first move';
   }
@@ -106,15 +87,19 @@ function renderHub() {
     grid.innerHTML = '';
     games.forEach((game, index) => {
       if (
-        (category === 'Arcade' && !arcade.includes(game.id)) ||
-        (category === 'Puzzles' && arcade.includes(game.id))
+        (category !== 'All games' &&
+          category !== '3D' &&
+          category !== game.category) ||
+        (category === '3D' && !game.dimension)
       )
         return;
       const card = document.createElement('button');
       card.className = 'hub-card';
-      card.style.setProperty('--accent', accents[index]);
+      card.style.setProperty('--accent', game.accent);
+      if (game.dimension) card.classList.add('featured-card');
       card.innerHTML = `
-        <div class="hub-card-top"><div class="hub-card-icon">${game.icon}</div><span class="hub-card-index">0${index + 1}</span></div>
+        ${game.dimension ? `<img class="card-art" src="/assets/${game.id === 'sky' ? 'sky-rush' : 'pocket-cargo'}.svg" alt="" />` : ''}
+        <div class="hub-card-top"><div class="hub-card-icon">${game.icon}</div><span class="hub-card-index">${game.dimension ? 'NEW · 3D' : String(index + 1).padStart(2, '0')}</span></div>
         <div class="hub-card-title">${game.name}</div>
         <div class="hub-card-desc">${game.description}</div>
         <div class="hub-card-foot"><span>${record(game.id)}</span><span aria-hidden="true">↗</span></div>
@@ -125,7 +110,7 @@ function renderHub() {
       grid.appendChild(card);
     });
   }
-  ['All games', 'Arcade', 'Puzzles'].forEach((category) => {
+  ['All games', '3D', 'Arcade', 'Puzzles'].forEach((category) => {
     const button = document.createElement('button');
     button.className = 'hub-filter';
     button.textContent = category;
@@ -140,16 +125,32 @@ function renderHub() {
   show('All games');
 }
 
-function startGame(id: string) {
-  const game = games.find((g) => g.id === id);
+async function startGame(id: string) {
+  const game = games.find((game) => game.id === id);
   if (!game) return;
+  const version = ++navigationVersion;
+  teardown?.();
+  teardown = null;
   document.title = `${game.name} | AeroPlay`;
   history.replaceState(null, '', `#${id}`);
-  teardown?.();
-  save('last-game', id);
-  teardown = game.mount(app, () => {
-    location.hash = 'hub';
-  });
+  app.innerHTML =
+    '<div class="game-loading" role="status">Getting your game ready…</div>';
+  try {
+    const module = await game.load();
+    if (version !== navigationVersion) return;
+    save('last-game', id);
+    teardown = module.default.mount(app, () => {
+      location.hash = 'hub';
+    });
+  } catch (error) {
+    if (version !== navigationVersion) return;
+    app.innerHTML =
+      '<div class="game-loading"><p>This game could not open. Please try again.</p><button class="touch-btn">Back to games</button></div>';
+    app.querySelector('button')!.addEventListener('click', () => {
+      location.hash = 'hub';
+    });
+    console.error('Game loading failed', error);
+  }
 }
 
 function handleHash() {
@@ -160,7 +161,7 @@ function handleHash() {
   }
   const game = games.find((g) => g.id === hash);
   if (game) {
-    startGame(game.id);
+    void startGame(game.id);
   } else {
     renderHub();
   }

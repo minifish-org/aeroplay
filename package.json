@@ -12,8 +12,12 @@
   },
   "devDependencies": {
     "@types/node": "^22.7.4",
+    "@types/three": "^0.183.1",
     "husky": "^9.1.6",
     "typescript": "^5.6.3",
     "vite": "^5.4.10"
+  },
+  "dependencies": {
+    "three": "^0.186.0"
   }
 }

@@ -43,8 +43,10 @@ try {
   await context.setOffline(true);
   await page.reload();
   await page.waitForSelector('.hub-card');
-  assert.equal(await page.locator('.hub-card').count(), 8);
+  assert.equal(await page.locator('.hub-card').count(), 10);
   for (const id of [
+    'sky',
+    'cargo',
     'snake',
     'tetris',
     '2048',
@@ -65,6 +67,25 @@ try {
     );
     assert(await page.locator('.game-area').isVisible());
   }
+  await page.evaluate(() => {
+    location.hash = 'cargo';
+  });
+  await page.waitForFunction(
+    () =>
+      window.render_game_to_text &&
+      JSON.parse(window.render_game_to_text()).game === 'cargo'
+  );
+  await page.getByRole('button', { name: 'Hint', exact: true }).tap();
+  await page.waitForFunction(
+    () => JSON.parse(window.render_game_to_text()).hintDirection !== null
+  );
+  assert.equal(
+    await page.evaluate(
+      () => JSON.parse(window.render_game_to_text()).hintDirection
+    ),
+    'right'
+  );
+  assert(cached.some((p) => p.includes('solver.worker')));
   await page.evaluate(() => {
     localStorage.setItem(
       'aeroplay:game2048:state',
@@ -156,10 +177,75 @@ try {
     path: 'output/offline/snake-touch.png',
     fullPage: true
   });
+  await page.evaluate(() => {
+    location.hash = 'sky';
+  });
+  await page.waitForFunction(
+    () =>
+      window.render_game_to_text &&
+      JSON.parse(window.render_game_to_text()).game === 'sky'
+  );
+  await page.getByRole('button', { name: 'Take flight →', exact: true }).tap();
+  const skyBox = await page.locator('canvas').boundingBox();
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: skyBox.x + 60, y: skyBox.y + skyBox.height / 2 }]
+  });
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [
+      { x: skyBox.x + skyBox.width - 60, y: skyBox.y + skyBox.height / 2 }
+    ]
+  });
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: []
+  });
+  await page.waitForFunction(
+    () => JSON.parse(window.render_game_to_text()).lane === 2
+  );
+  await page.getByRole('button', { name: 'Pause', exact: true }).tap();
+  await page.screenshot({
+    path: 'output/offline/sky-touch.png',
+    fullPage: true
+  });
+  await page.evaluate(() => {
+    location.hash = 'cargo';
+  });
+  await page.waitForFunction(
+    () =>
+      window.render_game_to_text &&
+      JSON.parse(window.render_game_to_text()).game === 'cargo'
+  );
+  const cargoBox = await page.locator('canvas').boundingBox();
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: cargoBox.x + 60, y: cargoBox.y + cargoBox.height / 2 }]
+  });
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [
+      {
+        x: cargoBox.x + cargoBox.width - 60,
+        y: cargoBox.y + cargoBox.height / 2
+      }
+    ]
+  });
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: []
+  });
+  await page.waitForFunction(
+    () => JSON.parse(window.render_game_to_text()).pushes === 1
+  );
+  await page.screenshot({
+    path: 'output/offline/cargo-touch.png',
+    fullPage: true
+  });
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);
   console.log(
-    `PASS Offline: ${cached.length} cached resources, offline reload, all eight games, saved scores, real 2048/Snake touch swipes, no external requests or page errors`
+    `PASS Offline: ${cached.length} cached resources, offline reload, all ten games, saved scores, real classic/3D touch swipes and offline worker hints, no external requests or page errors`
   );
 } finally {
   await browser.close();

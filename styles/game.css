@@ -444,3 +444,308 @@
     opacity: 1;
   }
 }
+
+/* Immersive games keep rendering and controls together on small screens. */
+.immersive-shell {
+  max-width: 850px;
+}
+.immersive-shell .game-area {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  background: #112b3d;
+}
+.three-view {
+  position: relative;
+  width: 100%;
+  isolation: isolate;
+  overflow: hidden;
+}
+.sky-view {
+  height: min(69svh, 650px);
+  min-height: 400px;
+}
+.three-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.three-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: linear-gradient(0deg, #123349bb, #12334922);
+}
+.three-overlay[hidden],
+.cargo-complete[hidden] {
+  display: none;
+}
+.three-panel {
+  width: min(100%, 380px);
+  padding: 26px;
+  border-radius: 20px;
+  background: #15394bee;
+  border: 1px solid #9ccac855;
+  box-shadow: 0 18px 60px #09253644;
+}
+.panel-eyebrow {
+  color: #c7eacb;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.15em;
+}
+.three-panel h2 {
+  font-size: clamp(28px, 5vw, 42px);
+  line-height: 1.05;
+  letter-spacing: -1.4px;
+  margin: 15px 0;
+}
+.three-panel p {
+  color: #c2d6de;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-bottom: 22px;
+}
+.primary-action {
+  background: #f2d39b;
+  color: #253f43;
+  border-color: #ffe7b9;
+  padding: 13px 20px;
+  min-height: 48px;
+  font-weight: 800;
+}
+.flight-hud {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  color: #173d51;
+  pointer-events: none;
+}
+.flight-hud strong {
+  display: block;
+  font-size: 25px;
+  font-variant-numeric: tabular-nums;
+}
+.hud-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+.flight-sector {
+  max-width: 145px;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.08em;
+  margin-top: 7px;
+  line-height: 1.6;
+}
+.flight-message {
+  position: absolute;
+  left: 15px;
+  right: 15px;
+  top: 82px;
+  color: #245263;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
+  text-shadow: 0 1px #f7ffe5;
+}
+.flight-meta {
+  position: absolute;
+  bottom: 16px;
+  left: 12px;
+  right: 12px;
+  text-align: center;
+  color: #ecf4e9;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  font-weight: 750;
+  pointer-events: none;
+  text-shadow: 0 1px 4px #123849;
+}
+.flight-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  width: 100%;
+  border: 0;
+  background: #366879;
+  appearance: none;
+}
+.flight-progress::-webkit-progress-bar {
+  background: #366879;
+}
+.flight-progress::-webkit-progress-value {
+  background: #f2d39b;
+}
+.flight-progress::-moz-progress-bar {
+  background: #f2d39b;
+}
+.flight-controls {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 10px;
+  padding: 14px 16px 8px;
+}
+.flight-controls .touch-btn {
+  min-height: 52px;
+  font-size: 17px;
+}
+.flight-controls .boost-button {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  background: linear-gradient(
+    90deg,
+    #e8c885 var(--charge, 100%),
+    #385767 var(--charge, 100%)
+  );
+  color: #15374a;
+  border-color: #c5b986;
+  font-weight: 800;
+}
+.flight-utility {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.flight-utility .touch-btn {
+  background: transparent;
+  border: 0;
+  font-size: 11px;
+  color: #a8c1ce;
+  min-height: 36px;
+  padding: 5px 12px;
+}
+.three-instruction {
+  color: #a6c0cd;
+  font-size: 10px;
+  text-align: center;
+  padding: 5px 15px 14px;
+  line-height: 1.5;
+}
+.three-unavailable {
+  min-height: 350px;
+  display: grid;
+  place-content: center;
+  padding: 30px;
+  line-height: 1.7;
+  background: #183348;
+}
+.game-loading {
+  min-height: 50vh;
+  display: grid;
+  place-content: center;
+  color: #bcd7dc;
+  text-align: center;
+  gap: 12px;
+}
+.cargo-shell {
+  max-width: 700px;
+}
+.cargo-header {
+  padding: 15px 18px;
+  background: #193a46;
+}
+.level-select {
+  border: 0;
+  color: #f4e8c9;
+  background: #193a46;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  width: 100%;
+  padding: 4px 0;
+}
+.cargo-stats {
+  color: #b9d3d4;
+  font-size: 11px;
+  margin-top: 8px;
+}
+.cargo-view {
+  aspect-ratio: 1.2;
+  min-height: 310px;
+  max-height: 520px;
+}
+.cargo-status {
+  padding: 12px 18px;
+  min-height: 50px;
+  color: #c9dfd9;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.cargo-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 0 15px 14px;
+}
+.cargo-controls .control-grid {
+  width: 155px;
+}
+.cargo-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.cargo-actions .touch-btn {
+  font-size: 11px;
+  padding: 8px;
+}
+.cargo-complete {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  right: 18px;
+  padding: 18px;
+  border-radius: 16px;
+  background: #193e42ef;
+  border: 1px solid #9bc9b7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 5px 30px #22434833;
+}
+.cargo-complete strong {
+  color: #f2d39b;
+  font-size: 24px;
+}
+.cargo-complete span {
+  font-size: 12px;
+  color: #d0e1da;
+  text-align: center;
+}
+@media (max-width: 480px) {
+  .sky-view {
+    height: min(63svh, 550px);
+    min-height: 360px;
+  }
+  .three-panel {
+    padding: 22px;
+  }
+  .flight-hud {
+    left: 15px;
+    right: 15px;
+  }
+  .cargo-controls {
+    gap: 10px;
+  }
+  .cargo-header {
+    padding: 12px 15px;
+  }
+  .cargo-view {
+    aspect-ratio: 1;
+    min-height: 290px;
+  }
+}

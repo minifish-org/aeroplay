@@ -2,7 +2,7 @@
 
 AGENT: FlightMode Games Project
 
-This project builds a pure frontend offline game collection optimized for iPhone flight-mode usage, using HTML + TypeScript + CSS only. No backend, no external runtime. All games share a unified Game Hub UI.
+This project builds a pure frontend offline game collection optimized for iPhone flight-mode usage, using HTML, TypeScript, CSS, and locally bundled game libraries such as Three.js. No backend or external runtime requests. All games share a unified Game Hub UI.
 
 Goal: produce a lightweight, responsive, mobile-friendly experience that runs entirely offline and can be added to Home Screen.
 
@@ -38,7 +38,10 @@ Difficulty A (must implement)
 
 Difficulty B (must implement)
 - Match-3 
-- Sokoban 
+- Pocket Cargo (3D Sokoban)
+- Sky Rush (3D flight arcade)
+- Sudoku
+- Lights Out
 
 Additional Requirements
 - Unified Game Hub with responsive grid of icons
@@ -115,7 +118,9 @@ In-Game Layout
 
 General
 - Use TypeScript
-- Use Canvas for animation-heavy games
+- Use Canvas or Three.js for animation-heavy games
+- Load game modules on demand and bundle all dependencies locally
+- Dispose 3D resources, workers, audio contexts, and event handlers on navigation
 - No external CDN
 - Target 60 FPS
 
@@ -227,7 +232,7 @@ Test on:
 ## ACCEPTANCE CRITERIA
 
 Project is complete when:
-- All 7 games are playable offline
+- All 10 games are playable offline
 - Hub UI loads each game
 - No network requests
 - Saves stored locally

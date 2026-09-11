@@ -1,7 +1,17 @@
 import { defineConfig } from 'vite';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+function publicFiles(directory = 'public', prefix = ''): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory()
+      ? publicFiles(resolve(directory, entry.name), `${prefix}${entry.name}/`)
+      : entry.name === 'service-worker.js'
+        ? []
+        : [`/${prefix}${entry.name}`]
+  );
+}
 
 export default defineConfig({
   plugins: [
@@ -15,8 +25,7 @@ export default defineConfig({
         const assets = [
           '/',
           ...files.map((file) => `/${file}`),
-          '/manifest.json',
-          '/assets/icon.svg'
+          ...publicFiles()
         ];
         const template = readFileSync(
           resolve('public/service-worker.js'),
@@ -36,5 +45,9 @@ export default defineConfig({
       }
     }
   ],
-  build: { outDir: 'dist', assetsDir: 'assets' }
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    rollupOptions: { output: { manualChunks: { three: ['three'] } } }
+  }
 });
