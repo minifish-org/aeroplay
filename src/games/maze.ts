@@ -1,191 +1,269 @@
 import { GameModule } from './gameTypes';
-import { createGameShell, bindSwipe } from '../core/ui';
+import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
+import { GameLoop } from '../core/engine';
+import { namespace } from '../core/storage';
+import { directionPad, exposeGame, message } from '../core/play';
 
 type Cell = {
   visited: boolean;
   walls: { top: boolean; right: boolean; bottom: boolean; left: boolean };
 };
-
-const COLS = 12;
-const ROWS = 12;
-const CELL_SIZE = 22;
-
+type Point = { x: number; y: number };
+const storage = namespace('maze');
 const maze: GameModule = {
   id: 'maze',
   name: 'Maze Escape',
-  description: 'Swipe to exit a random maze as fast as you can.',
   icon: '🧭',
+  description: 'Explore, collect three stars, and find your way home.',
   mount(root, goBack) {
     const { area } = createGameShell(root, 'Maze Escape', goBack);
     const info = document.createElement('div');
     info.className = 'info-row';
-    const timeEl = document.createElement('div');
-    const statusEl = document.createElement('div');
-    info.append(timeEl, statusEl);
-    area.appendChild(info);
-
     const canvas = document.createElement('canvas');
-    canvas.width = COLS * CELL_SIZE + 2;
-    canvas.height = ROWS * CELL_SIZE + 2;
+    canvas.width = canvas.height = 360;
     canvas.className = 'game-canvas';
-    area.appendChild(canvas);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas missing');
-
-    const controlsWrapper = document.createElement('div');
-    controlsWrapper.className = 'control-row';
-    controlsWrapper.style.justifyContent = 'space-between';
-    controlsWrapper.style.alignItems = 'center';
-    controlsWrapper.style.gap = '16px';
-    controlsWrapper.style.width = '100%';
-    controlsWrapper.style.maxWidth = '520px';
-    controlsWrapper.style.margin = '0 auto';
-
-    const makeBtn = (label: string, onPress: () => void) => {
-      const btn = document.createElement('button');
-      btn.className = 'touch-btn';
-      btn.textContent = label;
-      btn.addEventListener('click', onPress);
-      return btn;
-    };
-    const spacer = () => {
-      const s = document.createElement('div');
-      s.style.height = '48px';
-      return s;
-    };
-
-    const controls = document.createElement('div');
-    controls.className = 'control-grid';
-    controls.append(
-      spacer(),
-      makeBtn('↑', () => move('up')),
-      spacer(),
-      makeBtn('←', () => move('left')),
-      spacer(),
-      makeBtn('→', () => move('right')),
-      spacer(),
-      makeBtn('↓', () => move('down')),
-      spacer()
+    area.append(info, canvas);
+    const status = message(
+      area,
+      'Find the green exit. Take a detour for the three stars.'
     );
-
-    const leftBlock = document.createElement('div');
-    leftBlock.style.display = 'flex';
-    leftBlock.style.justifyContent = 'flex-start';
-    leftBlock.style.flex = '1';
-    leftBlock.appendChild(controls);
-
-    const resetButton = makeBtn('Reset', () => reset());
-    const rightBlock = document.createElement('div');
-    rightBlock.style.display = 'flex';
-    rightBlock.style.justifyContent = 'flex-end';
-    rightBlock.style.flex = '1';
-    rightBlock.appendChild(resetButton);
-
-    controlsWrapper.append(leftBlock, rightBlock);
-    area.appendChild(controlsWrapper);
-
-    let grid = generateMaze();
-    let player = { x: 0, y: 0 };
-    let startedAt = performance.now();
-    let finished = false;
-
-    const draw = () => {
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = '#e5e7eb';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let y = 0; y < ROWS; y++) {
-        for (let x = 0; x < COLS; x++) {
-          const cell = grid[y][x];
-          const px = x * CELL_SIZE + 1;
-          const py = y * CELL_SIZE + 1;
-          if (cell.walls.top) drawLine(ctx, px, py, px + CELL_SIZE, py);
-          if (cell.walls.right) drawLine(ctx, px + CELL_SIZE, py, px + CELL_SIZE, py + CELL_SIZE);
-          if (cell.walls.bottom) drawLine(ctx, px, py + CELL_SIZE, px + CELL_SIZE, py + CELL_SIZE);
-          if (cell.walls.left) drawLine(ctx, px, py, px, py + CELL_SIZE);
+    const ctx = canvas.getContext('2d')!;
+    let level = Math.max(1, storage.load('level', 1));
+    let size = 8,
+      grid: Cell[][] = [],
+      player = { x: 0, y: 0 };
+    let stars: Point[] = [],
+      collected = 0,
+      steps = 0,
+      elapsed = 0,
+      finished = false,
+      hints = 3;
+    let trail = new Set<string>(),
+      path: Point[] = [],
+      showTrail = true;
+    const controls = document.createElement('div');
+    controls.className = 'control-row';
+    const hint = createTouchButton('Hint · 3', () => {
+      if (!hints || finished) return;
+      hints--;
+      path = route(player, { x: size - 1, y: size - 1 }).slice(1, 6);
+      status.textContent = 'Follow the blue dots toward the exit.';
+      draw();
+    });
+    const trailButton = createTouchButton('Trail: On', () => {
+      showTrail = !showTrail;
+      trailButton.textContent = `Trail: ${showTrail ? 'On' : 'Off'}`;
+      draw();
+    });
+    const next = createTouchButton('New maze', () => {
+      if (finished) {
+        level++;
+        storage.save('level', level);
+      }
+      reset();
+    });
+    controls.append(hint, trailButton, next);
+    area.append(controls);
+    directionPad(area, move);
+    function neighbors(p: Point) {
+      const w = grid[p.y][p.x].walls;
+      return [
+        { x: p.x, y: p.y - 1, wall: w.top },
+        { x: p.x + 1, y: p.y, wall: w.right },
+        { x: p.x, y: p.y + 1, wall: w.bottom },
+        { x: p.x - 1, y: p.y, wall: w.left }
+      ].filter((n) => !n.wall);
+    }
+    function route(from: Point, to: Point): Point[] {
+      const queue: Point[][] = [[from]],
+        seen = new Set([`${from.x},${from.y}`]);
+      for (let i = 0; i < queue.length; i++) {
+        const way = queue[i],
+          p = way.at(-1)!;
+        if (p.x === to.x && p.y === to.y) return way;
+        for (const n of neighbors(p)) {
+          const key = `${n.x},${n.y}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            queue.push([...way, { x: n.x, y: n.y }]);
+          }
         }
       }
+      return [];
+    }
+    function reset() {
+      size = Math.min(16, 8 + Math.floor((level - 1) / 2) * 2);
+      grid = generateMaze(size);
+      player = { x: 0, y: 0 };
+      collected = 0;
+      steps = 0;
+      elapsed = 0;
+      finished = false;
+      hints = 3;
+      path = [];
+      trail = new Set(['0,0']);
+      const candidates: Point[] = [];
+      for (let y = 0; y < size; y++)
+        for (let x = 0; x < size; x++)
+          if (x + y > 2 && (x !== size - 1 || y !== size - 1))
+            candidates.push({ x, y });
+      stars = [];
+      for (let i = 0; i < 3; i++)
+        stars.push(
+          candidates.splice(Math.floor(Math.random() * candidates.length), 1)[0]
+        );
+      status.textContent =
+        'Find the green exit. Take a detour for the three stars.';
+      draw();
+    }
+    function draw() {
+      info.textContent = `Expedition ${level} · ${elapsed.toFixed(1)}s · ${steps} steps · Stars ${collected}/3`;
+      hint.textContent = `Hint · ${hints}`;
+      hint.disabled = !hints || finished;
+      next.textContent = finished ? 'Next expedition →' : 'New maze';
+      const c = 356 / size;
+      ctx.fillStyle = '#132638';
+      ctx.fillRect(0, 0, 360, 360);
+      if (showTrail) {
+        ctx.fillStyle = '#24465a';
+        for (const pos of trail) {
+          const [x, y] = pos.split(',').map(Number);
+          ctx.beginPath();
+          ctx.arc(2 + (x + 0.5) * c, 2 + (y + 0.5) * c, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.strokeStyle = '#7795ac';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let y = 0; y < size; y++)
+        for (let x = 0; x < size; x++) {
+          const w = grid[y][x].walls,
+            px = x * c + 2,
+            py = y * c + 2;
+          if (w.top) drawLine(ctx, px, py, px + c, py);
+          if (w.right) drawLine(ctx, px + c, py, px + c, py + c);
+          if (w.bottom) drawLine(ctx, px, py + c, px + c, py + c);
+          if (w.left) drawLine(ctx, px, py, px, py + c);
+        }
       ctx.stroke();
-      ctx.fillStyle = '#34d399';
+      ctx.fillStyle = '#79dab0';
       ctx.fillRect(
-        COLS * CELL_SIZE - CELL_SIZE + 5,
-        ROWS * CELL_SIZE - CELL_SIZE + 5,
-        CELL_SIZE - 8,
-        CELL_SIZE - 8
+        2 + (size - 1) * c + 5,
+        2 + (size - 1) * c + 5,
+        c - 10,
+        c - 10
       );
-
-      ctx.fillStyle = '#38bdf8';
+      ctx.fillStyle = '#ffdb82';
+      ctx.font = `${c * 0.65}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      stars.forEach((p) =>
+        ctx.fillText('★', 2 + (p.x + 0.5) * c, 2 + (p.y + 0.5) * c)
+      );
+      ctx.fillStyle = '#8bd9ff';
+      path.forEach((p) => {
+        ctx.beginPath();
+        ctx.arc(2 + (p.x + 0.5) * c, 2 + (p.y + 0.5) * c, 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.fillStyle = '#edf8ff';
       ctx.beginPath();
       ctx.arc(
-        player.x * CELL_SIZE + CELL_SIZE / 2 + 1,
-        player.y * CELL_SIZE + CELL_SIZE / 2 + 1,
-        CELL_SIZE / 3,
+        2 + (player.x + 0.5) * c,
+        2 + (player.y + 0.5) * c,
+        c * 0.27,
         0,
         Math.PI * 2
       );
       ctx.fill();
-    };
-
-    const move = (dir: 'up' | 'down' | 'left' | 'right') => {
+    }
+    function move(dx: number, dy: number) {
       if (finished) return;
-      const cell = grid[player.y][player.x];
-      if (dir === 'up' && !cell.walls.top) player.y -= 1;
-      if (dir === 'down' && !cell.walls.bottom) player.y += 1;
-      if (dir === 'left' && !cell.walls.left) player.x -= 1;
-      if (dir === 'right' && !cell.walls.right) player.x += 1;
-      draw();
-      checkWin();
-    };
-
-    const checkWin = () => {
-      if (player.x === COLS - 1 && player.y === ROWS - 1) {
+      const n = neighbors(player).find(
+        (p) => p.x === player.x + dx && p.y === player.y + dy
+      );
+      if (!n) return;
+      player = { x: n.x, y: n.y };
+      steps++;
+      trail.add(`${player.x},${player.y}`);
+      const i = stars.findIndex((p) => p.x === player.x && p.y === player.y);
+      if (i >= 0) {
+        stars.splice(i, 1);
+        collected++;
+        status.textContent = `Star found! ${collected}/3 collected.`;
+      }
+      if (player.x === size - 1 && player.y === size - 1) {
         finished = true;
-        const seconds = ((performance.now() - startedAt) / 1000).toFixed(1);
-        statusEl.textContent = `Finished in ${seconds}s`;
+        status.textContent = `Escaped! ${'★'.repeat(collected)}${'☆'.repeat(3 - collected)} · ${elapsed.toFixed(1)}s · Ready for a bigger adventure?`;
+        storage.save(
+          'completed',
+          Math.max(level, storage.load('completed', 0))
+        );
       }
-    };
-
-    const reset = () => {
-      grid = generateMaze();
-      player = { x: 0, y: 0 };
-      startedAt = performance.now();
-      finished = false;
-      statusEl.textContent = '';
       draw();
-      updateTime();
-    };
-
-    const swipeOff = bindSwipe(area, (dir) => move(dir));
-    const keyHandler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp') move('up');
-      if (e.key === 'ArrowDown') move('down');
-      if (e.key === 'ArrowLeft') move('left');
-      if (e.key === 'ArrowRight') move('right');
-      if (e.key === 'r') reset();
-    };
-    window.addEventListener('keydown', keyHandler);
-
-    const updateTime = () => {
-      if (!finished) {
-        const seconds = ((performance.now() - startedAt) / 1000).toFixed(1);
-        timeEl.textContent = `Time: ${seconds}s`;
-        requestAnimationFrame(updateTime);
+    }
+    const swipeOff = bindSwipe(canvas, (d) => {
+      const [x, y] = {
+        up: [0, -1],
+        down: [0, 1],
+        left: [-1, 0],
+        right: [1, 0]
+      }[d];
+      move(x, y);
+    });
+    const key = (e: KeyboardEvent) => {
+      const p = (
+        {
+          ArrowUp: [0, -1],
+          ArrowDown: [0, 1],
+          ArrowLeft: [-1, 0],
+          ArrowRight: [1, 0]
+        } as Record<string, number[]>
+      )[e.key];
+      if (p) {
+        e.preventDefault();
+        move(p[0], p[1]);
       }
     };
-
+    window.addEventListener('keydown', key);
+    const loop = new GameLoop((dt) => {
+      if (steps && !finished && !document.hidden) {
+        elapsed += dt;
+        info.textContent = `Expedition ${level} · ${elapsed.toFixed(1)}s · ${steps} steps · Stars ${collected}/3`;
+      }
+    });
     reset();
-    draw();
-    updateTime();
-
+    loop.start();
+    const off = exposeGame(
+      () => ({
+        game: 'maze',
+        mode: finished ? 'won' : 'playing',
+        size,
+        player,
+        stars,
+        collected,
+        grid: grid.map((row) => row.map((c) => c.walls)),
+        hints,
+        path,
+        steps,
+        elapsed,
+        level
+      }),
+      (ms) => loop.advance(ms)
+    );
     return () => {
+      loop.stop();
       swipeOff();
-      window.removeEventListener('keydown', keyHandler);
+      off();
+      window.removeEventListener('keydown', key);
     };
   }
 };
 
-function generateMaze(): Cell[][] {
+function generateMaze(size: number): Cell[][] {
+  const COLS = size,
+    ROWS = size;
   const grid: Cell[][] = Array.from({ length: ROWS }, () =>
     Array.from({ length: COLS }, () => ({
       visited: false,

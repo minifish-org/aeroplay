@@ -1,6 +1,7 @@
 import { GameModule } from './gameTypes';
-import { createGameShell } from '../core/ui';
+import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
+import { exposeGame, message } from '../core/play';
 
 type Board = number[];
 
@@ -15,23 +16,28 @@ interface SaveState {
   elapsedSeconds: number;
   mistakes: number;
   bestSeconds: number | null;
+  notes?: number[][];
+  hints?: number;
 }
 
 const PUZZLES: Puzzle[] = [
   {
-    puzzle: '530070000600195000098000060800060003400803001700020006060000280000419005000080079',
+    puzzle:
+      '530070000600195000098000060800060003400803001700020006060000280000419005000080079',
     solution:
       '534678912672195348198342567859761423426853791713924856961537284287419635345286179'
   },
   {
-    puzzle: '009000000080605020501078000000000700706040105004000000000830907090706080000000200',
+    puzzle:
+      '000260701680070090190004500820100040004602900050003028009300074040050036703018000',
     solution:
-      '469312857387695421521478369832159746796243185154687293245831967913726584678964512'
+      '435269781682571493197834562826195347374682915951743628519326874248957136763418259'
   },
   {
-    puzzle: '300200000000107000706030500070009080900020004010800050009040301000702000000008006',
+    puzzle:
+      '300200000000107000706030500070009080900020004010800050009040301000702000000008006',
     solution:
-      '394256187582197463716834529275469138968523714413871652829645371651782945347918256'
+      '351286497492157638786934512275469183938521764614873259829645371163792845547318926'
   }
 ];
 
@@ -40,7 +46,8 @@ const storage = namespace('sudoku');
 const sudoku: GameModule = {
   id: 'sudoku',
   name: 'Sudoku',
-  description: 'Fill the 9x9 grid without conflicts.',
+  description:
+    'A quiet challenge, with pencil notes and a nudge when you need it.',
   icon: '🔢',
   mount(root, goBack) {
     const { area } = createGameShell(root, 'Sudoku', goBack);
@@ -77,14 +84,57 @@ const sudoku: GameModule = {
     let bestSeconds: number | null = null;
     let timerId: number | undefined;
     let startMs = Date.now();
+    let notes: number[][] = Array.from({ length: 81 }, () => []);
+    let noteMode = false;
+    let hints = 3;
+    const history: { board: Board; notes: number[][] }[] = [];
+    const helper = message(
+      area,
+      'Choose a cell, then a number. Use Notes to pencil in candidates.'
+    );
+    const actions = document.createElement('div');
+    actions.className = 'control-row';
+    const noteButton = createTouchButton('Notes: Off', () => {
+      noteMode = !noteMode;
+      noteButton.textContent = `Notes: ${noteMode ? 'On' : 'Off'}`;
+      noteButton.setAttribute('aria-pressed', String(noteMode));
+    });
+    const undoButton = createTouchButton('Undo', () => {
+      if (isSolved()) return;
+      const old = history.pop();
+      if (!old) return;
+      board = old.board;
+      notes = old.notes;
+      render();
+      saveState();
+    });
+    const hintButton = createTouchButton('Hint · 3', () => {
+      if (!hints || isSolved()) return;
+      if (
+        selected === null ||
+        givens.has(selected) ||
+        board[selected] === solution[selected]
+      )
+        selected = board.findIndex((v, i) => v !== solution[i]);
+      if (selected < 0) return;
+      hints--;
+      noteMode = false;
+      noteButton.textContent = 'Notes: Off';
+      noteButton.setAttribute('aria-pressed', 'false');
+      setValue(solution[selected]);
+      helper.textContent =
+        'One cell revealed. Check its row, column and box for your next move.';
+    });
+    actions.append(noteButton, undoButton, hintButton);
+    area.insertBefore(actions, newBtn);
 
     hydrateFromSave();
     buildKeypad();
     render();
-    startTimer();
+    if (!isSolved()) startTimer();
 
     function hydrateFromSave() {
-      const saved = storage.load<SaveState | null>('state', null);
+      const saved = storage.load<SaveState | null>('state-v2', null);
       const totalPuzzles = PUZZLES.length;
       const savedIndex = saved?.puzzleIndex ?? 0;
       puzzleIndex = savedIndex % totalPuzzles;
@@ -97,7 +147,13 @@ const sudoku: GameModule = {
       givens = puzzleIndices(puzzle.puzzle);
       mistakes = saved?.mistakes ?? 0;
       elapsedBase = saved?.elapsedSeconds ?? 0;
-      bestSeconds = saved?.bestSeconds ?? storage.load<number | null>('bestSeconds', null);
+      bestSeconds =
+        saved?.bestSeconds ?? storage.load<number | null>('bestSeconds', null);
+      notes =
+        saved?.notes?.length === 81
+          ? saved.notes
+          : Array.from({ length: 81 }, () => []);
+      hints = saved?.hints ?? 3;
       startMs = Date.now();
     }
 
@@ -124,27 +180,15 @@ const sudoku: GameModule = {
         btn.className = 'sudoku-btn';
         btn.textContent = String(n);
         btn.addEventListener('click', () => setValue(n));
-        btn.addEventListener('touchend', (e) => {
-          e.preventDefault();
-          setValue(n);
-        });
         keypad.appendChild(btn);
       }
       const erase = document.createElement('button');
       erase.className = 'sudoku-btn muted';
       erase.textContent = 'Erase';
       erase.addEventListener('click', () => setValue(0));
-      erase.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        setValue(0);
-      });
       keypad.appendChild(erase);
 
       newBtn.addEventListener('click', nextPuzzle);
-      newBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        nextPuzzle();
-      });
     }
 
     function render() {
@@ -156,18 +200,42 @@ const sudoku: GameModule = {
           cell.className = 'sudoku-cell';
           const val = board[idx];
           if (val) cell.textContent = String(val);
+          else if (notes[idx]?.length) {
+            const pencil = document.createElement('span');
+            pencil.className = 'sudoku-notes';
+            for (let n = 1; n <= 9; n++) {
+              const label = document.createElement('span');
+              label.textContent = notes[idx].includes(n) ? String(n) : '';
+              pencil.append(label);
+            }
+            cell.append(pencil);
+          }
+          cell.setAttribute(
+            'aria-label',
+            `Row ${y + 1}, column ${x + 1}, ${val || 'empty'}${givens.has(idx) ? ', given' : ''}`
+          );
+          if (selected !== null) {
+            const sy = Math.floor(selected / 9),
+              sx = selected % 9;
+            if (
+              x === sx ||
+              y === sy ||
+              (Math.floor(x / 3) === Math.floor(sx / 3) &&
+                Math.floor(y / 3) === Math.floor(sy / 3))
+            )
+              cell.classList.add('peer');
+            if (val && val === board[selected])
+              cell.classList.add('same-value');
+          }
           if (givens.has(idx)) cell.classList.add('given');
           if (selected === idx) cell.classList.add('selected');
           if (val && val !== solution[idx]) cell.classList.add('invalid');
-          if (val && !givens.has(idx) && hasConflict(idx, val)) cell.classList.add('conflict');
+          if (val && !givens.has(idx) && hasConflict(idx, val))
+            cell.classList.add('conflict');
           if (x % 3 === 0) cell.classList.add('thick-left');
           if (y % 3 === 0) cell.classList.add('thick-top');
           cell.dataset.idx = String(idx);
           cell.addEventListener('click', onCellSelect);
-          cell.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            onCellSelect(e);
-          });
           boardEl.appendChild(cell);
         }
       }
@@ -177,14 +245,27 @@ const sudoku: GameModule = {
     function onCellSelect(e: Event) {
       const el = e.currentTarget as HTMLElement;
       const idx = Number(el.dataset.idx);
-      if (givens.has(idx)) return;
       selected = idx;
       render();
     }
 
     function setValue(val: number) {
-      if (selected === null) return;
+      if (selected === null || isSolved()) return;
       if (givens.has(selected)) return;
+      if (noteMode && val && !board[selected]) {
+        history.push({ board: [...board], notes: notes.map((n) => [...n]) });
+        notes[selected] = notes[selected].includes(val)
+          ? notes[selected].filter((n) => n !== val)
+          : [...notes[selected], val];
+        render();
+        saveState();
+        return;
+      }
+      if (board[selected] === val && (val !== 0 || !notes[selected].length))
+        return;
+      history.push({ board: [...board], notes: notes.map((n) => [...n]) });
+      if (history.length > 100) history.shift();
+      notes[selected] = [];
       board[selected] = val;
       if (val !== 0 && val !== solution[selected]) {
         mistakes += 1;
@@ -224,6 +305,9 @@ const sudoku: GameModule = {
       mistakes = 0;
       elapsedBase = 0;
       selected = null;
+      notes = Array.from({ length: 81 }, () => []);
+      hints = 3;
+      history.length = 0;
       startMs = Date.now();
       startTimer();
       statusEl.textContent = '';
@@ -232,19 +316,25 @@ const sudoku: GameModule = {
     }
 
     function saveState() {
-      storage.save<SaveState>('state', {
+      storage.save<SaveState>('state-v2', {
         puzzleIndex,
         board,
         elapsedSeconds: getElapsed(),
         mistakes,
-        bestSeconds
+        bestSeconds,
+        notes,
+        hints
       });
     }
 
     function updateInfo() {
       puzzleEl.textContent = `Puzzle ${puzzleIndex + 1}/${PUZZLES.length}`;
       timeEl.textContent = `Time: ${formatTime(getElapsed())}` + formatBest();
-      mistakesEl.textContent = `Mistakes: ${mistakes}`;
+      mistakesEl.textContent = `Mistakes: ${mistakes} · Filled ${board.filter(Boolean).length}/81`;
+      hintButton.textContent = `Hint · ${hints}`;
+      hintButton.disabled = !hints || isSolved();
+      undoButton.disabled = !history.length || isSolved();
+      statusEl.textContent = isSolved() ? 'Solved! Beautiful work.' : '';
     }
 
     function formatBest() {
@@ -298,8 +388,61 @@ const sudoku: GameModule = {
       return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     }
 
+    const keyHandler = (e: KeyboardEvent) => {
+      if (/^[1-9]$/.test(e.key)) {
+        e.preventDefault();
+        setValue(Number(e.key));
+      }
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        setValue(0);
+      }
+      if (e.key.toLowerCase() === 'n') noteButton.click();
+      if (e.key.toLowerCase() === 'z') undoButton.click();
+      const delta = (
+        { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -9, ArrowDown: 9 } as Record<
+          string,
+          number
+        >
+      )[e.key];
+      if (delta) {
+        e.preventDefault();
+        selected = Math.max(0, Math.min(80, (selected ?? 0) + delta));
+        render();
+      }
+    };
+    const visibility = () => {
+      if (document.hidden) {
+        stopTimer();
+        saveState();
+      } else if (!isSolved()) startTimer();
+    };
+    const pageHide = () => {
+      stopTimer();
+      saveState();
+    };
+    window.addEventListener('keydown', keyHandler);
+    document.addEventListener('visibilitychange', visibility);
+    window.addEventListener('pagehide', pageHide);
+    const off = exposeGame(() => ({
+      game: 'sudoku',
+      mode: isSolved() ? 'won' : 'playing',
+      board,
+      selected,
+      notes,
+      noteMode,
+      hints,
+      mistakes,
+      puzzleIndex,
+      elapsed: getElapsed()
+    }));
     return () => {
       stopTimer();
+      saveState();
+      off();
+      window.removeEventListener('keydown', keyHandler);
+      document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('pagehide', pageHide);
     };
   }
 };

@@ -1,160 +1,240 @@
 import { GameModule } from './gameTypes';
-import { createGameShell, bindTap } from '../core/ui';
+import { createGameShell, createTouchButton, bindTap } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
+import { Mode, canvasOverlay, exposeGame, message } from '../core/play';
 
-interface Pipe {
-  x: number;
-  gapY: number;
-}
-
-const WIDTH = 360;
-const HEIGHT = 520;
-const GAP = 260;
-const PIPE_SPACING = 420;
-const BIRD_X = 70;
+type Pipe = { x: number; gapY: number; gap: number; scored: boolean };
+const W = 360,
+  H = 480,
+  X = 82,
+  R = 12,
+  PIPE_W = 54;
 const storage = namespace('flappy');
-
 const flappy: GameModule = {
   id: 'flappy',
   name: 'Flappy Bird',
-  description: 'Tap to flap, dodge pipes, chase a high score.',
   icon: '🐤',
+  description: 'Find the perfect flight. Thread the gaps for bonus points.',
   mount(root, goBack) {
     const { area } = createGameShell(root, 'Flappy Bird', goBack);
     const info = document.createElement('div');
     info.className = 'info-row';
-    const scoreEl = document.createElement('div');
-    const bestEl = document.createElement('div');
-    info.append(scoreEl, bestEl);
-    area.appendChild(info);
-
     const canvas = document.createElement('canvas');
-    canvas.width = WIDTH;
-    canvas.height = HEIGHT;
-    canvas.className = 'game-canvas';
-    area.appendChild(canvas);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas missing');
-
-    let birdY = HEIGHT / 2;
-    let vel = 0;
-    let pipes: Pipe[] = [];
-    let score = 0;
-    let best = storage.load('best', 0);
-    let alive = true;
-    let timeSincePipe = 0;
-
-    const updateUI = () => {
-      scoreEl.textContent = `Score: ${score}`;
-      bestEl.textContent = `Best: ${best}`;
-    };
-
-    const spawnPipe = () => {
-      const margin = 80;
-      const gapY = margin + Math.random() * (HEIGHT - margin * 2 - GAP);
-      pipes.push({ x: WIDTH + 40, gapY });
-    };
-
-    const reset = () => {
-      birdY = HEIGHT / 2;
-      vel = 0;
-      score = 0;
-      alive = true;
-      pipes = [];
-      timeSincePipe = PIPE_SPACING;
-      updateUI();
-    };
-
-    const loop = new GameLoop((dt) => {
-      if (!alive) return;
-      timeSincePipe += dt * 1000;
-      if (timeSincePipe >= PIPE_SPACING) {
-        spawnPipe();
-        timeSincePipe = 0;
-      }
-      vel += 380 * dt;
-      birdY += vel * dt;
-      pipes.forEach((p) => (p.x -= 70 * dt));
-      pipes = pipes.filter((p) => p.x > -60);
-
-      pipes.forEach((p) => {
-        if (p.x + 50 < BIRD_X && !('scored' in p)) {
-          score += 1;
-          (p as any).scored = true;
-          best = Math.max(best, score);
-          storage.save('best', best);
-          updateUI();
-        }
-        const hitX = BIRD_X > p.x && BIRD_X < p.x + 60;
-        const hitY = birdY < p.gapY || birdY > p.gapY + GAP;
-        if (hitX && hitY) {
-          alive = false;
-        }
-      });
-
-      if (birdY > HEIGHT - 20 || birdY < 0) alive = false;
-      draw(ctx, birdY, pipes, alive);
-      if (!alive) {
-        drawGameOver(ctx);
-      }
+    canvas.width = W;
+    canvas.height = H;
+    canvas.className = 'game-canvas flappy-canvas';
+    area.append(info, canvas);
+    const status = message(
+      area,
+      'Tap the sky or press Space. Fly through the center for +2.'
+    );
+    const ctx = canvas.getContext('2d')!;
+    let y = H / 2,
+      velocity = 0,
+      score = 0,
+      passed = 0,
+      best = storage.load('best', 0);
+    let pipes: Pipe[] = [],
+      mode: Mode = 'ready';
+    let distance = 0,
+      flash = 0,
+      perfect = false;
+    const controls = document.createElement('div');
+    controls.className = 'control-row';
+    const flapButton = createTouchButton('Take flight', flap);
+    const pause = createTouchButton('Pause', () => {
+      if (mode === 'playing') mode = 'paused';
+      else if (mode === 'paused') mode = 'playing';
+      draw();
     });
-
-    const flap = () => {
-      if (!alive) {
+    controls.append(flapButton, pause);
+    area.append(controls);
+    function reset() {
+      y = H / 2;
+      velocity = 0;
+      score = 0;
+      passed = 0;
+      pipes = [];
+      distance = 0;
+      flash = 0;
+      mode = 'ready';
+    }
+    function flap() {
+      if (mode === 'paused') return;
+      if (mode === 'over') {
         reset();
+        draw();
         return;
       }
-      vel = -160;
+      if (mode === 'ready') {
+        mode = 'playing';
+        spawn();
+      }
+      velocity = -235;
+    }
+    function spawn() {
+      const gap = Math.max(142, 200 - passed * 3);
+      const previous = pipes.at(-1)?.gapY ?? (H - gap) / 2;
+      const gapY = Math.max(
+        48,
+        Math.min(H - 32 - gap - 48, previous + (Math.random() - 0.5) * 130)
+      );
+      pipes.push({ x: W + 28, gapY, gap, scored: false });
+    }
+    function draw() {
+      info.textContent = `Score ${score}   ·   Best ${best}   ·   Gates ${passed}`;
+      flapButton.textContent =
+        mode === 'ready'
+          ? 'Take flight'
+          : mode === 'over'
+            ? 'Try again'
+            : 'Flap';
+      flapButton.disabled = mode === 'paused';
+      pause.disabled = mode !== 'playing' && mode !== 'paused';
+      pause.textContent = mode === 'paused' ? 'Resume' : 'Pause';
+      status.textContent =
+        flash > 0
+          ? perfect
+            ? 'Perfect flight! +2'
+            : 'Through the gate! +1'
+          : 'Tap or Space to flap · aim for the dotted center';
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, '#b4e5f3');
+      sky.addColorStop(1, '#edf5d6');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#ffffff99';
+      for (let i = 0; i < 5; i++) {
+        const cx = ((((i * 110 - distance * 0.18) % 500) + 500) % 500) - 60;
+        ctx.beginPath();
+        ctx.ellipse(cx, 55 + (i % 3) * 55, 35, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      for (const p of pipes) {
+        ctx.fillStyle = '#2d9483';
+        ctx.fillRect(p.x, 0, PIPE_W, p.gapY);
+        ctx.fillRect(p.x, p.gapY + p.gap, PIPE_W, H - p.gapY - p.gap);
+        ctx.fillStyle = '#60cbb0';
+        ctx.fillRect(p.x - 4, p.gapY - 18, PIPE_W + 8, 18);
+        ctx.fillRect(p.x - 4, p.gapY + p.gap, PIPE_W + 8, 18);
+        if (!p.scored) {
+          ctx.strokeStyle = '#287b7977';
+          ctx.setLineDash([3, 5]);
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.gapY + p.gap / 2);
+          ctx.lineTo(p.x + PIPE_W, p.gapY + p.gap / 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+      ctx.fillStyle = '#d4bb87';
+      ctx.fillRect(0, H - 24, W, 24);
+      ctx.fillStyle = '#88b973';
+      ctx.fillRect(0, H - 28, W, 5);
+      ctx.save();
+      ctx.translate(X, y);
+      ctx.rotate(Math.max(-0.4, Math.min(0.8, velocity / 500)));
+      ctx.fillStyle = '#ffc85c';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 15, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e9a346';
+      ctx.beginPath();
+      ctx.ellipse(-6, 3, 7, 5, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(6, -4, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#183642';
+      ctx.beginPath();
+      ctx.arc(8, -4, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f47b52';
+      ctx.fillRect(10, 1, 10, 4);
+      ctx.restore();
+      if (mode !== 'playing')
+        canvasOverlay(
+          ctx,
+          mode === 'ready'
+            ? 'Small wings. Big adventure.'
+            : mode === 'paused'
+              ? 'Flight paused'
+              : `${passed >= 20 ? 'Gold' : passed >= 10 ? 'Silver' : passed >= 5 ? 'Bronze' : 'Keep flying'} · ${score} points`,
+          mode === 'over'
+            ? 'Tap to get ready for another flight'
+            : mode === 'paused'
+              ? 'Press Resume to continue'
+              : 'Tap the sky to begin'
+        );
+    }
+    const loop = new GameLoop((dt) => {
+      if (mode !== 'playing') return;
+      const speed = Math.min(170, 110 + passed * 2);
+      distance += speed * dt;
+      flash = Math.max(0, flash - dt);
+      velocity += 650 * dt;
+      y += velocity * dt;
+      for (const p of pipes) p.x -= speed * dt;
+      if (!pipes.length || pipes.at(-1)!.x < W - 190) spawn();
+      for (const p of pipes) {
+        if (
+          X + R > p.x - 4 &&
+          X - R < p.x + PIPE_W + 4 &&
+          (y - R < p.gapY || y + R > p.gapY + p.gap)
+        )
+          mode = 'over';
+        if (!p.scored && p.x + PIPE_W + 4 < X - R && mode === 'playing') {
+          p.scored = true;
+          passed++;
+          perfect = Math.abs(y - (p.gapY + p.gap / 2)) < 24;
+          score += perfect ? 2 : 1;
+          flash = 1.2;
+          best = Math.max(best, score);
+          storage.save('best', best);
+        }
+      }
+      pipes = pipes.filter((p) => p.x > -PIPE_W - 10);
+      if (y - R < 0 || y + R > H - 28) mode = 'over';
+      draw();
+    });
+    const tapOff = bindTap(canvas, flap);
+    const key = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!e.repeat) flap();
+      }
+      if (e.key === 'p' && !e.repeat) pause.click();
     };
-
-    const detach = bindTap(canvas, flap);
-    const keyHandler = (e: KeyboardEvent) => {
-      if (e.key === ' ') flap();
+    const hidden = () => {
+      if (document.hidden && mode === 'playing') {
+        mode = 'paused';
+        draw();
+      }
     };
-    window.addEventListener('keydown', keyHandler);
-
-    reset();
+    window.addEventListener('keydown', key);
+    document.addEventListener('visibilitychange', hidden);
+    draw();
     loop.start();
-
+    const off = exposeGame(
+      () => ({
+        game: 'flappy',
+        mode,
+        bird: { x: X, y, radius: R, velocity },
+        pipes,
+        score,
+        passed
+      }),
+      (ms) => loop.advance(ms)
+    );
     return () => {
       loop.stop();
-      detach();
-      window.removeEventListener('keydown', keyHandler);
+      tapOff();
+      off();
+      window.removeEventListener('keydown', key);
+      document.removeEventListener('visibilitychange', hidden);
     };
   }
 };
-
-function draw(
-  ctx: CanvasRenderingContext2D,
-  birdY: number,
-  pipes: Pipe[],
-  alive: boolean
-) {
-  ctx.fillStyle = '#0d172a';
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-  ctx.fillStyle = '#22d3ee';
-  ctx.beginPath();
-  ctx.arc(BIRD_X, birdY, 12, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#10b981';
-  pipes.forEach((p) => {
-    ctx.fillRect(p.x, 0, 60, p.gapY);
-    ctx.fillRect(p.x, p.gapY + GAP, 60, ctx.canvas.height - (p.gapY + GAP));
-  });
-
-  if (!alive) drawGameOver(ctx);
-}
-
-function drawGameOver(ctx: CanvasRenderingContext2D) {
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  ctx.fillStyle = '#fff';
-  ctx.font = '24px system-ui';
-  ctx.textAlign = 'center';
-  ctx.fillText('Tap to restart', ctx.canvas.width / 2, ctx.canvas.height / 2);
-}
-
 export default flappy;

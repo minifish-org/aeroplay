@@ -1,45 +1,15 @@
-const CACHE = 'aeroplay-v1';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/styles/base.css',
-  '/styles/hub.css',
-  '/styles/game.css',
-  '/manifest.json',
-  '/assets/icon.svg'
-];
-
+const CACHE = 'aeroplay-__VERSION__';
+const ASSETS = __PRECACHE__;
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
-
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))
-        )
-      )
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('aeroplay-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
-
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-          return response;
-        })
-        .catch(() => cached);
-    })
-  );
+  if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
+  event.respondWith(caches.open(CACHE).then(async cache => {
+    const cached = await cache.match(event.request.mode === 'navigate' ? '/index.html' : event.request);
+    return cached || fetch(event.request);
+  }));
 });

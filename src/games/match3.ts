@@ -1,170 +1,288 @@
 import { GameModule } from './gameTypes';
-import { createGameShell } from '../core/ui';
+import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
+import { GameLoop } from '../core/engine';
+import { exposeGame, message } from '../core/play';
 
 type Cell = number;
-
+type Point = { x: number; y: number };
 const SIZE = 8;
-const COLORS = ['#f97316', '#38bdf8', '#a855f7', '#22c55e', '#f59e0b'];
+const COLORS = ['#ef916e', '#6fcaeb', '#bb9bea', '#7ed6ad', '#f1ca6e'];
+const SYMBOLS = ['◆', '●', '✦', '⬟', '▲'];
 const storage = namespace('match3');
-
-const CELL_PX = 44; // tile size + gap for drop animation
-
 const match3: GameModule = {
   id: 'match3',
   name: 'Match-3',
-  description: 'Swap tiles to clear matches and rack up points.',
   icon: '💎',
+  description: '30 moves. One goal. Set off a spectacular chain reaction.',
   mount(root, goBack) {
     const { area } = createGameShell(root, 'Match-3', goBack);
     const info = document.createElement('div');
     info.className = 'info-row';
-    const scoreEl = document.createElement('div');
-    const bestEl = document.createElement('div');
-    const tipEl = document.createElement('div');
-    tipEl.textContent = 'Tap two neighbors to swap.';
-    info.append(scoreEl, bestEl, tipEl);
-    area.appendChild(info);
-
+    const progress = document.createElement('progress');
+    progress.className = 'goal-progress';
+    progress.setAttribute('aria-label', 'Level score target');
     const boardEl = document.createElement('div');
     boardEl.className = 'match3-board';
-    area.appendChild(boardEl);
-
-    let grid = createBoard();
-    let score = 0;
-    let best = storage.load('best', 0);
-    let selected: { x: number; y: number } | null = null;
-    let isResolving = false;
-
-    const key = (x: number, y: number) => `${x}-${y}`;
-
-    const updateUI = () => {
-      scoreEl.textContent = `Score: ${score}`;
-      bestEl.textContent = `Best: ${best}`;
-    };
-
-    const render = (animations?: RenderAnimations) => {
+    area.append(info, progress, boardEl);
+    const status = message(
+      area,
+      'Tap two neighbors. Cascades multiply your points.'
+    );
+    let grid = createBoard(),
+      score = 0,
+      moves = 30,
+      level = 1,
+      best = storage.load('best', 0);
+    let selected: Point | null = null,
+      hinted: Point[] = [],
+      matching: Point[] = [];
+    let phase: 'playing' | 'clearing' | 'falling' | 'won' | 'over' = 'playing';
+    let timer = 0,
+      chain = 0;
+    const saved = storage.load<{
+      grid: number[][];
+      score: number;
+      moves: number;
+      level: number;
+    } | null>('run', null);
+    if (
+      saved &&
+      saved.grid?.length === SIZE &&
+      saved.grid.every(
+        (r) =>
+          r.length === SIZE &&
+          r.every((v) => Number.isInteger(v) && v >= 0 && v < COLORS.length)
+      ) &&
+      !findMatches(saved.grid).length
+    ) {
+      grid = saved.grid;
+      score = saved.score;
+      moves = saved.moves;
+      level = saved.level;
+    }
+    const controls = document.createElement('div');
+    controls.className = 'control-row';
+    const hint = createTouchButton('Hint', () => {
+      if (phase !== 'playing') return;
+      hinted = findMove(grid) ?? [];
+      selected = null;
+      status.textContent =
+        'Try swapping the two outlined gems. Hints cost no moves.';
+      render();
+    });
+    const next = createTouchButton('Restart level', () => {
+      if (phase === 'clearing' || phase === 'falling') return;
+      if (phase === 'won') level++;
+      grid = createBoard();
+      score = 0;
+      moves = 30;
+      chain = 0;
+      selected = null;
+      hinted = [];
+      phase = 'playing';
+      status.textContent = 'Tap two neighbors. Cascades multiply your points.';
+      persist();
+      render();
+    });
+    controls.append(hint, next);
+    area.append(controls);
+    function target() {
+      return 1000 + (level - 1) * 350;
+    }
+    function persist() {
+      storage.save('run', { grid, score, moves, level });
+    }
+    function render(
+      falls: { x: number; from: number; to: number; isNew: boolean }[] = []
+    ) {
+      info.textContent = `Level ${level} · Score ${score}/${target()} · Moves ${moves} · Best ${best}`;
+      progress.max = target();
+      progress.value = score;
+      hint.disabled = phase !== 'playing';
+      next.disabled = phase === 'clearing' || phase === 'falling';
+      next.textContent =
+        phase === 'won'
+          ? 'Next level →'
+          : phase === 'over'
+            ? 'Try again'
+            : 'Restart level';
       boardEl.innerHTML = '';
-      grid.forEach((row, y) => {
-        row.forEach((cell, x) => {
-          const tile = document.createElement('button');
-          tile.className = 'match3-cell';
-          tile.style.backgroundColor = COLORS[cell];
-          tile.dataset.x = String(x);
-          tile.dataset.y = String(y);
-          tile.classList.toggle('selected', selected?.x === x && selected?.y === y);
-          const drop = animations?.drops?.[key(x, y)];
-          if (drop) {
-            tile.style.setProperty('--fall-distance', `${drop}px`);
-            tile.classList.add('match3-fall');
+      grid.forEach((row, y) =>
+        row.forEach((value, x) => {
+          const button = document.createElement('button');
+          button.className = 'match3-cell';
+          button.style.background = COLORS[value];
+          button.textContent = SYMBOLS[value];
+          button.setAttribute(
+            'aria-label',
+            `Row ${y + 1}, column ${x + 1}, gem ${value + 1}`
+          );
+          button.dataset.x = String(x);
+          button.dataset.y = String(y);
+          button.classList.toggle(
+            'selected',
+            selected?.x === x && selected?.y === y
+          );
+          button.classList.toggle(
+            'hinted',
+            hinted.some((p) => p.x === x && p.y === y)
+          );
+          button.classList.toggle(
+            'match3-clearing',
+            phase === 'clearing' && matching.some((p) => p.x === x && p.y === y)
+          );
+          const fall = falls.find((m) => m.x === x && m.to === y);
+          if (fall) {
+            const cellSize = boardEl.clientWidth / SIZE;
+            button.style.setProperty(
+              '--fall-distance',
+              `${(fall.to - fall.from) * cellSize}px`
+            );
+            button.classList.add('match3-fall');
           }
-          if (animations?.newTiles?.has(key(x, y))) {
-            tile.classList.add('match3-new');
-          }
-          if (animations?.clearing?.has(key(x, y))) {
-            tile.classList.add('match3-clearing');
-          }
-          tile.addEventListener('click', onSelect);
-          tile.addEventListener('touchend', onSelect);
-          boardEl.appendChild(tile);
-        });
-      });
-      updateUI();
-    };
-
-    const onSelect = async (e: Event) => {
-      if (isResolving) return;
-      e.preventDefault();
-      const target = e.currentTarget as HTMLElement;
-      const x = Number(target.dataset.x);
-      const y = Number(target.dataset.y);
-      if (!selected) {
-        selected = { x, y };
-      } else {
-        if (isNeighbor(selected, { x, y })) {
-          await attemptSwap(selected, { x, y });
-          selected = null;
+          button.disabled = phase !== 'playing';
+          button.addEventListener('click', () => select({ x, y }));
+          boardEl.append(button);
+        })
+      );
+    }
+    function select(p: Point) {
+      if (phase !== 'playing') return;
+      hinted = [];
+      if (!selected) selected = p;
+      else if (p.x === selected.x && p.y === selected.y) selected = null;
+      else if (isNeighbor(selected, p)) {
+        const a = selected;
+        selected = null;
+        swap(grid, a, p);
+        matching = findMatches(grid);
+        if (!matching.length) {
+          swap(grid, a, p);
+          status.textContent =
+            'Make a line of 3 or more. That swap costs no move.';
         } else {
-          selected = { x, y };
+          moves--;
+          chain = 1;
+          phase = 'clearing';
+          timer = 0.16;
+        }
+      } else selected = p;
+      render();
+    }
+    function finish() {
+      if (score >= target()) {
+        phase = 'won';
+        status.textContent = `Level cleared! ${moves >= 15 ? '★★★' : moves >= 6 ? '★★' : '★'} · ${moves} moves to spare`;
+      } else if (moves === 0) {
+        phase = 'over';
+        status.textContent = `So close! ${target() - score} points from the target. Try another route.`;
+      } else {
+        phase = 'playing';
+        if (!hasMove(grid)) {
+          grid = createBoard();
+          status.textContent =
+            'Fresh gems! No available swaps, so the board was shuffled for free.';
         }
       }
+      persist();
       render();
-    };
-
-    const attemptSwap = async (a: { x: number; y: number }, b: { x: number; y: number }) => {
-      swap(grid, a, b);
-      render();
-      const cleared = await resolveBoardAnimated();
-      if (!cleared) {
-        swap(grid, a, b);
-        render();
-      } else {
-        score += cleared;
+    }
+    const loop = new GameLoop((dt) => {
+      if (phase !== 'clearing' && phase !== 'falling') return;
+      timer -= dt;
+      if (timer > 0) return;
+      if (phase === 'clearing') {
+        const gained = matching.length * 10 * chain;
+        score += gained;
         best = Math.max(best, score);
         storage.save('best', best);
-        render();
-      }
-    };
-
-    const resolveBoardAnimated = async () => {
-      if (isResolving) return 0;
-      isResolving = true;
-      let totalCleared = 0;
-
-      while (true) {
-        const matches = findMatches(grid);
-        if (!matches.length) break;
-
-        const clearing = new Set(matches.map((m) => key(m.x, m.y)));
-        render({ clearing });
-        await sleep(120);
-
-        matches.forEach(({ x, y }) => {
+        status.textContent = `${chain > 1 ? `Cascade ×${chain}!` : matching.length >= 4 ? 'Big match!' : 'Nice match!'} +${gained}`;
+        matching.forEach(({ x, y }) => {
           grid[y][x] = -1;
         });
-
-        const moves = applyGravityWithMoves(grid);
-        const drops: Record<string, number> = {};
-        const newTiles = new Set<string>();
-        moves.forEach((m) => {
-          const distance = m.to - m.from;
-          drops[key(m.x, m.to)] = distance * CELL_PX;
-          if (m.isNew) newTiles.add(key(m.x, m.to));
-        });
-
-        render({ drops, newTiles });
-        await sleep(220);
-
-        totalCleared += matches.length * 10;
+        const falls = applyGravityWithMoves(grid);
+        phase = 'falling';
+        timer = 0.23;
+        render(falls);
+      } else {
+        matching = findMatches(grid);
+        if (matching.length) {
+          chain++;
+          phase = 'clearing';
+          timer = 0.16;
+          render();
+        } else finish();
       }
-
-      isResolving = false;
-      render();
-      return totalCleared;
+    });
+    finish();
+    loop.start();
+    const off = exposeGame(
+      () => ({
+        game: 'match3',
+        mode: phase,
+        grid,
+        selected,
+        hinted,
+        score,
+        moves,
+        level,
+        target: target(),
+        chain
+      }),
+      (ms) => loop.advance(ms)
+    );
+    return () => {
+      loop.stop();
+      off();
     };
-
-    // ensure starting board has a move then resolve initial matches with animations
-    ensureResolvable(grid);
-    render();
-    void resolveBoardAnimated();
-
-    return () => {};
   }
 };
 
 function createBoard(): Cell[][] {
-  return Array.from({ length: SIZE }, () =>
-    Array.from({ length: SIZE }, () => Math.floor(Math.random() * COLORS.length))
-  );
+  let grid: Cell[][];
+  do {
+    grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+    for (let y = 0; y < SIZE; y++)
+      for (let x = 0; x < SIZE; x++) {
+        const choices = [0, 1, 2, 3, 4].filter(
+          (v) =>
+            !(x >= 2 && grid[y][x - 1] === v && grid[y][x - 2] === v) &&
+            !(y >= 2 && grid[y - 1][x] === v && grid[y - 2][x] === v)
+        );
+        grid[y][x] = choices[Math.floor(Math.random() * choices.length)];
+      }
+  } while (!hasMove(grid));
+  return grid;
 }
-
+function findMove(grid: Cell[][]): Point[] | null {
+  for (let y = 0; y < SIZE; y++)
+    for (let x = 0; x < SIZE; x++) {
+      for (const n of [
+        { x: x + 1, y },
+        { x, y: y + 1 }
+      ]) {
+        if (n.x >= SIZE || n.y >= SIZE) continue;
+        const p = { x, y };
+        swap(grid, p, n);
+        const found = findMatches(grid).length > 0;
+        swap(grid, p, n);
+        if (found) return [p, n];
+      }
+    }
+  return null;
+}
 function isNeighbor(a: { x: number; y: number }, b: { x: number; y: number }) {
   const dx = Math.abs(a.x - b.x);
   const dy = Math.abs(a.y - b.y);
   return dx + dy === 1;
 }
 
-function swap(grid: Cell[][], a: { x: number; y: number }, b: { x: number; y: number }) {
+function swap(
+  grid: Cell[][],
+  a: { x: number; y: number },
+  b: { x: number; y: number }
+) {
   const tmp = grid[a.y][a.x];
   grid[a.y][a.x] = grid[b.y][b.x];
   grid[b.y][b.x] = tmp;
@@ -200,7 +318,7 @@ function findMatches(grid: Cell[][]): { x: number; y: number }[] {
       }
     }
   }
-  return found;
+  return [...new Map(found.map((p) => [`${p.x}-${p.y}`, p])).values()];
 }
 
 function applyGravityWithMoves(
@@ -235,19 +353,6 @@ function applyGravityWithMoves(
   return moves;
 }
 
-function ensureResolvable(grid: Cell[][]) {
-  // keep regenerating until there is at least one match potential
-  let attempts = 0;
-  while (!hasMove(grid) && attempts < 50) {
-    for (let y = 0; y < SIZE; y++) {
-      for (let x = 0; x < SIZE; x++) {
-        grid[y][x] = Math.floor(Math.random() * COLORS.length);
-      }
-    }
-    attempts++;
-  }
-}
-
 function hasMove(grid: Cell[][]): boolean {
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
@@ -267,15 +372,5 @@ function hasMove(grid: Cell[][]): boolean {
   }
   return false;
 }
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-type RenderAnimations = {
-  drops?: Record<string, number>;
-  newTiles?: Set<string>;
-  clearing?: Set<string>;
-};
 
 export default match3;

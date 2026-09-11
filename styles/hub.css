@@ -1,49 +1,197 @@
+.hub-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0 28px;
+}
+.hub-brand {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+.hub-brand span {
+  color: #91dac0;
+}
+.offline-badge {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #b3d8c9;
+  padding: 7px 11px;
+  border: 1px solid #35544f;
+  border-radius: 20px;
+  background: #16362e;
+}
 .hub-hero {
-  margin: 12px 0 16px;
+  position: relative;
+  padding: 30px;
+  border: 1px solid #3a5b65;
+  border-radius: 24px;
+  background: linear-gradient(120deg, #254a55, #1d3547 75%);
+  overflow: hidden;
+  margin-bottom: 28px;
 }
-
-.hub-heading {
-  font-size: 24px;
+.hub-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: #a3dcca;
   font-weight: 700;
-  margin-bottom: 4px;
 }
-
+.hub-heading {
+  font-size: clamp(32px, 6vw, 52px);
+  font-weight: 750;
+  letter-spacing: -2px;
+  line-height: 1.08;
+  margin: 14px 0;
+  max-width: 600px;
+}
 .hub-subtitle {
-  color: #9ca3af;
+  color: #b8cbd6;
   font-size: 14px;
+  line-height: 1.7;
+  max-width: 420px;
+  margin-bottom: 20px;
 }
-
+.hub-play {
+  background: #b9ebd2;
+  color: #163c32;
+  font-weight: 750;
+  border-radius: 12px;
+  padding: 13px 20px;
+  min-height: 46px;
+}
+.hub-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hub-section h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.4px;
+}
+.hub-filters {
+  display: flex;
+  gap: 5px;
+  background: #132337;
+  padding: 4px;
+  border-radius: 12px;
+}
+.hub-filter {
+  min-height: 36px;
+  padding: 7px 13px;
+  background: transparent;
+  color: #a8bacb;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.hub-filter[aria-pressed='true'] {
+  background: #2b4356;
+  color: #fff;
+}
 .hub-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
-
 .hub-card {
-  background: #111827;
-  border: 1px solid #1f2937;
+  --accent: #9edac2;
+  background: #14263a;
+  border: 1px solid #2a3e52;
   color: inherit;
-  border-radius: 12px;
-  padding: 14px;
+  border-radius: 19px;
+  padding: 18px;
   text-align: left;
-  display: grid;
-  gap: 6px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition:
+    border-color 160ms,
+    transform 160ms;
+  min-width: 0;
 }
-
-.hub-card:active {
-  transform: translateY(1px);
+.hub-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-3px);
 }
-
+.hub-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .hub-card-icon {
-  font-size: 28px;
+  font-size: 30px;
+  background: #223c4e;
+  border-radius: 14px;
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
 }
-
+.hub-card-index {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #748da2;
+}
 .hub-card-title {
-  font-weight: 700;
+  font-weight: 750;
+  font-size: 17px;
+  letter-spacing: -0.3px;
 }
-
 .hub-card-desc {
-  color: #9ca3af;
-  font-size: 13px;
+  color: #a5b7c9;
+  font-size: 12px;
+  line-height: 1.65;
+  flex: 1;
+}
+.hub-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  color: var(--accent);
+  font-size: 11px;
+  padding-top: 10px;
+  border-top: 1px solid #2a3e52;
+}
+.hub-footer {
+  font-size: 11px;
+  text-align: center;
+  color: #829bad;
+  margin-top: 28px;
+  line-height: 1.8;
+}
+@media (max-width: 850px) {
+  .hub-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .hub-hero {
+    padding: 24px 20px;
+    margin-bottom: 22px;
+  }
+  .hub-topline {
+    padding-bottom: 18px;
+  }
+  .hub-grid {
+    gap: 10px;
+  }
+  .hub-card {
+    padding: 14px;
+    gap: 10px;
+  }
+  .hub-card-title {
+    font-size: 16px;
+  }
+  .hub-card-desc {
+    font-size: 11px;
+  }
+  .hub-heading {
+    letter-spacing: -1.3px;
+  }
 }

@@ -3,8 +3,8 @@
   "short_name": "AeroPlay",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#0b1120",
-  "theme_color": "#0d0d0d",
+  "background_color": "#0c1726",
+  "theme_color": "#0c1726",
   "icons": [
     {
       "src": "/assets/icon.svg",

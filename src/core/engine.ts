@@ -5,7 +5,10 @@ export class GameLoop {
   private last = 0;
   private rafId = 0;
 
-  constructor(private readonly step: StepFn, private readonly maxDt = 0.05) {}
+  constructor(
+    private readonly step: StepFn,
+    private readonly maxDt = 0.05
+  ) {}
 
   start() {
     if (this.running) return;
@@ -20,6 +23,15 @@ export class GameLoop {
     cancelAnimationFrame(this.rafId);
   }
 
+  advance(ms: number) {
+    if (!this.running) return;
+    // Manual stepping takes ownership until the loop is stopped and started again.
+    cancelAnimationFrame(this.rafId);
+    for (let remaining = ms / 1000; remaining > 0; remaining -= 1 / 60) {
+      this.step(Math.min(remaining, 1 / 60));
+    }
+  }
+
   private tick = (time: number) => {
     if (!this.running) return;
     const rawDt = (time - this.last) / 1000;
@@ -32,13 +44,18 @@ export class GameLoop {
 
 export function runInterval(stepMs: number, step: StepFn) {
   let last = performance.now();
-  const id = requestAnimationFrame(function loop(time) {
+  let active = true;
+  let id = requestAnimationFrame(function loop(time) {
+    if (!active) return;
     if (time - last >= stepMs) {
       const dt = (time - last) / 1000;
       last = time;
       step(dt);
     }
-    requestAnimationFrame(loop);
+    id = requestAnimationFrame(loop);
   });
-  return () => cancelAnimationFrame(id);
+  return () => {
+    active = false;
+    cancelAnimationFrame(id);
+  };
 }

@@ -16,28 +16,32 @@ npm run preview      # serve built files locally
 ```
 Open the shown URL in a browser. For mobile testing, run with `--host 0.0.0.0` and open from your phone on the same Wi‑Fi.
 
-## Playing on Phone in Flight Mode (PWA-style)
-1) Build and preview on your machine (one-time online step):
-```bash
-npm run build
-npm run preview -- --host 0.0.0.0 --port 4173
-```
-2) On your phone (same Wi‑Fi), open `http://<your-lan-ip>:4173/`.
-3) Add to home screen:
-   - iPhone Safari: Share → Add to Home Screen.
-   - Android Chrome: Menu → Install app / Add to Home Screen.
-4) Open the new icon once while online so the service worker caches assets.
-5) Switch to flight mode; reopen via the icon. Games and saves work offline.
+## Playing on Phone in Flight Mode
+1. Run `npm run build` and serve `dist` over HTTPS. Service workers require a secure origin; plain HTTP on a LAN address does not enable offline installation. `localhost` works for desktop preview.
+2. Open the site in Safari or Chrome while online and wait for **Offline ready** in the hub.
+3. Add to Home Screen, open it once, then enable flight mode. All eight games are precached, including games you have not opened yet.
+4. Progress stays in local storage on that browser and device. Clearing website data clears saves.
+
+For local layout testing only, use `npm run dev -- --host 0.0.0.0`. The development server does not install a service worker.
 
 ## Games & Controls
-- Snake: Arrow buttons (or keys), slower pace for relaxed play.
-- Tetris: On-screen arrows/rotate/drop; 10x20 well; mobile-friendly sizing.
-- 2048: Swipe or on-screen arrow buttons; local best score.
-- Flappy Bird: Tap to flap; slowed pace; offline-ready.
-- Maze: Swipe to move; timer; random mazes.
-- Match-3: Tap two adjacent tiles to swap; clears with gravity.
-- Sudoku: Tap cells; toggles for numbers/notes; local save.
-- Lights Out: Tap tiles to toggle neighbors; clear the board.
+| Game | What's new | Controls |
+| --- | --- | --- |
+| Snake | Classic acceleration, relaxed edge wrapping, timed golden fruit, results | Swipe board, arrows, Start/Pause; Space or P |
+| Tetris | Seven-bag pieces, three previews, hold, landing ghost, wall kicks, lock delay, combo scoring | Arrows; Space drops; C holds; P pauses; touch buttons |
+| 2048 | Saved run, 20-step undo, milestones, game-over detection | Swipe board, arrows, Z to undo |
+| Flappy Bird | Fair pipe spacing, progressive gaps, perfect-flight bonus, medals | Tap board or Space; P pauses |
+| Maze | Three optional stars, footprints, limited route hints, larger expeditions | Swipe board or arrows |
+| Match-3 | 30-move target levels, cascade multipliers, free hints and dead-board shuffles | Tap two adjacent gems |
+| Sudoku | Validated puzzles, notes, peer highlights, undo, three hints, saved timer | Select cell, keypad or 1–9; N toggles notes; Z undoes |
+| Lights Out | Progressive solvable puzzles, optimal hints, undo, star results | Tap tiles to flip a cross |
+
+Arcade games pause when the page is hidden. Press F for fullscreen where supported. Puzzle saves include 2048, Match-3 (after cascades settle), Sudoku, and Lights Out; Maze saves expedition progress.
+
+## Gameplay verification
+With Playwright available, run `node scripts/verify-games.mjs` against the development server. Set `PLAYWRIGHT_MODULE` to an existing Playwright module path if it is installed outside the project. `TEST_BROWSER=webkit` selects WebKit, and `TEST_URL` changes the server address. The script exercises wins/losses, scoring, hints, undo, persistence, and 320/390/768px layouts, and writes screenshots to `output/`.
+
+Run `node scripts/verify-offline.mjs` against `npm run preview` to verify production precaching, offline reload, all eight game mounts, and touch swipes. It uses the same `PLAYWRIGHT_MODULE` override.
 
 ## Tech Notes
 - Pure frontend: no external CDN/assets; all local.

@@ -1,6 +1,7 @@
 import { GameModule } from './gameTypes';
 import { createGameShell, bindSwipe, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
+import { exposeGame, message } from '../core/play';
 
 const SIZE = 4;
 const storage = namespace('game2048');
@@ -26,7 +27,7 @@ type MoveRecord = {
 const game2048: GameModule = {
   id: '2048',
   name: '2048',
-  description: 'Swipe tiles to merge to 2048.',
+  description: 'Build your next milestone. Undo a move and try another path.',
   icon: '🧮',
   mount(root, goBack) {
     const { area } = createGameShell(root, '2048', goBack);
@@ -62,8 +63,41 @@ const game2048: GameModule = {
     );
     area.appendChild(controls);
 
-    let grid = createGrid();
-    let score = 0;
+    type Snapshot = { grid: Grid; score: number; moves: number };
+    const saved = storage.load<Snapshot | null>('state', null);
+    const validSave =
+      saved &&
+      saved.grid?.length === 4 &&
+      saved.grid.every(
+        (row) =>
+          row.length === 4 &&
+          row.every(
+            (v) =>
+              Number.isInteger(v) &&
+              v >= 0 &&
+              (v === 0 || (v >= 2 && Number.isInteger(Math.log2(v))))
+          )
+      );
+    let grid = validSave ? saved.grid : createGrid();
+    let score = validSave ? saved.score : 0;
+    let moves = validSave ? saved.moves : 0;
+    const history: Snapshot[] = [];
+    const status = message(area, 'Swipe the board to combine matching tiles.');
+    const undo = createTouchButton('Undo', () => {
+      const previous = history.pop();
+      if (!previous) return;
+      grid = previous.grid;
+      score = previous.score;
+      moves = previous.moves;
+      animations = {};
+      render();
+    });
+    info.append(undo);
+    function canMove() {
+      return grid.some((row, y) =>
+        row.some((v, x) => !v || v === grid[y][x + 1] || v === grid[y + 1]?.[x])
+      );
+    }
     let best = storage.load('best', 0);
     let animations: Record<string, AnimationMeta> = {};
 
@@ -90,6 +124,18 @@ const game2048: GameModule = {
       });
       scoreEl.textContent = `Score: ${score}`;
       bestEl.textContent = `Best: ${best}`;
+      undo.disabled = !history.length;
+      const highest = Math.max(...grid.flat());
+      const target = Math.max(
+        128,
+        2 ** (Math.floor(Math.log2(highest || 2)) + 1)
+      );
+      status.textContent = !canMove()
+        ? 'No moves left. Undo to try another route, or start again.'
+        : highest >= 2048
+          ? `2048 reached! Keep going for ${target}. · Moves ${moves}`
+          : `Next milestone: ${target} · Moves ${moves}${history.length ? ' · Undo available' : ''}`;
+      storage.save('state', { grid, score, moves });
 
       animations = {};
     };
@@ -105,7 +151,10 @@ const game2048: GameModule = {
       const { x, y } = empties[Math.floor(Math.random() * empties.length)];
       grid[y][x] = Math.random() < 0.9 ? 2 : 4;
       if (markNew) {
-        animations[`${x}-${y}`] = { ...(animations[`${x}-${y}`] || {}), spawned: true };
+        animations[`${x}-${y}`] = {
+          ...(animations[`${x}-${y}`] || {}),
+          spawned: true
+        };
       }
       return true;
     };
@@ -114,12 +163,16 @@ const game2048: GameModule = {
       animations = {};
       grid = createGrid();
       score = 0;
+      moves = 0;
+      history.length = 0;
       spawn(true);
       spawn(true);
       render();
     };
 
     const move = (dir: MoveDirection) => {
+      if (!canMove()) return;
+      const snapshot = { grid: grid.map((row) => [...row]), score, moves };
       const before = gridToString(grid);
       animations = {};
       if (dir === 'left' || dir === 'right') {
@@ -129,7 +182,9 @@ const game2048: GameModule = {
           grid[y] = merged.newRow;
           score += merged.gained;
           merged.moves.forEach((record) => {
-            const shift = Math.max(...record.sources.map((s) => Math.abs(s - record.target)));
+            const shift = Math.max(
+              ...record.sources.map((s) => Math.abs(s - record.target))
+            );
             animations[`${record.target}-${y}`] = {
               dir,
               shift,
@@ -144,7 +199,9 @@ const game2048: GameModule = {
           for (let y = 0; y < SIZE; y++) grid[y][x] = merged.newRow[y];
           score += merged.gained;
           merged.moves.forEach((record) => {
-            const shift = Math.max(...record.sources.map((s) => Math.abs(s - record.target)));
+            const shift = Math.max(
+              ...record.sources.map((s) => Math.abs(s - record.target))
+            );
             animations[`${x}-${record.target}`] = {
               dir,
               shift,
@@ -155,6 +212,9 @@ const game2048: GameModule = {
       }
       const after = gridToString(grid);
       if (before !== after) {
+        history.push(snapshot);
+        if (history.length > 20) history.shift();
+        moves++;
         best = Math.max(best, score);
         storage.save('best', best);
         spawn(true);
@@ -162,13 +222,11 @@ const game2048: GameModule = {
       }
     };
 
-    const swipeOff = bindSwipe(area, (dir) => move(dir));
+    const swipeOff = bindSwipe(gridEl, (dir) => move(dir));
     restart.addEventListener('click', restartGame);
-    restart.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      restartGame();
-    });
     const keyHandler = (e: KeyboardEvent) => {
+      if (e.key.startsWith('Arrow')) e.preventDefault();
+      if (e.key.toLowerCase() === 'z') undo.click();
       if (e.key === 'ArrowLeft') move('left');
       if (e.key === 'ArrowRight') move('right');
       if (e.key === 'ArrowUp') move('up');
@@ -176,9 +234,19 @@ const game2048: GameModule = {
     };
     window.addEventListener('keydown', keyHandler);
 
-    restartGame();
+    if (validSave) render();
+    else restartGame();
+    const off = exposeGame(() => ({
+      game: '2048',
+      mode: canMove() ? 'playing' : 'over',
+      grid,
+      score,
+      moves,
+      undoCount: history.length
+    }));
 
     return () => {
+      off();
       swipeOff();
       window.removeEventListener('keydown', keyHandler);
     };

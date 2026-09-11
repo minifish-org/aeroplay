@@ -1,238 +1,245 @@
 .game-shell {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  max-width: 520px;
+  margin: 0 auto;
 }
-
 .game-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
-
 .back-btn {
-  background: #111827;
-  color: #e5e7eb;
-  border: 1px solid #1f2937;
-  padding: 8px 12px;
-  border-radius: 10px;
-}
-
-.game-title {
-  font-weight: 700;
-  font-size: 18px;
-}
-
-.game-area {
-  background: #0f172a;
-  border: 1px solid #1f2937;
+  background: #1b3045;
+  color: #c7d8e6;
+  border: 1px solid #334c60;
+  min-height: 44px;
+  padding: 8px 15px;
   border-radius: 12px;
-  padding: 12px;
+}
+.game-title {
+  font-weight: 750;
+  font-size: 20px;
+  letter-spacing: -0.5px;
+}
+.game-area {
+  background: #132438;
+  border: 1px solid #2a4056;
+  border-radius: 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+  min-width: 0;
 }
-
 .game-canvas {
+  display: block;
   width: 100%;
+  max-width: 420px;
   height: auto;
-  border-radius: 12px;
-  border: 1px solid #1f2937;
-  background: #0b0f1a;
+  border-radius: 14px;
+  border: 1px solid #365168;
+  margin: 0 auto;
+  touch-action: none;
 }
-
+.flappy-canvas {
+  max-width: min(360px, calc((100svh - 255px) * 0.75));
+  min-width: 210px;
+}
+.tetris-canvas {
+  max-width: min(240px, calc((100svh - 330px) * 0.5));
+  min-width: 145px;
+  aspect-ratio: 1 / 2;
+}
 .info-row {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   align-items: center;
-  color: #cbd5e1;
-  font-size: 14px;
+  color: #c0d0df;
+  font-size: 12px;
+  line-height: 1.8;
+  font-variant-numeric: tabular-nums;
 }
-
-.touch-btn {
-  background: #1f2937;
-  color: #e5e7eb;
-  border-radius: 12px;
-  padding: 10px 14px;
-  border: 1px solid #1f2937;
-  min-width: 48px;
+.game-message {
+  color: #b8cadb;
+  font-size: 12px;
+  line-height: 1.6;
+  min-height: 38px;
+  padding: 10px 12px;
+  background: #1b3248;
+  border-radius: 10px;
 }
-
-.touch-btn:active {
-  transform: translateY(1px);
+.touch-btn,
+.sudoku-btn,
+.sudoku-action {
+  background: #284359;
+  color: #e9f3fb;
+  border-radius: 11px;
+  padding: 10px 13px;
+  border: 1px solid #3a5870;
+  min-width: 44px;
+  min-height: 44px;
+  font-weight: 600;
+  font-size: 13px;
 }
-
-.game-flex {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: center;
-}
-
-.tetris-flex {
-  align-items: stretch;
-}
-
 .control-row {
   display: flex;
   gap: 8px;
-}
-
-.tetris-controls {
-  justify-content: center;
   flex-wrap: wrap;
+  justify-content: center;
 }
-
 .control-grid {
-  width: 180px;
+  width: 170px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  gap: 6px;
-  justify-items: center;
-  align-items: center;
+  grid-template-rows: repeat(3, 44px);
+  gap: 5px;
+  justify-items: stretch;
+  align-items: stretch;
+  align-self: center;
 }
-
+.tetris-previews {
+  display: flex;
+  justify-content: space-around;
+  padding: 8px;
+  background: #0f1e30;
+  border-radius: 12px;
+}
+.piece-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  color: #91a9be;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+.mini-piece {
+  display: grid;
+  grid-template-columns: repeat(4, 10px);
+  grid-template-rows: repeat(4, 10px);
+  gap: 1px;
+}
+.mini-piece i {
+  border-radius: 2px;
+}
 .grid-2048 {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  padding: 7px;
+  background: #0c1b2c;
+  border-radius: 13px;
+  touch-action: none;
+  overflow: hidden;
 }
-
 .tile {
-  height: 68px;
+  aspect-ratio: 1;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 20px;
-  color: #0f172a;
+  font-weight: 800;
+  font-size: clamp(20px, 5vw, 30px);
+  color: #193646;
+  background: #f1a466;
   position: relative;
   --shift: 0;
-  transition: transform 220ms ease, background-color 220ms ease, color 220ms ease;
 }
-
 .tile-empty {
-  background: #111827;
+  background: #1c3044;
 }
-
 .tile-2 {
-  background: #e0f2fe;
+  background: #d7e8ed;
 }
-
 .tile-4 {
-  background: #bae6fd;
+  background: #b3d9df;
 }
-
 .tile-8 {
-  background: #7dd3fc;
+  background: #89cdd4;
 }
-
 .tile-16 {
-  background: #38bdf8;
-  color: #0b1224;
+  background: #66bbc9;
 }
-
 .tile-32 {
-  background: #0ea5e9;
-  color: #0b1224;
+  background: #419dac;
+  color: #fff;
 }
-
 .tile-64 {
-  background: #0284c7;
-  color: #e0f2fe;
+  background: #337c95;
+  color: #fff;
 }
-
 .tile-128 {
-  background: #0f766e;
-  color: #ecfeff;
+  background: #80cbb0;
 }
-
 .tile-256 {
-  background: #65a30d;
-  color: #0f172a;
+  background: #accc78;
 }
-
 .tile-512 {
-  background: #ca8a04;
-  color: #0f172a;
+  background: #e6d27f;
 }
-
 .tile-1024 {
-  background: #f97316;
-  color: #0b0f1a;
+  background: #edb36f;
 }
-
 .tile-2048 {
-  background: #facc15;
-  color: #0b0f1a;
+  background: #ffda73;
+  box-shadow: 0 0 18px #ffda7344;
 }
-
 .tile-new {
-  animation: pop-in 220ms ease;
+  animation: pop-in 180ms ease;
 }
-
 .tile-merged {
-  animation: merge-pop 220ms ease;
+  animation: merge-pop 200ms ease;
 }
-
 .slide-left {
-  animation: slide-left 220ms ease;
+  animation: slide-left 180ms ease;
 }
-
 .slide-right {
-  animation: slide-right 220ms ease;
+  animation: slide-right 180ms ease;
 }
-
 .slide-up {
-  animation: slide-up 220ms ease;
+  animation: slide-up 180ms ease;
 }
-
 .slide-down {
-  animation: slide-down 220ms ease;
+  animation: slide-down 180ms ease;
 }
-
 @keyframes slide-left {
   from {
-    transform: translateX(calc(var(--shift) * -1 * (100% + 8px)));
+    transform: translateX(calc(var(--shift) * (100% + 7px)));
   }
   to {
     transform: translateX(0);
   }
 }
-
 @keyframes slide-right {
   from {
-    transform: translateX(calc(var(--shift) * 1 * (100% + 8px)));
+    transform: translateX(calc(var(--shift) * -1 * (100% + 7px)));
   }
   to {
     transform: translateX(0);
   }
 }
-
 @keyframes slide-up {
   from {
-    transform: translateY(calc(var(--shift) * -1 * (100% + 8px)));
+    transform: translateY(calc(var(--shift) * (100% + 7px)));
   }
   to {
     transform: translateY(0);
   }
 }
-
 @keyframes slide-down {
   from {
-    transform: translateY(calc(var(--shift) * 1 * (100% + 8px)));
+    transform: translateY(calc(var(--shift) * -1 * (100% + 7px)));
   }
   to {
     transform: translateY(0);
   }
 }
-
 @keyframes pop-in {
   from {
-    transform: scale(0.6);
+    transform: scale(0.7);
     opacity: 0.4;
   }
   to {
@@ -240,188 +247,200 @@
     opacity: 1;
   }
 }
-
 @keyframes merge-pop {
-  0% {
-    transform: scale(1);
-  }
   50% {
-    transform: scale(1.08);
-  }
-  100% {
-    transform: scale(1);
+    transform: scale(1.1);
   }
 }
-
+.goal-progress {
+  width: 100%;
+  height: 8px;
+  border: none;
+  border-radius: 5px;
+  overflow: hidden;
+  appearance: none;
+  background: #2a4056;
+}
+.goal-progress::-webkit-progress-bar {
+  background: #2a4056;
+}
+.goal-progress::-webkit-progress-value {
+  background: #99dec0;
+  border-radius: 5px;
+}
+.goal-progress::-moz-progress-bar {
+  background: #99dec0;
+}
 .match3-board {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 5px;
+  touch-action: manipulation;
 }
-
 .match3-cell {
-  width: 38px;
-  height: 38px;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
   border-radius: 10px;
   border: 2px solid transparent;
-  transition: transform 200ms ease, opacity 160ms ease;
+  color: #193044;
+  font-size: clamp(16px, 4.4vw, 24px);
+  transition: transform 140ms;
 }
-
+.match3-cell:disabled,
+.light-cell:disabled {
+  opacity: 1;
+}
 .match3-cell.selected {
-  border-color: #e0f2fe;
+  border-color: #fff;
+  transform: scale(0.9);
 }
-
-.match3-cell.match3-fall {
-  animation: match3-fall 220ms ease;
+.hinted {
+  outline: 3px solid #fff;
+  outline-offset: -3px;
+  box-shadow: 0 0 12px #c9f4ff77;
 }
-
 .match3-cell.match3-new {
-  animation: match3-pop-in 180ms ease;
+  animation: pop-in 220ms ease;
 }
-
 .match3-cell.match3-clearing {
-  animation: match3-clear 140ms ease forwards;
+  animation: match3-clear 160ms ease forwards;
 }
-
-@keyframes match3-fall {
-  from {
-    transform: translateY(calc(var(--fall-distance, 0px) * -1));
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-@keyframes match3-pop-in {
-  from {
-    transform: scale(0.7);
-    opacity: 0.3;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
 @keyframes match3-clear {
-  from {
-    transform: scale(1);
-    opacity: 1;
-  }
   to {
-    transform: scale(0.6);
-    opacity: 0.2;
+    transform: scale(0.4);
+    opacity: 0.1;
   }
 }
-
 .sudoku-grid {
+  max-width: 400px;
   display: grid;
-  grid-template-columns: repeat(9, 1fr);
+  grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 2px;
   width: 100%;
-  max-width: 440px;
   margin: 0 auto;
 }
-
 .sudoku-cell {
   width: 100%;
   aspect-ratio: 1;
-  background: #0b1224;
-  border: 1px solid #1f2937;
-  color: #e5e7eb;
+  padding: 0;
+  background: #0e1e31;
+  border: 1px solid #263f56;
+  color: #a5ddf5;
   font-weight: 700;
-  border-radius: 6px;
+  font-size: clamp(15px, 4.3vw, 22px);
+  border-radius: 4px;
 }
-
 .sudoku-cell.given {
-  background: #0f172a;
-  color: #cbd5e1;
+  color: #e0eaf3;
 }
-
+.sudoku-cell.peer {
+  background: #203c51;
+}
+.sudoku-cell.same-value {
+  background: #325d71;
+}
 .sudoku-cell.selected {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid #b0f0ce;
+  outline-offset: -2px;
+  background: #36586a;
 }
-
 .sudoku-cell.invalid {
-  background: #2b0d0d;
-  border-color: #ef4444;
+  color: #ffadb0;
+  background: #542f3c;
 }
-
 .sudoku-cell.conflict {
-  border-color: #fbbf24;
+  border-color: #eca18e;
 }
-
 .sudoku-cell.thick-left {
-  border-left-width: 2px;
+  border-left: 2px solid #6a849c;
 }
-
 .sudoku-cell.thick-top {
-  border-top-width: 2px;
+  border-top: 2px solid #6a849c;
 }
-
+.sudoku-notes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  font-size: clamp(7px, 1.8vw, 10px);
+  line-height: 1.15;
+  color: #b5cbda;
+  padding: 2px;
+}
+.sudoku-notes span {
+  min-height: 8px;
+}
 .sudoku-keypad {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
-
 .sudoku-btn {
-  background: #1f2937;
-  color: #e5e7eb;
-  border: 1px solid #1f2937;
-  border-radius: 10px;
-  padding: 12px;
-  font-weight: 600;
+  padding: 8px;
 }
-
-.sudoku-btn.muted {
-  background: #0f172a;
-  color: #cbd5e1;
-}
-
 .sudoku-action {
-  margin-top: 4px;
-  background: #0f766e;
-  color: #ecfeff;
-  border: 1px solid #0f766e;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-weight: 700;
+  background: #315d50;
+  border-color: #507b68;
 }
-
 .lights-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   width: 100%;
-  max-width: 340px;
+  max-width: 380px;
   margin: 0 auto;
 }
-
 .light-cell {
-  width: 60px;
-  height: 60px;
-  border-radius: 10px;
-  border: 1px solid #1f2937;
-  background: #0b1224;
-  transition: background-color 160ms ease, transform 120ms ease;
-}
-
-.light-cell.on {
-  background: #fbbf24;
-  box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
-}
-
-.light-cell:active {
-  transform: translateY(1px);
-}
-
-.tetris-canvas {
   width: 100%;
-  max-width: 360px;
-  aspect-ratio: 10 / 20;
-  height: auto;
-  max-height: 70vh;
-  align-self: center;
-  image-rendering: pixelated;
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid #3c5267;
+  background: #1a2f43;
+  color: #52708a;
+  font-size: 24px;
+  transition:
+    background-color 160ms,
+    box-shadow 160ms;
+}
+.light-cell.on {
+  background: #f6cf78;
+  color: #826229;
+  border-color: #ffe8b6;
+  box-shadow: 0 0 12px #f6cf7833;
+}
+@media (max-width: 480px) {
+  .game-area {
+    padding: 12px;
+    gap: 11px;
+  }
+  .game-shell {
+    gap: 12px;
+  }
+  .match3-board {
+    gap: 4px;
+  }
+  .match3-cell {
+    border-radius: 7px;
+  }
+  .info-row {
+    font-size: 11px;
+  }
+  .touch-btn {
+    padding: 9px 11px;
+    font-size: 12px;
+  }
+}
+
+.match3-cell.match3-fall {
+  animation: match3-fall 220ms ease-out;
+}
+@keyframes match3-fall {
+  from {
+    transform: translateY(calc(-1 * var(--fall-distance)));
+    opacity: 0.5;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }

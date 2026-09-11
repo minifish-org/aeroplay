@@ -37,10 +37,8 @@ export function bindTap(el: HTMLElement, handler: () => void): () => void {
     handler();
   };
   el.addEventListener('click', onClick);
-  el.addEventListener('touchend', onClick);
   return () => {
     el.removeEventListener('click', onClick);
-    el.removeEventListener('touchend', onClick);
   };
 }
 
@@ -60,10 +58,6 @@ export function createGameShell(
   back.className = 'back-btn';
   back.textContent = 'Back';
   back.addEventListener('click', onBack);
-  back.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    onBack();
-  });
 
   const heading = document.createElement('div');
   heading.className = 'game-title';
@@ -94,9 +88,13 @@ export function createTouchButton(
     e.preventDefault();
     onPress();
   });
-  btn.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    onPress();
-  });
+  const names: Record<string, string> = {
+    '▲': 'Up',
+    '▼': 'Down',
+    '◀': 'Left',
+    '▶': 'Right',
+    '⟳': 'Rotate'
+  };
+  if (names[label]) btn.setAttribute('aria-label', names[label]);
   return btn;
 }
