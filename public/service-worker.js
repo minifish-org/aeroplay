@@ -9,7 +9,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(caches.open(CACHE).then(async cache => {
-    const cached = await cache.match(event.request.mode === 'navigate' ? '/index.html' : event.request);
+    // Pages redirects /index.html to /; redirected responses cannot serve navigations.
+    const cached = await cache.match(event.request.mode === 'navigate' ? '/' : event.request);
     return cached || fetch(event.request);
   }));
 });

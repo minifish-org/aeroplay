@@ -1,13 +1,35 @@
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import fs from 'node:fs/promises';
+import { preview } from 'vite';
+
+const pagesPreview = process.env.TEST_PAGES_REDIRECTS === '1'
+  ? await preview({
+      preview: { host: '127.0.0.1', port: 0, open: false },
+      plugins: [{
+        name: 'pages-html-redirect',
+        configurePreviewServer(server) {
+          server.middlewares.use((request, response, next) => {
+            if (new URL(request.url, 'http://localhost').pathname !== '/index.html') {
+              next();
+              return;
+            }
+            response.writeHead(308, { Location: '/' });
+            response.end();
+          });
+        }
+      }]
+    })
+  : null;
 const { chromium } = await import(
   process.env.PLAYWRIGHT_MODULE
     ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href
     : 'playwright'
 );
 const browser = await chromium.launch({ headless: true });
-const base = process.env.TEST_URL ?? 'http://127.0.0.1:4173';
+const base = pagesPreview
+  ? `http://127.0.0.1:${pagesPreview.httpServer.address().port}`
+  : process.env.TEST_URL ?? 'http://127.0.0.1:4173';
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   isMobile: true,
@@ -29,6 +51,9 @@ try {
       ?.textContent.includes('Offline ready')
   );
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+  await page.reload();
+  await page.waitForSelector('.hub-card');
+  assert.equal(await page.locator('.hub-card').count(), 10);
   const cached = await page.evaluate(async () => {
     const names = await caches.keys();
     return (
@@ -39,7 +64,11 @@ try {
   });
   assert(cached.some((p) => p.endsWith('.js')));
   assert(cached.some((p) => p.endsWith('.css')));
-  assert(cached.includes('/index.html'));
+  assert(cached.includes('/'));
+  assert.equal(await page.evaluate(async () => {
+    const response = await caches.match('/');
+    return response.redirected;
+  }), false);
   await context.setOffline(true);
   await page.reload();
   await page.waitForSelector('.hub-card');
@@ -245,8 +274,14 @@ try {
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);
   console.log(
-    `PASS Offline: ${cached.length} cached resources, offline reload, all ten games, saved scores, real classic/3D touch swipes and offline worker hints, no external requests or page errors`
+    `PASS Offline: ${cached.length} cached resources, online/offline reload${pagesPreview ? ' with Pages HTML redirects' : ''}, all ten games, saved scores, real classic/3D touch swipes and offline worker hints, no external requests or page errors`
   );
 } finally {
   await browser.close();
+  if (pagesPreview) {
+    await new Promise((resolve, reject) => {
+      pagesPreview.httpServer.close((error) => error ? reject(error) : resolve());
+      pagesPreview.httpServer.closeAllConnections();
+    });
+  }
 }

@@ -45,6 +45,8 @@ With Playwright available, run `node scripts/verify-games.mjs` against the devel
 
 Run `node scripts/verify-offline.mjs` against `npm run preview` to verify production precaching, offline reload, all ten game mounts, and touch swipes. It uses the same `PLAYWRIGHT_MODULE` override.
 
+Run `TEST_PAGES_REDIRECTS=1 node scripts/verify-offline.mjs` after building to start an isolated preview with Cloudflare Pages-style `/index.html` redirects and verify both online and offline reloads. The service worker uses the canonical `/` response for navigation; caching a redirected HTML response breaks browser reloads on Pages.
+
 ## 3D games and architecture
 - **Sky Rush** is a three-lane flight game. Golden rings grow a score multiplier, a full charge activates a three-second boost, and one shield absorbs a collision. Finish 1,000 meters to enter the next sector.
 - **Pocket Cargo** has 12 small Sokoban boards. Every board has been solved and its minimum push count verified. Hints run in a worker so the scene stays responsive.

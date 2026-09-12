@@ -20,7 +20,7 @@ export default defineConfig({
       apply: 'build',
       writeBundle(options, bundle) {
         const files = Object.keys(bundle).filter(
-          (file) => file !== 'service-worker.js'
+          (file) => file !== 'service-worker.js' && file !== 'index.html'
         );
         const assets = [
           '/',

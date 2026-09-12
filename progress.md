@@ -72,3 +72,13 @@ Original prompt: Revisit all games in this project and make them more fun to pla
 - Hub entry JavaScript is about 9 KB (4 KB gzip); Three.js is a separate approximately 529 KB chunk (132 KB gzip), precached for offline use. The build's 500 KB chunk advisory refers to this intentionally shared renderer.
 - Physical iPhone Safari/Home Screen testing remains external QA; WebKit mobile testing passed.
 - Latest local production preview: http://127.0.0.1:4174/
+
+## Production navigation repair (2026-09-12)
+- User reported that https://games.minifish.org/ could not open.
+- DNS, TLS, deployment status, and all 23 deployed resources were healthy. A fresh deployment URL loaded once, then failed on reload with Chrome ERR_FAILED.
+- Root cause: Pages redirects /index.html to / with HTTP 308. The service worker cached the redirected response and returned it for navigations, which Chromium rejects.
+- Added a Pages-redirect mode to the offline verifier and reproduced ERR_FAILED against the unchanged production build.
+- Navigation now uses the canonical cached / response; /index.html is excluded from precaching.
+- Production build and the Pages-redirect offline suite pass: 22 cached resources, online/offline reload, all ten games, saved scores, touch controls, and offline worker hints, with no page errors or external requests.
+- Required browser client verified Snake gameplay; the screenshot and game state were inspected.
+- Production publication and existing-session recovery verification follow this commit.
