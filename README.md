@@ -69,6 +69,8 @@ Every AI action comes from the model's selected option; there is no rule-player 
 
 The static site is deployed by the existing Pages workflow; the Python model service runs separately. Self-hosting instructions, protocol, CORS and resource limits are in [services/laya/README.md](services/laya/README.md). A tailnet-only endpoint requires the player's device to be connected to that tailnet.
 
+Browsers can require [local network permission](https://developer.chrome.com/blog/local-network-access) before a public site can reach a private service. CORS alone does not grant that permission. Some embedded browsers block private destinations; use a browser that permits the configured connection. A failed connection keeps personal play available and watch mode disabled.
+
 Run `node scripts/verify-laya-core.mjs` for transport, cancellation, input validation, controller lifecycle and save isolation tests. These use fake transport to exercise failures and do not count as real-model gameplay verification.
 
 ## Tech Notes

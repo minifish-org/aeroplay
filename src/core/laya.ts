@@ -53,6 +53,9 @@ function publish(state: ConnectionState, message: string, health?: LayaHealth) {
 export async function probeLaya(address: string, signal?: AbortSignal): Promise<LayaHealth> {
   const base = normalizeLayaAddress(address);
   if (!base) throw new Error('Enter your Laya service address first.');
+  const networkHelp = new URL(base).hostname.endsWith('.ts.net')
+    ? ' For a tailnet address, check Tailscale and your browser’s local network permission.'
+    : '';
   if (!navigator.onLine) throw new Error('You’re offline. You can keep playing yourself.');
   const controller = new AbortController();
   const abort = () => controller.abort();
@@ -69,8 +72,8 @@ export async function probeLaya(address: string, signal?: AbortSignal): Promise<
     if (controller.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
     return health;
   } catch (error) {
-    if (controller.signal.aborted) throw new Error('The connection timed out. Check the address and try again.');
-    if (error instanceof TypeError) throw new Error('Could not reach Laya. Check its address and connection.');
+    if (controller.signal.aborted) throw new Error(`The connection timed out. Check the address and try again.${networkHelp}`);
+    if (error instanceof TypeError) throw new Error(`Could not reach Laya. Check its address and connection.${networkHelp}`);
     throw error;
   } finally {
     window.clearTimeout(timeout);

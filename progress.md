@@ -13,6 +13,7 @@ Original prompt: Revisit all games in this project and make them more fun to pla
 - Actual production browser verification passed after stopping the preview server: hub reload, all ten game mounts, disabled watch mode without configuration, and human Sky gameplay. Static precache completeness and the offline handler regression checks also passed.
 - Publication will use the existing push-to-main Pages workflow. Physical iPhone/Safari testing has not been performed for this change.
 - The feature commit `a1bac8c` was pushed to main. Its first deployment failed before checkout because `cloudflare/pages-action` could not be resolved. Updated the workflow to the current Wrangler action, pinned the CLI, and used its required Node 22 environment; existing project secrets and main-branch deployment target are preserved.
+- Workflow repair `cb62735` built and published successfully in run `36977646617`; the production hub shows the shared settings entry. Production IAB requests to the private service timed out without reaching the backend, and direct private navigation returned `ERR_BLOCKED_BY_CLIENT`. The service's production CORS/PNA responses are correct. Local real-model integration passed, but production cross-network watch is not verified in this embedded browser; added tailnet connection guidance and documented browser permissions.
 
 ## Direction
 - Improve all eight existing games, preserving the lightweight, local-only architecture.
