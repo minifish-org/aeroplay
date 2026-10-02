@@ -79,8 +79,8 @@ Run `node scripts/verify-laya-core.mjs` for transport, cancellation, input valid
 ## Deploying to Cloudflare Pages
 - Recommended: use the included workflow `.github/workflows/deploy-cloudflare-pages.yml`.
 - In repo secrets add `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (Pages:Edit scope), and `CLOUDFLARE_PAGES_PROJECT` (your Pages project name).
-- Trigger on push to `main` (or manual dispatch); the workflow runs `npm ci`, `npm run build`, and publishes `dist` via `cloudflare/pages-action@v1`.
-- If configuring in the Cloudflare UI instead, set build command to `npm run build`, output directory to `dist`, and Node 20.
+- Trigger on push to `main` (or manual dispatch); the workflow uses Node 22, runs `npm ci` and `npm run build`, and publishes `dist` to the main branch via `cloudflare/wrangler-action@v4` with a pinned Wrangler version. This follows the [Cloudflare CI guide](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/).
+- If configuring in the Cloudflare UI instead, set build command to `npm run build`, output directory to `dist`, and Node 22.
 
 ## Repo Structure (key parts)
 - `src/core`: shared engine loop, UI helpers, storage wrapper.

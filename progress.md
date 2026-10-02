@@ -12,6 +12,7 @@ Original prompt: Revisit all games in this project and make them more fun to pla
 - Fixed a static precache lookup mismatch caused by `Vary: Origin` on preview module responses. The worker ignores request-header variation only within its same-origin static cache; canonical navigation and external/non-GET request boundaries remain covered by `scripts/verify-offline-cache.mjs`.
 - Actual production browser verification passed after stopping the preview server: hub reload, all ten game mounts, disabled watch mode without configuration, and human Sky gameplay. Static precache completeness and the offline handler regression checks also passed.
 - Publication will use the existing push-to-main Pages workflow. Physical iPhone/Safari testing has not been performed for this change.
+- The feature commit `a1bac8c` was pushed to main. Its first deployment failed before checkout because `cloudflare/pages-action` could not be resolved. Updated the workflow to the current Wrangler action, pinned the CLI, and used its required Node 22 environment; existing project secrets and main-branch deployment target are preserved.
 
 ## Direction
 - Improve all eight existing games, preserving the lightweight, local-only architecture.
