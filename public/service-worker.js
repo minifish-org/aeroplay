@@ -10,7 +10,9 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(caches.open(CACHE).then(async cache => {
     // Pages redirects /index.html to /; redirected responses cannot serve navigations.
-    const cached = await cache.match(event.request.mode === 'navigate' ? '/' : event.request);
+    // Cached files are static. Module requests can send Origin when precache requests do not.
+    // Ignore Vary so an Origin difference cannot hide an offline module response.
+    const cached = await cache.match(event.request.mode === 'navigate' ? '/' : event.request, { ignoreVary: true });
     return cached || fetch(event.request);
   }));
 });

@@ -2,6 +2,7 @@ import { GameModule } from './gameTypes';
 import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
+import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
 import { Mode, canvasOverlay, exposeGame, message } from '../core/play';
 
 type Matrix = number[][];
@@ -9,7 +10,6 @@ type Matrix = number[][];
 const WIDTH = 10;
 const HEIGHT = 20;
 const CELL = 24;
-const storage = namespace('tetris');
 
 const SHAPES: Matrix[] = [
   [
@@ -66,12 +66,25 @@ interface Piece {
   y: number;
 }
 
+type PlacementAction = 'left' | 'right' | 'rotate';
+interface Landing {
+  piece: Piece;
+  path: PlacementAction[];
+  rotation: number;
+  lines: number;
+  holes: number;
+  height: number;
+  roughness: number;
+  quality: number;
+}
+
 const tetris: GameModule = {
   id: 'tetris',
   name: 'Tetris',
   description: 'Stack tetrominoes, clear lines, avoid the top.',
   icon: '🧱',
   mount(root, goBack) {
+    const storage = namespace('tetris');
     const { area } = createGameShell(root, 'Tetris', goBack);
     const info = document.createElement('div');
     info.className = 'info-row';
@@ -118,6 +131,8 @@ const tetris: GameModule = {
       lockResets = 0;
     let best = storage.load('best', 0),
       mode: Mode = 'ready';
+    let pieceVersion = 0;
+    let landingCache: { key: string; landings: Landing[] } | null = null;
     function take() {
       if (!bag.length) {
         bag = [0, 1, 2, 3, 4, 5, 6];
@@ -129,6 +144,7 @@ const tetris: GameModule = {
       return bag.pop()!;
     }
     function spawn(id: number) {
+      pieceVersion++;
       current = id;
       piece = { matrix: SHAPES[id].map((r) => [...r]), x: 3, y: 0 };
       lockTimer = 0;
@@ -210,22 +226,10 @@ const tetris: GameModule = {
     function rotate() {
       if (mode !== 'playing') return;
       const grounded = collides(board, { ...piece, y: piece.y + 1 });
-      const matrix = rotateMatrix(piece.matrix);
-      for (const [dx, dy] of [
-        [0, 0],
-        [-1, 0],
-        [1, 0],
-        [-2, 0],
-        [2, 0],
-        [0, -1],
-        [0, -2]
-      ]) {
-        const candidate = { matrix, x: piece.x + dx, y: piece.y + dy };
-        if (!collides(board, candidate)) {
-          piece = candidate;
-          shiftLock(grounded);
-          break;
-        }
+      const candidate = rotatedPiece(board, piece);
+      if (candidate) {
+        piece = candidate;
+        shiftLock(grounded);
       }
       draw();
     }
@@ -297,6 +301,7 @@ const tetris: GameModule = {
     }
     const loop = new GameLoop((dt) => {
       if (mode !== 'playing') return;
+      if (isLayaControlling()) dt *= 0.18;
       dropTimer += dt;
       const speed = Math.max(0.09, 0.8 * Math.pow(0.8, Math.floor(lines / 10)));
       if (dropTimer >= speed) {
@@ -356,8 +361,66 @@ const tetris: GameModule = {
       }),
       (ms) => loop.advance(ms)
     );
+    const placementKey = () =>
+      `${pieceVersion}:${piece.x}:${piece.y}:${piece.matrix.flat().join('')}`;
+    function placements() {
+      const key = placementKey();
+      if (landingCache?.key !== key)
+        landingCache = { key, landings: findLandings(board, piece) };
+      return landingCache.landings;
+    }
+    const layaOff = registerLayaGame({
+      game: 'tetris',
+      observe: () => {
+        if (mode !== 'playing') return null;
+        const landings = placements();
+        if (!landings.length) return null;
+        const shapeNames = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+        const heights = boardHeights(board);
+        return {
+          key: placementKey(),
+          context: `Tetris: board width 10, height 20. Current piece ${shapeNames[current]}; next ${next.map((id) => shapeNames[id]).join(',')}. Column heights left to right: ${heights.join(',')}. Reachable placements are shortlisted using visible board outcomes. A hole is an empty cell below a block. Roughness is the sum of adjacent height differences.`,
+          question: 'Which landing clears lines while keeping holes, height and roughness low?',
+          choices: Object.fromEntries(landings.map((landing, index) => [
+            String(index),
+            `rotation ${landing.rotation * 90}, x ${landing.piece.x}: lines ${landing.lines}, holes ${landing.holes}, height ${landing.height}, roughness ${landing.roughness}`
+          ]))
+        };
+      },
+      act: (choice, key) => {
+        if (mode !== 'playing' || key !== placementKey() || !/^\d+$/.test(choice))
+          return false;
+        const landing = placements()[Number(choice)];
+        if (!landing) return false;
+        for (const action of landing.path) {
+          if (action === 'rotate') rotate();
+          else move(action === 'left' ? -1 : 1);
+        }
+        if (
+          piece.x !== landing.piece.x ||
+          piece.matrix.flat().join('') !== landing.piece.matrix.flat().join('')
+        ) return false;
+        let y = piece.y;
+        while (!collides(board, { ...piece, y: y + 1 })) y++;
+        if (y !== landing.piece.y) return false;
+        drop();
+        return true;
+      },
+      start: () => {
+        if (mode === 'over') reset();
+        mode = 'playing';
+        draw();
+      },
+      pause: () => { if (mode === 'playing') mode = 'paused'; draw(); },
+      resume: () => { if (mode === 'paused') mode = 'playing'; draw(); },
+      isFinished: () => mode === 'over',
+      isPaused: () => mode === 'paused',
+      intervalMs: 500,
+      assistance: 'Reachable landings are calculated and shortlisted by board features. Laya chooses the placement. Watch gravity runs at 18% speed.'
+    });
     return () => {
       loop.stop();
+      layaOff();
       off();
       window.removeEventListener('keydown', key);
       document.removeEventListener('visibilitychange', hidden);
@@ -414,6 +477,83 @@ function rotateMatrix(matrix: Matrix): Matrix {
     }
   }
   return result;
+}
+
+function rotatedPiece(board: Matrix, piece: Piece): Piece | null {
+  const matrix = rotateMatrix(piece.matrix);
+  for (const [dx, dy] of [
+    [0, 0], [-1, 0], [1, 0], [-2, 0], [2, 0], [0, -1], [0, -2]
+  ]) {
+    const candidate = { matrix, x: piece.x + dx, y: piece.y + dy };
+    if (!collides(board, candidate)) return candidate;
+  }
+  return null;
+}
+
+function boardHeights(board: Matrix) {
+  return Array.from({ length: WIDTH }, (_, x) => {
+    const top = board.findIndex((row) => row[x] !== 0);
+    return top < 0 ? 0 : HEIGHT - top;
+  });
+}
+
+function findLandings(board: Matrix, initial: Piece): Landing[] {
+  const queue: { piece: Piece; path: PlacementAction[]; rotation: number }[] = [
+    { piece: initial, path: [], rotation: 0 }
+  ];
+  const visited = new Set<string>();
+  const landings = new Map<string, Landing>();
+  while (queue.length && visited.size < 200) {
+    const state = queue.shift()!;
+    const key = `${state.piece.x}:${state.piece.y}:${state.piece.matrix.flat().join('')}`;
+    if (visited.has(key) || state.piece.y < -4 || collides(board, state.piece)) continue;
+    visited.add(key);
+    const landing = { ...state.piece };
+    while (!collides(board, { ...landing, y: landing.y + 1 })) landing.y++;
+    const cells: string[] = [];
+    landing.matrix.forEach((row, y) => row.forEach((value, x) => {
+      if (value) cells.push(`${landing.x + x},${landing.y + y}`);
+    }));
+    const landingKey = cells.sort().join(';');
+    if (!landings.has(landingKey) && cells.every((cell) => Number(cell.split(',')[1]) >= 0)) {
+      const result = board.map((row) => [...row]);
+      merge(result, landing);
+      const lines = clearLines(result);
+      const heights = boardHeights(result);
+      const height = Math.max(...heights);
+      const roughness = heights.slice(1).reduce(
+        (sum, value, index) => sum + Math.abs(value - heights[index]), 0
+      );
+      let holes = 0;
+      for (let x = 0; x < WIDTH; x++) {
+        let covered = false;
+        for (let y = 0; y < HEIGHT; y++) {
+          if (result[y][x]) covered = true;
+          else if (covered) holes++;
+        }
+      }
+      landings.set(landingKey, {
+        piece: landing,
+        path: state.path,
+        rotation: state.rotation,
+        lines,
+        holes,
+        height,
+        roughness,
+        quality: lines * 10000 - holes * 600 - height * 100 - roughness * 20 -
+          heights.reduce((sum, value) => sum + value, 0) * 5
+      });
+    }
+    for (const [action, dx] of [['left', -1], ['right', 1]] as const) {
+      const candidate = { ...state.piece, x: state.piece.x + dx };
+      if (!collides(board, candidate))
+        queue.push({ piece: candidate, path: [...state.path, action], rotation: state.rotation });
+    }
+    const rotated = rotatedPiece(board, state.piece);
+    if (rotated)
+      queue.push({ piece: rotated, path: [...state.path, 'rotate'], rotation: (state.rotation + 1) % 4 });
+  }
+  return [...landings.values()].sort((a, b) => b.quality - a.quality).slice(0, 12);
 }
 
 function drawMatrix(

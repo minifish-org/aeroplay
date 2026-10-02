@@ -2,6 +2,8 @@ import { GameModule } from './gameTypes';
 import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
+import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
+import { sudokuLayaMoves } from './laya-puzzles';
 
 type Board = number[];
 
@@ -41,7 +43,6 @@ const PUZZLES: Puzzle[] = [
   }
 ];
 
-const storage = namespace('sudoku');
 
 const sudoku: GameModule = {
   id: 'sudoku',
@@ -50,6 +51,7 @@ const sudoku: GameModule = {
     'A quiet challenge, with pencil notes and a nudge when you need it.',
   icon: '🔢',
   mount(root, goBack) {
+    const storage = namespace('sudoku');
     const { area } = createGameShell(root, 'Sudoku', goBack);
 
     const info = document.createElement('div');
@@ -87,6 +89,7 @@ const sudoku: GameModule = {
     let notes: number[][] = Array.from({ length: 81 }, () => []);
     let noteMode = false;
     let hints = 3;
+    let paused = false;
     const history: { board: Board; notes: number[][] }[] = [];
     const helper = message(
       area,
@@ -158,7 +161,8 @@ const sudoku: GameModule = {
     }
 
     function startTimer() {
-      if (timerId !== undefined) clearInterval(timerId);
+      if (timerId !== undefined) return;
+      if (paused || document.hidden || isSolved()) return;
       startMs = Date.now();
       timerId = window.setInterval(() => {
         updateInfo();
@@ -243,14 +247,15 @@ const sudoku: GameModule = {
     }
 
     function onCellSelect(e: Event) {
+      if (paused || isLayaControlling()) return;
       const el = e.currentTarget as HTMLElement;
       const idx = Number(el.dataset.idx);
       selected = idx;
       render();
     }
 
-    function setValue(val: number) {
-      if (selected === null || isSolved()) return;
+    function setValue(val: number, fromLaya = false) {
+      if (paused || (isLayaControlling() && !fromLaya) || selected === null || isSolved()) return;
       if (givens.has(selected)) return;
       if (noteMode && val && !board[selected]) {
         history.push({ board: [...board], notes: notes.map((n) => [...n]) });
@@ -389,6 +394,7 @@ const sudoku: GameModule = {
     }
 
     const keyHandler = (e: KeyboardEvent) => {
+      if (paused || isLayaControlling()) return;
       if (/^[1-9]$/.test(e.key)) {
         e.preventDefault();
         setValue(Number(e.key));
@@ -415,7 +421,7 @@ const sudoku: GameModule = {
       if (document.hidden) {
         stopTimer();
         saveState();
-      } else if (!isSolved()) startTimer();
+      } else if (!paused && !isSolved()) startTimer();
     };
     const pageHide = () => {
       stopTimer();
@@ -424,10 +430,55 @@ const sudoku: GameModule = {
     window.addEventListener('keydown', keyHandler);
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('pagehide', pageHide);
+    const stateKey = () => `${puzzleIndex}:${board.join('')}`;
+    let candidateKey = '';
+    let candidates: ReturnType<typeof sudokuLayaMoves> = [];
+    function options() {
+      const key = stateKey();
+      if (key !== candidateKey) {
+        candidateKey = key;
+        candidates = sudokuLayaMoves(board, givens).slice(0, 8);
+      }
+      return candidates;
+    }
+    const offLaya = registerLayaGame({
+      game: 'sudoku',
+      observe: () => {
+        if (paused || isSolved()) return null;
+        const moves = options();
+        if (!moves.length) return null;
+        return {
+          key: stateKey(),
+          context: `Sudoku. Rows top to bottom; 0 is empty.\n${Array.from({ length: 9 }, (_, row) => board.slice(row * 9, (row + 1) * 9).join('')).join('\n')}\nConstraint assistance checks rows, columns and boxes of this visible board. When no forced digit exists, visible-board search checks possible completions. No answer sheet is used.\n${moves.map((c, i) => `Option ${i}: r${Math.floor(c.index / 9) + 1}c${c.index % 9 + 1} ${c.value ? `= ${c.value}, ${c.candidates.length} legal digits` : 'erase to repair the board'}.`).join('\n')}`,
+          question: moves[0].value ? 'Which assisted placement should be filled next?' : 'Which editable number should be erased to repair this board?',
+          choices: Object.fromEntries(moves.map((c, i) => [String(i), `${c.value ? `Fill ${c.value} in` : 'Erase'} r${Math.floor(c.index / 9) + 1}c${c.index % 9 + 1}`]))
+        };
+      },
+      act: (choice, key) => {
+        if (paused || isSolved() || key !== stateKey()) return false;
+        const candidate = options()[Number(choice)];
+        if (!candidate || String(Number(choice)) !== choice || givens.has(candidate.index)) return false;
+        selected = candidate.index;
+        noteMode = false;
+        noteButton.textContent = 'Notes: Off';
+        noteButton.setAttribute('aria-pressed', 'false');
+        const before = stateKey();
+        setValue(candidate.value, true);
+        return before !== stateKey();
+      },
+      start: () => { paused = false; if (isSolved()) nextPuzzle(); else startTimer(); },
+      pause: () => { paused = true; stopTimer(); saveState(); updateInfo(); },
+      resume: () => { paused = false; if (!isSolved()) startTimer(); },
+      isFinished: isSolved,
+      isPaused: () => paused,
+      intervalMs: 500,
+      assistance: 'Constraint assistance'
+    });
     const off = exposeGame(() => ({
       game: 'sudoku',
-      mode: isSolved() ? 'won' : 'playing',
+      mode: isSolved() ? 'won' : paused ? 'paused' : 'playing',
       board,
+      givens: [...givens],
       selected,
       notes,
       noteMode,
@@ -437,6 +488,7 @@ const sudoku: GameModule = {
       elapsed: getElapsed()
     }));
     return () => {
+      offLaya();
       stopTimer();
       saveState();
       off();

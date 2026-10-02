@@ -2,7 +2,7 @@
 
 AGENT: FlightMode Games Project
 
-This project builds a pure frontend offline game collection optimized for iPhone flight-mode usage, using HTML, TypeScript, CSS, and locally bundled game libraries such as Three.js. No backend or external runtime requests. All games share a unified Game Hub UI.
+This project builds an offline-first frontend game collection optimized for iPhone flight-mode usage, using HTML, TypeScript, CSS, and locally bundled game libraries such as Three.js. All games share a unified Game Hub UI. Optional Laya watch mode uses a separately configured decision service; personal gameplay and game assets remain fully offline.
 
 Goal: produce a lightweight, responsive, mobile-friendly experience that runs entirely offline and can be added to Home Screen.
 
@@ -47,7 +47,7 @@ Additional Requirements
 - Unified Game Hub with responsive grid of icons
 - Each game runs in its own page or dynamically loaded view
 - Mobile touch controls required
-- All assets local, no network dependency
+- All game assets local, no network dependency for personal gameplay; optional Laya mode connects only after a service is configured.
 - Use localStorage for save data
 - Optional: PWA support (service worker + manifest)
 
@@ -202,7 +202,7 @@ Output must run 100% offline.
 - Minimize DOM reflow
 - Prefer Canvas for animations
 - Cap FPS if needed
-- No network usage at all
+- No runtime network usage for an unconfigured installation. Configured Laya mode may check service health and request decisions; never add an external dependency to personal gameplay.
 
 ----------------------------------------------------------------
 
@@ -234,7 +234,7 @@ Test on:
 Project is complete when:
 - All 10 games are playable offline
 - Hub UI loads each game
-- No network requests
+- No external requests without an explicitly configured Laya service
 - Saves stored locally
 - Touch controls fully functional
 - Build outputs static files runnable anywhere

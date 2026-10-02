@@ -2,9 +2,9 @@ import { GameModule } from './gameTypes';
 import { createGameShell, bindSwipe, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
+import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
 
 const SIZE = 4;
-const storage = namespace('game2048');
 
 type Grid = number[][];
 
@@ -30,6 +30,7 @@ const game2048: GameModule = {
   description: 'Build your next milestone. Undo a move and try another path.',
   icon: '🧮',
   mount(root, goBack) {
+    const storage = namespace('game2048');
     const { area } = createGameShell(root, '2048', goBack);
     const info = document.createElement('div');
     info.className = 'info-row';
@@ -100,6 +101,7 @@ const game2048: GameModule = {
     }
     let best = storage.load('best', 0);
     let animations: Record<string, AnimationMeta> = {};
+    let paused = false;
 
     const render = () => {
       gridEl.innerHTML = '';
@@ -170,8 +172,8 @@ const game2048: GameModule = {
       render();
     };
 
-    const move = (dir: MoveDirection) => {
-      if (!canMove()) return;
+    const move = (dir: MoveDirection, fromLaya = false) => {
+      if (paused || (isLayaControlling() && !fromLaya) || !canMove()) return;
       const snapshot = { grid: grid.map((row) => [...row]), score, moves };
       const before = gridToString(grid);
       animations = {};
@@ -225,6 +227,7 @@ const game2048: GameModule = {
     const swipeOff = bindSwipe(gridEl, (dir) => move(dir));
     restart.addEventListener('click', restartGame);
     const keyHandler = (e: KeyboardEvent) => {
+      if (isLayaControlling() || paused) return;
       if (e.key.startsWith('Arrow')) e.preventDefault();
       if (e.key.toLowerCase() === 'z') undo.click();
       if (e.key === 'ArrowLeft') move('left');
@@ -236,9 +239,43 @@ const game2048: GameModule = {
 
     if (validSave) render();
     else restartGame();
+    const stateKey = () => `${moves}:${gridToString(grid)}`;
+    const candidates = () =>
+      (['left', 'right', 'up', 'down'] as MoveDirection[])
+        .map((direction) => ({ direction, ...preview2048Move(grid, direction) }))
+        .filter((candidate) => candidate.changed);
+    const offLaya = registerLayaGame({
+      game: '2048',
+      observe: () => {
+        if (paused || !canMove()) return null;
+        const options = candidates();
+        if (!options.length) return null;
+        return {
+          key: stateKey(),
+          context: `2048. Rows top to bottom; 0 is empty.\n${grid.map((row) => row.join(' ')).join('\n')}\n${options.map((c, i) => `Option ${i}: ${c.direction}, merge points ${c.gained}, empty cells ${c.empty}.`).join('\n')}`,
+          question: 'Which legal slide best combines matching tiles while keeping empty space?',
+          choices: Object.fromEntries(options.map((c, i) => [String(i), c.direction]))
+        };
+      },
+      act: (choice, key) => {
+        if (paused || key !== stateKey()) return false;
+        const candidate = candidates()[Number(choice)];
+        if (!candidate || String(Number(choice)) !== choice) return false;
+        const before = stateKey();
+        move(candidate.direction, true);
+        return before !== stateKey();
+      },
+      start: () => { paused = false; if (!canMove()) restartGame(); },
+      pause: () => { paused = true; },
+      resume: () => { paused = false; },
+      isFinished: () => !canMove(),
+      isPaused: () => paused,
+      intervalMs: 450,
+      assistance: 'Move planning'
+    });
     const off = exposeGame(() => ({
       game: '2048',
-      mode: canMove() ? 'playing' : 'over',
+      mode: !canMove() ? 'over' : paused ? 'paused' : 'playing',
       grid,
       score,
       moves,
@@ -246,6 +283,7 @@ const game2048: GameModule = {
     }));
 
     return () => {
+      offLaya();
       off();
       swipeOff();
       window.removeEventListener('keydown', keyHandler);
@@ -307,6 +345,25 @@ function compressAndMerge(
 
 function gridToString(grid: Grid) {
   return grid.flat().join(',');
+}
+
+export function preview2048Move(grid: Grid, direction: MoveDirection) {
+  const next = grid.map((row) => [...row]);
+  let gained = 0;
+  for (let index = 0; index < SIZE; index++) {
+    const horizontal = direction === 'left' || direction === 'right';
+    const line = horizontal ? grid[index] : grid.map((row) => row[index]);
+    const merged = compressAndMerge(line, direction === 'left' || direction === 'up');
+    gained += merged.gained;
+    if (horizontal) next[index] = merged.newRow;
+    else for (let row = 0; row < SIZE; row++) next[row][index] = merged.newRow[row];
+  }
+  return {
+    grid: next,
+    gained,
+    empty: next.flat().filter((value) => value === 0).length,
+    changed: gridToString(next) !== gridToString(grid)
+  };
 }
 
 export default game2048;

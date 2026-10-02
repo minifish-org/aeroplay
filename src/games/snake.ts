@@ -2,6 +2,7 @@ import { GameModule } from './gameTypes';
 import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
+import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
 import {
   Mode,
   canvasOverlay,
@@ -13,14 +14,13 @@ import {
 type Point = { x: number; y: number };
 const SIZE = 20;
 const CELL = 18;
-const storage = namespace('snake');
-
 const snake: GameModule = {
   id: 'snake',
   name: 'Snake',
   icon: '🐍',
   description: 'Chase golden fruit. Find your rhythm as the pace rises.',
   mount(root, goBack) {
+    const storage = namespace('snake');
     const { area } = createGameShell(root, 'Snake', goBack);
     const info = document.createElement('div');
     info.className = 'info-row';
@@ -45,6 +45,7 @@ const snake: GameModule = {
     let mode: Mode = 'ready';
     let acc = 0;
     let relaxed = false;
+    let stepVersion = 0;
     const row = document.createElement('div');
     row.className = 'control-row';
     const start = createTouchButton('Start', () => {
@@ -89,6 +90,7 @@ const snake: GameModule = {
         : null;
     }
     function reset() {
+      stepVersion++;
       segments = [
         { x: 8, y: 10 },
         { x: 9, y: 10 },
@@ -106,6 +108,7 @@ const snake: GameModule = {
       mode = 'ready';
     }
     function step() {
+      stepVersion++;
       dir = queue.shift() ?? dir;
       const head = segments[segments.length - 1];
       const next = { x: head.x + dir.x, y: head.y + dir.y };
@@ -223,14 +226,15 @@ const snake: GameModule = {
     }
     const loop = new GameLoop((dt) => {
       if (mode !== 'playing') return;
+      const speed = relaxed
+        ? 0.22
+        : Math.max(0.09, 0.21 - Math.floor(eaten / 5) * 0.02);
+      if (isLayaControlling()) dt *= speed / 0.9;
       if (bonus) {
         bonusTime -= dt;
         if (bonusTime <= 0) bonus = null;
       }
       acc += dt;
-      const speed = relaxed
-        ? 0.22
-        : Math.max(0.09, 0.21 - Math.floor(eaten / 5) * 0.02);
       while (acc >= speed && mode === 'playing') {
         acc -= speed;
         step();
@@ -279,8 +283,77 @@ const snake: GameModule = {
       }),
       (ms) => loop.advance(ms)
     );
+    const directions: Record<string, Point> = {
+      up: { x: 0, y: -1 },
+      down: { x: 0, y: 1 },
+      left: { x: -1, y: 0 },
+      right: { x: 1, y: 0 }
+    };
+    function availableMoves() {
+      const head = segments.at(-1)!;
+      return Object.entries(directions).flatMap(([name, direction]) => {
+        if (direction.x === -dir.x && direction.y === -dir.y) return [];
+        const next = {
+          x: head.x + direction.x,
+          y: head.y + direction.y
+        };
+        if (relaxed) {
+          next.x = (next.x + SIZE) % SIZE;
+          next.y = (next.y + SIZE) % SIZE;
+        }
+        const grows =
+          (next.x === food?.x && next.y === food?.y) ||
+          (next.x === bonus?.x && next.y === bonus?.y);
+        const body = grows ? segments : segments.slice(1);
+        if (
+          next.x < 0 || next.x >= SIZE || next.y < 0 || next.y >= SIZE ||
+          body.some((point) => point.x === next.x && point.y === next.y)
+        ) return [];
+        return [{ name, direction, next }];
+      });
+    }
+    const layaOff = registerLayaGame({
+      game: 'snake',
+      observe: () => {
+        if (mode !== 'playing') return null;
+        const moves = availableMoves();
+        if (!moves.length) return null;
+        const head = segments.at(-1)!;
+        return {
+          key: String(stepVersion),
+          context: `Snake on a ${SIZE} by ${SIZE} grid. Coordinates: x right, y down. Head (${head.x},${head.y}); direction (${dir.x},${dir.y}). Fruit ${food ? `(${food.x},${food.y})` : 'none'}; golden fruit ${bonus ? `(${bonus.x},${bonus.y})` : 'none'}. Body length ${segments.length}. ${relaxed ? 'Edges wrap.' : 'Edges are walls.'} Only collision-free next moves are offered.`,
+          question: 'Which next direction approaches fruit while avoiding collision?',
+          choices: Object.fromEntries(moves.map(({ name, next }) => [
+            name,
+            `Move ${name} to (${next.x},${next.y})${food ? `; fruit distance ${Math.abs(food.x - next.x) + Math.abs(food.y - next.y)}` : ''}${bonus ? `; golden fruit distance ${Math.abs(bonus.x - next.x) + Math.abs(bonus.y - next.y)}` : ''}`
+          ]))
+        };
+      },
+      act: (choice, key) => {
+        if (mode !== 'playing' || key !== String(stepVersion)) return false;
+        const move = availableMoves().find(({ name }) => name === choice);
+        if (!move) return false;
+        queue = [];
+        if (move.direction.x !== dir.x || move.direction.y !== dir.y)
+          queue.push({ ...move.direction });
+        return true;
+      },
+      start: () => {
+        if (mode === 'over' || mode === 'won') reset();
+        queue = [];
+        mode = 'playing';
+        draw();
+      },
+      pause: () => { if (mode === 'playing') mode = 'paused'; draw(); },
+      resume: () => { if (mode === 'paused') mode = 'playing'; draw(); },
+      isFinished: () => mode === 'over' || mode === 'won',
+      isPaused: () => mode === 'paused',
+      intervalMs: 50,
+      assistance: 'Watch mode moves one cell every 0.9 seconds. Collision-free directions are calculated; Laya chooses the direction.'
+    });
     return () => {
       loop.stop();
+      layaOff();
       off();
       swipeOff();
       window.removeEventListener('keydown', key);

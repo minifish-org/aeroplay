@@ -5,7 +5,7 @@ A lightweight, offline-first collection of ten games (Sky Rush, Pocket Cargo, Sn
 **Use this as a template:** In GitHub, click “Use this template” to bootstrap a new repo without inheriting issues or history. Keep `main` clean (no build artifacts) for easy forking.
 
 ## About
-AeroPlay is a pure-frontend, mobile-first game hub optimized for flight-mode usage. All assets are local, no network calls, and games save progress with `localStorage`. A service worker and manifest enable add-to-homescreen behavior and offline play.
+AeroPlay is an offline-first, mobile-first game hub optimized for flight-mode usage. All game assets are local and games save progress with `localStorage`. A service worker and manifest enable add-to-homescreen behavior and offline play. Optional Laya watch mode uses a separately configured online decision service; no external requests occur before one is configured.
 
 ## Quick Start (desktop)
 ```bash
@@ -57,8 +57,22 @@ Run `TEST_PAGES_REDIRECTS=1 node scripts/verify-offline.mjs` after building to s
 
 Run `node scripts/verify-3d.mjs` with the same Playwright environment overrides to check all 12 Cargo solutions, flight rules, a complete 3D flight, worker hints, undo, stars, saving and mobile rendering. Both Chromium and WebKit are supported by the verifier. Screenshots are saved to `output/3d-*`.
 
+## Watching Laya play
+
+1. Open **Laya settings** on the hub or inside any game. Enter the base HTTPS address of an [AeroPlay Laya service](services/laya/README.md), test the connection, then save it. One connection is shared by all ten games and saved on this device.
+2. Open a game and select **Watch Laya**. The service must be reachable and report that it supports this game; browser online status alone does not enable watch mode.
+3. Use **Pause**, **Resume**, or **Take over**. A connection failure pauses the game and keeps the board available for takeover. Switching back to **Play yourself** starts a personal run with your personal saves.
+
+Laya and assisted runs use separate local saves and records. Taking over an AI run does not add its score to your personal best. Human controls are disabled while Laya is in charge. Clear the service address to return to a fully local installation.
+
+Every AI action comes from the model's selected option; there is no rule-player fallback. Move planning supplies legal candidate moves and their visible outcomes. Sudoku and Lights Out additionally use visible-board constraint assistance, shown in the session label; Sudoku never provides its stored answer sheet to the AI adapter. Snake, Flappy Bird and Tetris run more slowly in watch mode to accommodate inference latency, while personal gameplay keeps its original speed. Connecting a game does not guarantee that the model will win it.
+
+The static site is deployed by the existing Pages workflow; the Python model service runs separately. Self-hosting instructions, protocol, CORS and resource limits are in [services/laya/README.md](services/laya/README.md). A tailnet-only endpoint requires the player's device to be connected to that tailnet.
+
+Run `node scripts/verify-laya-core.mjs` for transport, cancellation, input validation, controller lifecycle and save isolation tests. These use fake transport to exercise failures and do not count as real-model gameplay verification.
+
 ## Tech Notes
-- Pure frontend: Three.js is bundled locally; no external CDN, remote assets, or backend.
+- Static frontend: Three.js is bundled locally; no external CDN or remote game assets. Optional Laya inference is a separate service.
 - Offline: service worker + manifest; localStorage per-game saves.
 - Mobile UX: touch controls, double-tap zoom disabled, overscroll reduced.
 

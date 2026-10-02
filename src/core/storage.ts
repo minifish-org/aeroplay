@@ -1,4 +1,14 @@
 const KEY_PREFIX = 'aeroplay:';
+export type PlayProfile = 'human' | 'laya';
+let playProfile: PlayProfile = 'human';
+
+export function setPlayProfile(profile: PlayProfile) {
+  playProfile = profile;
+}
+
+export function getPlayProfile() {
+  return playProfile;
+}
 
 const withPrefix = (key: string, game?: string) =>
   `${KEY_PREFIX}${game ? `${game}:` : ''}${key}`;
@@ -23,8 +33,10 @@ export function load<T>(key: string, fallback: T, game?: string): T {
 }
 
 export function namespace(game: string) {
+  // Capture ownership so delayed saves cannot write to a later personal run.
+  const owner = playProfile === 'laya' ? `laya:${game}` : game;
   return {
-    save: <T>(key: string, value: T) => save(key, value, game),
-    load: <T>(key: string, fallback: T) => load(key, fallback, game)
+    save: <T>(key: string, value: T) => save(key, value, owner),
+    load: <T>(key: string, fallback: T) => load(key, fallback, owner)
   };
 }

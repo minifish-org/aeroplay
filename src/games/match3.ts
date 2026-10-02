@@ -3,19 +3,20 @@ import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { exposeGame, message } from '../core/play';
+import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
 
 type Cell = number;
 type Point = { x: number; y: number };
 const SIZE = 8;
 const COLORS = ['#ef916e', '#6fcaeb', '#bb9bea', '#7ed6ad', '#f1ca6e'];
 const SYMBOLS = ['◆', '●', '✦', '⬟', '▲'];
-const storage = namespace('match3');
 const match3: GameModule = {
   id: 'match3',
   name: 'Match-3',
   icon: '💎',
   description: '30 moves. One goal. Set off a spectacular chain reaction.',
   mount(root, goBack) {
+    const storage = namespace('match3');
     const { area } = createGameShell(root, 'Match-3', goBack);
     const info = document.createElement('div');
     info.className = 'info-row';
@@ -40,6 +41,7 @@ const match3: GameModule = {
     let phase: 'playing' | 'clearing' | 'falling' | 'won' | 'over' = 'playing';
     let timer = 0,
       chain = 0;
+    let paused = false;
     const saved = storage.load<{
       grid: number[][];
       score: number;
@@ -71,7 +73,7 @@ const match3: GameModule = {
         'Try swapping the two outlined gems. Hints cost no moves.';
       render();
     });
-    const next = createTouchButton('Restart level', () => {
+    function restartLevel() {
       if (phase === 'clearing' || phase === 'falling') return;
       if (phase === 'won') level++;
       grid = createBoard();
@@ -84,7 +86,8 @@ const match3: GameModule = {
       status.textContent = 'Tap two neighbors. Cascades multiply your points.';
       persist();
       render();
-    });
+    }
+    const next = createTouchButton('Restart level', restartLevel);
     controls.append(hint, next);
     area.append(controls);
     function target() {
@@ -147,8 +150,8 @@ const match3: GameModule = {
         })
       );
     }
-    function select(p: Point) {
-      if (phase !== 'playing') return;
+    function select(p: Point, fromLaya = false) {
+      if (paused || (isLayaControlling() && !fromLaya) || phase !== 'playing') return;
       hinted = [];
       if (!selected) selected = p;
       else if (p.x === selected.x && p.y === selected.y) selected = null;
@@ -189,6 +192,7 @@ const match3: GameModule = {
       render();
     }
     const loop = new GameLoop((dt) => {
+      if (paused || document.hidden) return;
       if (phase !== 'clearing' && phase !== 'falling') return;
       timer -= dt;
       if (timer > 0) return;
@@ -217,10 +221,41 @@ const match3: GameModule = {
     });
     finish();
     loop.start();
+    const stateKey = () => `${level}:${moves}:${score}:${phase}:${grid.flat().join('')}`;
+    const options = () => match3Moves(grid).slice(0, 8);
+    const offLaya = registerLayaGame({
+      game: 'match3',
+      observe: () => {
+        if (paused || phase !== 'playing') return null;
+        const candidates = options();
+        if (!candidates.length) return null;
+        return {
+          key: stateKey(),
+          context: `Match-3. Need ${Math.max(0, target() - score)} points in ${moves} moves. Gem types 1-5.\n${grid.map((row) => row.map((value) => value + 1).join('')).join('\n')}\n${candidates.map((c, i) => `Option ${i}: r${c.a.y + 1}c${c.a.x + 1} with r${c.b.y + 1}c${c.b.x + 1}; clears ${c.count} gems.`).join('\n')}`,
+          question: 'Which legal swap clears the most gems immediately?',
+          choices: Object.fromEntries(candidates.map((c, i) => [String(i), `Swap r${c.a.y + 1}c${c.a.x + 1} with r${c.b.y + 1}c${c.b.x + 1}`]))
+        };
+      },
+      act: (choice, key) => {
+        if (paused || phase !== 'playing' || key !== stateKey()) return false;
+        const candidate = options()[Number(choice)];
+        if (!candidate || String(Number(choice)) !== choice) return false;
+        selected = candidate.a;
+        select(candidate.b, true);
+        return phase !== 'playing';
+      },
+      start: () => { paused = false; if (phase === 'won' || phase === 'over') restartLevel(); },
+      pause: () => { paused = true; },
+      resume: () => { paused = false; },
+      isFinished: () => phase === 'won' || phase === 'over',
+      isPaused: () => paused,
+      intervalMs: 400,
+      assistance: 'Move planning'
+    });
     const off = exposeGame(
       () => ({
         game: 'match3',
-        mode: phase,
+        mode: paused ? 'paused' : phase,
         grid,
         selected,
         hinted,
@@ -233,6 +268,7 @@ const match3: GameModule = {
       (ms) => loop.advance(ms)
     );
     return () => {
+      offLaya();
       loop.stop();
       off();
     };
@@ -371,6 +407,23 @@ function hasMove(grid: Cell[][]): boolean {
     }
   }
   return false;
+}
+
+export function match3Moves(grid: Cell[][]) {
+  const result: { a: Point; b: Point; count: number }[] = [];
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const a = { x, y };
+      for (const b of [{ x: x + 1, y }, { x, y: y + 1 }]) {
+        if (b.x >= SIZE || b.y >= SIZE) continue;
+        swap(grid, a, b);
+        const count = findMatches(grid).length;
+        swap(grid, a, b);
+        if (count) result.push({ a, b, count });
+      }
+    }
+  }
+  return result.sort((a, b) => b.count - a.count);
 }
 
 export default match3;

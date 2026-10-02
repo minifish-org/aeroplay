@@ -3,19 +3,20 @@ import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
 import { GameLoop } from '../core/engine';
 import { namespace } from '../core/storage';
 import { directionPad, exposeGame, message } from '../core/play';
+import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
 
 type Cell = {
   visited: boolean;
   walls: { top: boolean; right: boolean; bottom: boolean; left: boolean };
 };
 type Point = { x: number; y: number };
-const storage = namespace('maze');
 const maze: GameModule = {
   id: 'maze',
   name: 'Maze Escape',
   icon: '🧭',
   description: 'Explore, collect three stars, and find your way home.',
   mount(root, goBack) {
+    const storage = namespace('maze');
     const { area } = createGameShell(root, 'Maze Escape', goBack);
     const info = document.createElement('div');
     info.className = 'info-row';
@@ -38,6 +39,10 @@ const maze: GameModule = {
       elapsed = 0,
       finished = false,
       hints = 3;
+    let paused = false,
+      revision = 0,
+      routeTimer = 0;
+    let planned: Point[] = [];
     let trail = new Set<string>(),
       path: Point[] = [],
       showTrail = true;
@@ -92,6 +97,8 @@ const maze: GameModule = {
       return [];
     }
     function reset() {
+      revision++;
+      planned = [];
       size = Math.min(16, 8 + Math.floor((level - 1) / 2) * 2);
       grid = generateMaze(size);
       player = { x: 0, y: 0 };
@@ -178,8 +185,8 @@ const maze: GameModule = {
       );
       ctx.fill();
     }
-    function move(dx: number, dy: number) {
-      if (finished) return;
+    function move(dx: number, dy: number, fromLaya = false) {
+      if (paused || (isLayaControlling() && !fromLaya) || finished) return;
       const n = neighbors(player).find(
         (p) => p.x === player.x + dx && p.y === player.y + dy
       );
@@ -213,6 +220,7 @@ const maze: GameModule = {
       move(x, y);
     });
     const key = (e: KeyboardEvent) => {
+      if (paused || isLayaControlling()) return;
       const p = (
         {
           ArrowUp: [0, -1],
@@ -228,17 +236,64 @@ const maze: GameModule = {
     };
     window.addEventListener('keydown', key);
     const loop = new GameLoop((dt) => {
-      if (steps && !finished && !document.hidden) {
+      if (paused || document.hidden) return;
+      if (planned.length && !isLayaControlling()) planned = [];
+      if (planned.length && !finished) {
+        routeTimer -= dt;
+        if (routeTimer <= 0) {
+          const next = planned.shift()!;
+          const before = steps;
+          move(next.x - player.x, next.y - player.y, true);
+          if (before === steps) planned = [];
+          routeTimer = 0.15;
+        }
+      }
+      if (steps && !finished) {
         elapsed += dt;
         info.textContent = `Expedition ${level} · ${elapsed.toFixed(1)}s · ${steps} steps · Stars ${collected}/3`;
       }
     });
     reset();
     loop.start();
+    const stateKey = () => `${revision}:${steps}:${player.x},${player.y}:${stars.map((p) => `${p.x},${p.y}`).join(';')}`;
+    const targets = () => mazeLayaTargets(
+      stars,
+      { x: size - 1, y: size - 1 },
+      (target) => route(player, target).slice(1)
+    );
+    const offLaya = registerLayaGame({
+      game: 'maze',
+      observe: () => {
+        if (paused || finished || planned.length) return null;
+        const candidates = targets();
+        if (!candidates.length) return null;
+        return {
+          key: stateKey(),
+          context: `Maze ${size} by ${size}. Player row ${player.y + 1}, column ${player.x + 1}. Stars collected ${collected}/3. Routes use the visible maze walls. The exit ends the round, so stars beyond it are unavailable.\n${candidates.map((c, i) => `Option ${i}: ${c.kind} at row ${c.target.y + 1}, column ${c.target.x + 1}, route length ${c.way.length}.`).join('\n')}`,
+          question: candidates[0].kind === 'star' ? 'Which remaining star has the shortest route?' : 'Which route reaches the exit?',
+          choices: Object.fromEntries(candidates.map((c, i) => [String(i), `${c.kind === 'star' ? 'Star' : 'Exit'} at row ${c.target.y + 1}, column ${c.target.x + 1}`]))
+        };
+      },
+      act: (choice, key) => {
+        if (paused || finished || planned.length || key !== stateKey()) return false;
+        const candidate = targets()[Number(choice)];
+        if (!candidate || String(Number(choice)) !== choice) return false;
+        planned = candidate.way;
+        routeTimer = 0;
+        return true;
+      },
+      start: () => { paused = false; if (finished) reset(); },
+      pause: () => { paused = true; planned = []; },
+      resume: () => { paused = false; },
+      isFinished: () => finished,
+      isPaused: () => paused,
+      intervalMs: 300,
+      assistance: 'Move planning'
+    });
     const off = exposeGame(
       () => ({
         game: 'maze',
-        mode: finished ? 'won' : 'playing',
+        mode: finished ? 'won' : paused ? 'paused' : 'playing',
         size,
         player,
         stars,
@@ -246,6 +301,7 @@ const maze: GameModule = {
         grid: grid.map((row) => row.map((c) => c.walls)),
         hints,
         path,
+        planned,
         steps,
         elapsed,
         level
@@ -253,6 +309,7 @@ const maze: GameModule = {
       (ms) => loop.advance(ms)
     );
     return () => {
+      offLaya();
       loop.stop();
       swipeOff();
       off();
@@ -260,6 +317,17 @@ const maze: GameModule = {
     };
   }
 };
+
+/** Route steps exclude the player cell; entering the exit ends the round. */
+export function mazeLayaTargets(stars: Point[], exit: Point, routeTo: (target: Point) => Point[]) {
+  const candidates = stars
+    .map((target) => ({ target, way: routeTo(target), kind: 'star' as const }))
+    .filter((candidate) => candidate.way.length > 0 &&
+      !candidate.way.some((point) => point.x === exit.x && point.y === exit.y));
+  if (candidates.length) return candidates;
+  const way = routeTo(exit);
+  return way.length ? [{ target: exit, way, kind: 'exit' as const }] : [];
+}
 
 function generateMaze(size: number): Cell[][] {
   const COLS = size,

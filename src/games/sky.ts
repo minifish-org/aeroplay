@@ -22,6 +22,7 @@ import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
 import { GameAudio } from '../core/audio';
 import { GameLoop } from '../core/engine';
 import { exposeGame } from '../core/play';
+import { registerLayaGame } from '../core/laya-bridge';
 import { namespace } from '../core/storage';
 import { createStage } from '../core/three/stage';
 import {
@@ -33,7 +34,6 @@ import {
   stepFlight
 } from './skyState';
 
-const storage = namespace('sky');
 const sky: GameModule = {
   id: 'sky',
   name: 'Sky Rush',
@@ -41,6 +41,7 @@ const sky: GameModule = {
   description:
     'Bank through the clouds. Chase rings, build a streak, hit the boost.',
   mount(root, goBack) {
+    const storage = namespace('sky');
     const { area } = createGameShell(root, 'Sky Rush', goBack);
     area.closest('.game-shell')!.classList.add('immersive-shell');
     const view = document.createElement('div');
@@ -54,6 +55,7 @@ const sky: GameModule = {
     stage.scene.fog = new Fog(0xbde3e8, 65, 175);
     const audio = new GameAudio();
     let state = createFlight();
+    let flightVersion = 0;
     let best = storage.load('best', 0),
       visualTime = 0,
       shake = 0;
@@ -250,6 +252,7 @@ const sky: GameModule = {
     }
     function restart(nextSector = false) {
       const previous = state;
+      flightVersion++;
       state = createFlight(Math.random, nextSector ? previous.sector + 1 : 1);
       if (nextSector) {
         state.score = previous.score;
@@ -464,8 +467,58 @@ const sky: GameModule = {
       }),
       (ms) => loop.advance(ms)
     );
+    const nearestRow = () =>
+      state.rows
+        .filter((row) => !row.passed && row.distance >= 0)
+        .reduce<(typeof state.rows)[number] | null>(
+          (nearest, row) =>
+            !nearest || row.distance < nearest.distance ? row : nearest,
+          null
+        );
+    const rowKey = () => {
+      const row = nearestRow();
+      return row ? `${flightVersion}:${state.sector}:${row.index}` : null;
+    };
+    const layaOff = registerLayaGame({
+      game: 'sky',
+      observe: () => {
+        const row = nearestRow();
+        const key = rowKey();
+        if (state.mode !== 'playing' || !row || !key) return null;
+        const lanes = ['left', 'middle', 'right'];
+        return {
+          key,
+          context: `The golden ring is in the ${lanes[row.safeLane]} lane. ` +
+            row.obstacles.map((lane) => `The ${lanes[lane]} lane has a barrier.`).join(' '),
+          question: 'Which lane contains the golden ring?',
+          choices: { '0': 'left', '1': 'middle', '2': 'right' }
+        };
+      },
+      act: (choice, key) => {
+        if (state.mode !== 'playing' || key !== rowKey()) return false;
+        if (!['0', '1', '2'].includes(choice)) return false;
+        steerFlight(state, Number(choice) - state.lane);
+        return true;
+      },
+      start: () => {
+        if (state.mode === 'over' || state.mode === 'won') restart();
+        else begin();
+      },
+      pause: () => {
+        if (state.mode === 'playing') state.mode = 'paused';
+        syncUI();
+      },
+      resume: () => {
+        if (state.mode === 'paused') begin();
+      },
+      isFinished: () => state.mode === 'over' || state.mode === 'won',
+      isPaused: () => state.mode === 'paused',
+      intervalMs: 50,
+      assistance: 'Laya reads the visible ring and barrier lanes and chooses a lane. Watch mode steers without boost.'
+    });
     return () => {
       loop.stop();
+      layaOff();
       off();
       swipeOff();
       audio.dispose();

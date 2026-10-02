@@ -1,5 +1,18 @@
 Original prompt: Revisit all games in this project and make them more fun to play.
 
+## Optional Laya play modes (2026-10-02)
+- User selected the in-game mode switch preview, a single shared Laya settings entry, offline human play, and online human/Laya play across all ten games.
+- Keep the hub's game cards unchanged; add connection settings globally and player controls inside each game.
+- Add an optional external decision service. The authorized online mode extends the original local-only constraint; human gameplay and all game assets stay offline-ready.
+- Separate Laya/assisted records and saves from personal records. Never use a deterministic player as a silent Laya fallback.
+- Implemented one shared connection dialog, in-game watch controls, cancellation on pause/navigation, disconnect/retry/takeover, and captured per-run storage ownership across all ten games.
+- The separate, resource-limited Laya service is ready on the GMK tailnet endpoint (port 8448). The existing Sky experiment on 8447 remains separate.
+- Production build, 17 pure core cases, 11 service boundary cases, and independent source review passed. Browser checks exercised real model actions in all ten games, keyboard pause/resume, takeover, connection failure/recovery, and 320/390px layouts.
+- Observed examples: Sky collected 34 rings before takeover, Maze escaped with three stars, 2048 reached score 68, Match-3 reached 680, Sudoku made 12 placements without mistakes, and solver-assisted Lights Out completed in three moves. Flappy ended before its first gate; these checks verify integration, not reliable winning strategies.
+- Fixed a static precache lookup mismatch caused by `Vary: Origin` on preview module responses. The worker ignores request-header variation only within its same-origin static cache; canonical navigation and external/non-GET request boundaries remain covered by `scripts/verify-offline-cache.mjs`.
+- Actual production browser verification passed after stopping the preview server: hub reload, all ten game mounts, disabled watch mode without configuration, and human Sky gameplay. Static precache completeness and the offline handler regression checks also passed.
+- Publication will use the existing push-to-main Pages workflow. Physical iPhone/Safari testing has not been performed for this change.
+
 ## Direction
 - Improve all eight existing games, preserving the lightweight, local-only architecture.
 - Arcade: intentional start/pause/results, fair pacing, progressive challenge, stronger feedback.

@@ -1,5 +1,8 @@
 import { games } from './games/registry';
-import { load, save, namespace } from './core/storage';
+import { load, save, namespace, setPlayProfile, type PlayProfile } from './core/storage';
+import { createLayaSettingsButton } from './core/laya-settings';
+import { mountLayaControls } from './core/laya-controls';
+import '../styles/laya.css';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -18,6 +21,7 @@ function renderHub() {
   navigationVersion++;
   teardown?.();
   teardown = null;
+  setPlayProfile('human');
   document.title = 'AeroPlay Hub';
   history.replaceState(null, '', '#hub');
   app.innerHTML = '';
@@ -25,7 +29,10 @@ function renderHub() {
   const top = document.createElement('div');
   top.className = 'hub-topline';
   top.innerHTML =
-    '<div class="hub-brand">aero<span>play</span> ↗</div><div class="offline-badge">Your pocket arcade</div>';
+    '<div class="hub-brand">aero<span>play</span> ↗</div><div class="hub-tools"><div class="offline-badge">Your pocket arcade</div></div>';
+  const settings = createLayaSettingsButton();
+  top.querySelector('.hub-tools')!.append(settings.button);
+  teardown = settings.dispose;
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     void navigator.serviceWorker.ready.then(() => {
       const badge = top.querySelector('.offline-badge');
@@ -125,7 +132,7 @@ function renderHub() {
   show('All games');
 }
 
-async function startGame(id: string) {
+async function startGame(id: string, profile: PlayProfile = 'human') {
   const game = games.find((game) => game.id === id);
   if (!game) return;
   const version = ++navigationVersion;
@@ -139,9 +146,13 @@ async function startGame(id: string) {
     const module = await game.load();
     if (version !== navigationVersion) return;
     save('last-game', id);
-    teardown = module.default.mount(app, () => {
+    setPlayProfile(profile);
+    const gameTeardown = module.default.mount(app, () => {
       location.hash = 'hub';
     });
+    const controls = mountLayaControls(app, profile, (next) => { void startGame(id, next); });
+    teardown = () => { controls.dispose(); gameTeardown(); };
+    if (profile === 'laya') controls.startWatching();
   } catch (error) {
     if (version !== navigationVersion) return;
     app.innerHTML =
@@ -171,6 +182,7 @@ window.addEventListener('hashchange', handleHash);
 handleHash();
 
 window.addEventListener('keydown', (event) => {
+  if (event.target instanceof HTMLElement && event.target.closest('dialog,input,textarea,select')) return;
   if (event.key.toLowerCase() !== 'f' || event.repeat) return;
   if (document.fullscreenElement) void document.exitFullscreen();
   else if (document.documentElement.requestFullscreen)
