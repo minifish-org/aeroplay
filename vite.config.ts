@@ -35,6 +35,8 @@ export default defineConfig({
         const fingerprint = createHash("sha256").update(
           JSON.stringify(assets) + template,
         );
+        const html = bundle["index.html"];
+        if (html?.type === "asset") fingerprint.update(html.source);
         for (const file of staticFiles) {
           fingerprint
             .update(file)

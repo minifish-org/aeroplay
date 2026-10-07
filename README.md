@@ -47,6 +47,8 @@ Run `node scripts/verify-offline.mjs` against `npm run preview` to verify produc
 
 The WebKit offline check starts its own preview from `dist` and shuts that server down after installation. This verifies cached responses without Playwright's offline override, which rejects service-worker navigations in this WebKit environment.
 
+Run `node scripts/verify-script-policy.mjs` against the production preview to confirm that injected external scripts are blocked before network dispatch in Chromium and WebKit. The offline verifier rejects external network requests, including failed ones; only explicit browser CSP blocks are excluded.
+
 Run `TEST_PAGES_REDIRECTS=1 node scripts/verify-offline.mjs` after building to start an isolated preview with Cloudflare Pages-style `/index.html` redirects and verify both online and offline reloads. The service worker uses the canonical `/` response for navigation; caching a redirected HTML response breaks browser reloads on Pages.
 
 Run `node scripts/verify-phaser-models.mjs` for independent grid-rule checks, Sudoku uniqueness, maze connectivity, minimum Lights Out solutions and legal Tetris landing plans.
@@ -57,7 +59,8 @@ Run `node scripts/verify-phaser-models.mjs` for independent grid-rule checks, Su
 - Pure grid rules and solvers live in `src/games/models`; rendering helpers live in `src/games/views`. Grid games use discrete rules rather than unnecessary physics simulation.
 - Phaser and Three.js are separate local chunks; the hub loads neither engine until its game is opened. The service worker precaches both for flight mode.
 - Vector artwork and tiny local WAV cues require no external assets. Sound is optional and saved per device.
-- Precache versions include public asset contents, so artwork or audio updates alone refresh the offline installation.
+- Precache versions include page HTML and public asset contents, so page policies, artwork or audio updates alone refresh the offline installation.
+- The page restricts scripts and workers to its own origin. This blocks hosting-injected external analytics while allowing locally bundled games, offline service workers, Cargo hints and the configured Laya decision connection.
 - Human and Laya play share the same rules. Model observations contain visible state and legal outcomes; stale observations are rejected before applying actions.
 - A new asynchronous mount is canceled when another navigation wins. Navigation releases the active scene, sound manager, renderer, gestures and callbacks.
 - Sudoku permutes three validated unique templates and adds starter clues; transformations and extra clues preserve uniqueness. A new puzzle is saved with its own givens and solution. The Laya adapter never receives that stored solution.

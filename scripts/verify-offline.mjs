@@ -50,7 +50,7 @@ const errors = [],
 page.on("pageerror", (error) => errors.push(error.message));
 page.on("request", (request) => {
   if (new URL(request.url()).origin !== new URL(base).origin)
-    external.push(request.url());
+    external.push(request);
 });
 try {
   await page.goto(base);
@@ -277,9 +277,16 @@ try {
     fullPage: true,
   });
   assert.deepEqual(errors, []);
-  assert.deepEqual(external, []);
+  // Chromium reports a synthetic request when CSP blocks a script before network dispatch.
+  const networkExternal = external.filter(
+    (request) => request.failure()?.errorText !== "csp",
+  );
+  assert.deepEqual(
+    networkExternal.map((request) => request.url()),
+    [],
+  );
   console.log(
-    `PASS Offline: ${cached.length} cached resources, online/offline reload${pagesRedirects ? " with Pages HTML redirects" : ""}, all ten games, saved scores, ${isWebKit ? "WebKit native touch controls" : "real 2D/3D touch swipes"} and offline worker hints, no external requests or page errors`,
+    `PASS Offline: ${cached.length} cached resources, online/offline reload${pagesRedirects ? " with Pages HTML redirects" : ""}, all ten games, saved scores, ${isWebKit ? "WebKit native touch controls" : "real 2D/3D touch swipes"} and offline worker hints, no external network requests or page errors${external.length ? `; ${external.length} script attempts blocked by CSP before network dispatch` : ""}`,
   );
 } finally {
   await browser.close();
