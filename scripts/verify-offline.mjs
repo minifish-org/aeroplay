@@ -136,14 +136,6 @@ try {
     "right",
   );
   assert(cached.some((p) => p.includes("solver.worker")));
-  assert(
-    cached.some((p) => /phaser-.*\.js/.test(p)),
-    "Shared Phaser engine is precached",
-  );
-  assert(
-    cached.some((p) => p.includes("/sounds/win.wav")),
-    "Local audio is precached",
-  );
   await page.evaluate(() => {
     localStorage.setItem(
       "aeroplay:game2048:state",
@@ -165,7 +157,7 @@ try {
       window.render_game_to_text &&
       JSON.parse(window.render_game_to_text()).game === "2048",
   );
-  const box = await page.locator(".pocket-stage canvas").boundingBox();
+  const box = await page.locator(".grid-2048").boundingBox();
   const session = isWebKit ? null : await context.newCDPSession(page);
   async function touchMove(box, direction, button) {
     if (!session) {
@@ -198,7 +190,8 @@ try {
       touchPoints: [],
     });
   }
-  await touchMove(box, "left", "Left");
+  if (isWebKit) await page.keyboard.press("ArrowLeft");
+  else await touchMove(box, "left", "Left");
   await page.waitForFunction(
     () => JSON.parse(window.render_game_to_text()).moves === 1,
   );
@@ -286,7 +279,7 @@ try {
     [],
   );
   console.log(
-    `PASS Offline: ${cached.length} cached resources, online/offline reload${pagesRedirects ? " with Pages HTML redirects" : ""}, all ten games, saved scores, ${isWebKit ? "WebKit native touch controls" : "real 2D/3D touch swipes"} and offline worker hints, no external network requests or page errors${external.length ? `; ${external.length} script attempts blocked by CSP before network dispatch` : ""}`,
+    `PASS Offline: ${cached.length} cached resources, online/offline reload${pagesRedirects ? " with Pages HTML redirects" : ""}, all ten games, saved scores, ${isWebKit ? "WebKit native controls and keyboard" : "real 2D/3D touch swipes"} and offline worker hints, no external network requests or page errors${external.length ? `; ${external.length} script attempts blocked by CSP before network dispatch` : ""}`,
   );
 } finally {
   await browser.close();

@@ -1,6 +1,6 @@
 # AeroPlay — FlightMode Offline Game Hub
 
-A lightweight, offline-first collection of ten games (Sky Rush, Pocket Cargo, Snake, Tetris, 2048, Flappy Bird, Maze, Match-3, Sudoku, Lights Out) built with TypeScript, Vite, Phaser 4.2.1 (eight 2D games), and Three.js (two 3D games). Designed for mobile, touch-friendly play in airplane mode with add-to-homescreen support.
+A lightweight, offline-first collection of ten games (Sky Rush, Pocket Cargo, Snake, Tetris, 2048, Flappy Bird, Maze, Match-3, Sudoku, Lights Out) built with TypeScript, Vite, and Three.js. Designed for mobile, touch-friendly play in airplane mode with add-to-homescreen support.
 
 **Use this as a template:** In GitHub, click “Use this template” to bootstrap a new repo without inheriting issues or history. Keep `main` clean (no build artifacts) for easy forking.
 
@@ -19,7 +19,7 @@ Open the shown URL in a browser. For mobile testing, run with `--host 0.0.0.0` a
 ## Playing on Phone in Flight Mode
 1. Run `npm run build` and serve `dist` over HTTPS. Service workers require a secure origin; plain HTTP on a LAN address does not enable offline installation. `localhost` works for desktop preview.
 2. Open the site in Safari or Chrome while online and wait for **Offline ready** in the hub.
-3. Add to Home Screen, open it once, then enable flight mode. All ten games are precached, including games you have not opened yet, both shared renderers, all artwork and sound, and the Cargo hint worker.
+3. Add to Home Screen, open it once, then enable flight mode. All ten games are precached, including games you have not opened yet, the shared 3D renderer, and the Cargo hint worker.
 4. Progress stays in local storage on that browser and device. Clearing website data clears saves.
 
 For local layout testing only, use `npm run dev -- --host 0.0.0.0`. The development server does not install a service worker.
@@ -29,41 +29,25 @@ For local layout testing only, use `npm run dev -- --host 0.0.0.0`. The developm
 | --- | --- | --- |
 | Sky Rush | 3D lane flight, ring streaks, boost, shield, sector progression, optional sound | Swipe or ←/→ to steer; Space boosts; P pauses |
 | Pocket Cargo | 12 solvable 3D Sokoban islands, worker hints, minimum-push targets, undo, stars | Swipe or arrows; Z undoes; level selector |
-| Snake | Friendly garden art, default relaxed edge wrapping, classic challenge, golden stars, results | Swipe board, arrows, Start/Pause; Space or P |
+| Snake | Classic acceleration, relaxed edge wrapping, timed golden fruit, results | Swipe board, arrows, Start/Pause; Space or P |
 | Tetris | Seven-bag pieces, three previews, hold, landing ghost, wall kicks, lock delay, combo scoring | Arrows; Space drops; C holds; P pauses; touch buttons |
-| 2048 | Animated tile slides and merges, saved run, 20-step undo, milestone celebrations | Swipe board, arrows, Z to undo |
-| Flappy Bird | Sunny scenery, default gentle speed/wider gaps, classic challenge, perfect-flight rings, medals | Tap board or Space; P pauses |
+| 2048 | Saved run, 20-step undo, milestones, game-over detection | Swipe board, arrows, Z to undo |
+| Flappy Bird | Fair pipe spacing, progressive gaps, perfect-flight bonus, medals | Tap board or Space; P pauses |
 | Maze | Three optional stars, footprints, limited route hints, larger expeditions | Swipe board or arrows |
-| Match-3 | Animated gem swaps and gravity, tap or swipe, cascades, hints, free dead-board shuffles | Tap two adjacent gems or swipe a gem |
-| Sudoku | Varied unique puzzles, default 52-clue Starter mode, Classic mode, notes, undo, three hints, saved timer | Select cell, keypad or 1–9; N toggles notes; Z undoes |
-| Lights Out | Sleepy-star theme, ripple feedback, solvable puzzles, optimal hints, undo, star results | Tap tiles to flip a cross |
+| Match-3 | 30-move target levels, cascade multipliers, free hints and dead-board shuffles | Tap two adjacent gems |
+| Sudoku | Validated puzzles, notes, peer highlights, undo, three hints, saved timer | Select cell, keypad or 1–9; N toggles notes; Z undoes |
+| Lights Out | Progressive solvable puzzles, optimal hints, undo, star results | Tap tiles to flip a cross |
 
-Arcade games and Sudoku pause when the page is hidden. Press F for fullscreen where supported. Puzzle saves include 2048, Match-3 (after cascades settle), Sudoku, and Lights Out; Maze saves expedition progress.
+Arcade games pause when the page is hidden. Press F for fullscreen where supported. Puzzle saves include 2048, Match-3 (after cascades settle), Sudoku, and Lights Out; Maze saves expedition progress.
 
 ## Gameplay verification
 With Playwright available, run `node scripts/verify-games.mjs` against the development server. Set `PLAYWRIGHT_MODULE` to an existing Playwright module path if it is installed outside the project. `TEST_BROWSER=webkit` selects WebKit, and `TEST_URL` changes the server address. The script exercises wins/losses, scoring, hints, undo, persistence, and 320/390/768px layouts, and writes screenshots to `output/`.
 
-Run `node scripts/verify-offline.mjs` against `npm run preview` to verify production precaching, offline reload, all ten game mounts, saves and offline worker hints. It uses the same Playwright environment overrides. Chromium exercises native swipes; WebKit exercises native touch buttons.
-
-The WebKit offline check starts its own preview from `dist` and shuts that server down after installation. This verifies cached responses without Playwright's offline override, which rejects service-worker navigations in this WebKit environment.
-
-Run `node scripts/verify-script-policy.mjs` against the production preview to confirm that injected external scripts are blocked before network dispatch in Chromium and WebKit. The offline verifier rejects external network requests, including failed ones; only explicit browser CSP blocks are excluded.
+Run `node scripts/verify-offline.mjs` against `npm run preview` to verify production precaching, offline reload, all ten game mounts, and touch swipes. It uses the same Playwright environment overrides, including `TEST_BROWSER=webkit`. The WebKit check installs an isolated preview and then stops the server to verify cached reload and play without Playwright's service-worker offline override.
 
 Run `TEST_PAGES_REDIRECTS=1 node scripts/verify-offline.mjs` after building to start an isolated preview with Cloudflare Pages-style `/index.html` redirects and verify both online and offline reloads. The service worker uses the canonical `/` response for navigation; caching a redirected HTML response breaks browser reloads on Pages.
 
-Run `node scripts/verify-phaser-models.mjs` for independent grid-rule checks, Sudoku uniqueness, maze connectivity, minimum Lights Out solutions and legal Tetris landing plans.
-
-## 2D playground architecture
-- All eight 2D games run inside Phaser Scenes. The hub, native touch controls, settings and Laya panel remain HTML.
-- `src/core/phaser/pocket.ts` owns scene lifecycle, scaling, pointer gestures, keyboard routing, local sound, reduced-motion effects and inspection hooks. `board.ts` reuses tile containers across board games.
-- Pure grid rules and solvers live in `src/games/models`; rendering helpers live in `src/games/views`. Grid games use discrete rules rather than unnecessary physics simulation.
-- Phaser and Three.js are separate local chunks; the hub loads neither engine until its game is opened. The service worker precaches both for flight mode.
-- Vector artwork and tiny local WAV cues require no external assets. Sound is optional and saved per device.
-- Precache versions include page HTML and public asset contents, so page policies, artwork or audio updates alone refresh the offline installation.
-- The page restricts scripts and workers to its own origin. This blocks hosting-injected external analytics while allowing locally bundled games, offline service workers, Cargo hints and the configured Laya decision connection.
-- Human and Laya play share the same rules. Model observations contain visible state and legal outcomes; stale observations are rejected before applying actions.
-- A new asynchronous mount is canceled when another navigation wins. Navigation releases the active scene, sound manager, renderer, gestures and callbacks.
-- Sudoku permutes three validated unique templates and adds starter clues; transformations and extra clues preserve uniqueness. A new puzzle is saved with its own givens and solution. The Laya adapter never receives that stored solution.
+Run `node scripts/verify-script-policy.mjs` against the production preview to confirm that injected external scripts are blocked before network dispatch in Chromium and WebKit. The offline verifier rejects external network requests, including failed ones; only explicit browser CSP blocks are excluded.
 
 ## 3D games and architecture
 - **Sky Rush** is a three-lane flight game. Golden rings grow a score multiplier, a full charge activates a three-second boost, and one shield absorbs a collision. Finish 1,000 meters to enter the next sector.
@@ -91,11 +75,10 @@ Browsers can require [local network permission](https://developer.chrome.com/blo
 
 Run `node scripts/verify-laya-core.mjs` for transport, cancellation, input validation, controller lifecycle and save isolation tests. These use fake transport to exercise failures and do not count as real-model gameplay verification.
 
-Run `node scripts/verify-phaser-laya.mjs` against the development server to exercise all eight real Phaser adapters with controlled transport, including decisions, pause, late replies, takeover, save isolation and rapid navigation. It supports the same Playwright environment overrides, including WebKit. These checks verify integration, not model playing skill.
-
 ## Tech Notes
-- Static frontend: Phaser and Three.js are bundled locally; no external CDN or remote game assets. Optional Laya inference is a separate service.
-- Offline: service worker + manifest; localStorage per-game saves.
+- Static frontend: Three.js is bundled locally; no external CDN or remote game assets. Optional Laya inference is a separate service.
+- Offline: service worker + manifest; localStorage per-game saves. Cache versions include built page HTML and public asset contents, so policy and artwork changes refresh installed copies.
+- The page restricts scripts and workers to its own origin. Hosting-injected analytics cannot run or make external requests; the configured Laya decision connection remains available.
 - Mobile UX: touch controls, double-tap zoom disabled, overscroll reduced.
 
 ## Deploying to Cloudflare Pages

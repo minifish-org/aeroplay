@@ -117,3 +117,12 @@ Original prompt: Revisit all games in this project and make them more fun to pla
 - User subsequently authorized committing and pushing the completed migration to main. The existing push workflow performs the production build and Pages publication.
 - Migration commit 282ef3d was pushed to main and its Pages workflow succeeded. Live production checks passed all ten offline games, saves, swipes and worker hints, but detected an injected Cloudflare analytics script as an external request. Added a same-origin script/worker page policy and included HTML content in cache fingerprints so this policy reaches installed offline copies.
 - The policy passes Chromium/WebKit checks with zero intercepted network dispatches and no injected-script execution. Both offline browser suites and the Laya adapter suite still pass. Build fixtures verify HTML-only and artwork-only cache invalidation. Chromium's synthetic CSP request events are classified by their explicit CSP failure; all actual external network requests remain rejected.
+
+## Restore pre-Phaser games (2026-10-08)
+- User rejected the Phaser rewrite and requested a return to the previous version. They clarified that future visual work should enhance existing 2D renderers with PixiJS and target ages 11 and 13.
+- Archived unfinished teen-style changes in a local Git stash. Reverted the Phaser migration without rewriting published Git history.
+- Restored the eight original Canvas/DOM games and their Laya adapters, touch controls, saves and shared helpers. The two Three.js games and configured Laya service remain.
+- Preserve the later same-origin script policy and content-based offline cache invalidation. No PixiJS migration is part of this rollback.
+- Validation passed: production build; eight-game Chromium/WebKit gameplay outcomes, touch controls, saves and 320/390/768px layouts; all ten games offline with cached reload and Cargo worker hints; seventeen Laya core cases; ten restored Laya adapters in both browser engines using controlled transport (decisions, pause, late replies, separate saves and takeover); script policy and content-based cache checks.
+- Confirmed game sources, shared helpers, styles, public gameplay assets, dependency manifests and AGENTS.md match pre-migration commit 984b8d5. Only offline safeguards, their verification and documentation remain newer.
+- Reviewed restored hub and gameplay screenshots. Future PixiJS work should enhance rendering and effects around the existing mechanics, with a visual direction appropriate for ages 11 and 13.

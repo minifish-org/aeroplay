@@ -1,204 +1,172 @@
-import { games } from "./games/registry";
-import {
-  load,
-  save,
-  namespace,
-  setPlayProfile,
-  type PlayProfile,
-} from "./core/storage";
-import { createLayaSettingsButton } from "./core/laya-settings";
-import { mountLayaControls } from "./core/laya-controls";
-import "../styles/laya.css";
-import "../styles/pocket.css";
+import { games } from './games/registry';
+import { load, save, namespace, setPlayProfile, type PlayProfile } from './core/storage';
+import { createLayaSettingsButton } from './core/laya-settings';
+import { mountLayaControls } from './core/laya-controls';
+import '../styles/laya.css';
 
-const app = document.querySelector<HTMLDivElement>("#app")!;
+const app = document.querySelector<HTMLDivElement>('#app')!;
 
 let teardown: (() => void) | null = null;
 let navigationVersion = 0;
-let mounting: AbortController | null = null;
 
-if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch((err) => {
-      console.warn("SW register failed", err);
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch((err) => {
+      console.warn('SW register failed', err);
     });
   });
 }
 
 function renderHub() {
-  mounting?.abort();
   navigationVersion++;
   teardown?.();
   teardown = null;
-  setPlayProfile("human");
-  document.title = "AeroPlay Hub";
-  history.replaceState(null, "", "#hub");
-  app.innerHTML = "";
+  setPlayProfile('human');
+  document.title = 'AeroPlay Hub';
+  history.replaceState(null, '', '#hub');
+  app.innerHTML = '';
 
-  const top = document.createElement("div");
-  top.className = "hub-topline";
+  const top = document.createElement('div');
+  top.className = 'hub-topline';
   top.innerHTML =
     '<div class="hub-brand">aero<span>play</span> ↗</div><div class="hub-tools"><div class="offline-badge">Your pocket arcade</div></div>';
   const settings = createLayaSettingsButton();
-  top.querySelector(".hub-tools")!.append(settings.button);
+  top.querySelector('.hub-tools')!.append(settings.button);
   teardown = settings.dispose;
-  if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     void navigator.serviceWorker.ready.then(() => {
-      const badge = top.querySelector(".offline-badge");
-      if (badge) badge.textContent = "● Offline ready";
+      const badge = top.querySelector('.offline-badge');
+      if (badge) badge.textContent = '● Offline ready';
     });
   }
-  const hero = document.createElement("div");
-  hero.className = "hub-hero";
+  const hero = document.createElement('div');
+  hero.className = 'hub-hero';
   hero.innerHTML = `
-    <div class="hub-eyebrow">YOUR LITTLE POCKET PLAYGROUND</div>
-    <h1 class="hub-heading">A little play.<br>A lot of wonder.</h1>
-    <div class="hub-subtitle">Grow a garden friend, chase a rainbow, or fly into the clouds. Ten little adventures. Yours to explore.</div>
+    <div class="hub-eyebrow">AEROPLAY ORIGINALS · NOW IN 3D</div>
+    <h1 class="hub-heading">A bigger world.<br>In your pocket.</h1>
+    <div class="hub-subtitle">Fly above the clouds. Deliver a little joy. Discover two new 3D adventures, alongside eight pocket classics.</div>
   `;
-  const last =
-    games.find((g) => g.id === load("last-game", "snake")) ?? games[0];
-  const artwork = document.createElement("img");
-  artwork.src = "/assets/playground.svg";
-  artwork.alt = "";
-  artwork.className = "hero-art";
+  const last = games.find((g) => g.id === load('last-game', 'sky')) ?? games[0];
+  const artwork = document.createElement('img');
+  artwork.src = '/assets/sky-rush.svg';
+  artwork.alt = '';
+  artwork.className = 'hero-art';
   hero.append(artwork);
-  const resume = document.createElement("button");
-  resume.className = "hub-play";
+  const resume = document.createElement('button');
+  resume.className = 'hub-play';
   resume.textContent = `Play ${last.name} ↗`;
-  resume.addEventListener("click", () => {
+  resume.addEventListener('click', () => {
     location.hash = last.id;
   });
   hero.append(resume);
-  const section = document.createElement("div");
-  section.className = "hub-section";
-  section.innerHTML = "<h2>Find your next favorite</h2>";
-  const filters = document.createElement("div");
-  filters.className = "hub-filters";
-  filters.setAttribute("aria-label", "Game categories");
+  const section = document.createElement('div');
+  section.className = 'hub-section';
+  section.innerHTML = '<h2>Find your next favorite</h2>';
+  const filters = document.createElement('div');
+  filters.className = 'hub-filters';
+  filters.setAttribute('aria-label', 'Game categories');
   section.append(filters);
-  const grid = document.createElement("div");
-  grid.className = "hub-grid";
+  const grid = document.createElement('div');
+  grid.className = 'hub-grid';
   function record(id: string) {
-    const store = namespace(id === "2048" ? "game2048" : id);
-    if (id === "maze") return `Expedition ${store.load("level", 1)}`;
-    if (id === "lightsout")
-      return `Puzzle ${store.load<{ level: number }>("state-v2", { level: 1 }).level}`;
-    if (id === "sudoku") return "Take your time";
-    if (id === "cargo") {
-      const stars = store.load<Record<string, number>>("stars", {});
+    const store = namespace(id === '2048' ? 'game2048' : id);
+    if (id === 'maze') return `Expedition ${store.load('level', 1)}`;
+    if (id === 'lightsout')
+      return `Puzzle ${store.load<{ level: number }>('state-v2', { level: 1 }).level}`;
+    if (id === 'sudoku') return 'Take your time';
+    if (id === 'cargo') {
+      const stars = store.load<Record<string, number>>('stars', {});
       return `${Object.keys(stars).length}/12 islands delivered`;
     }
-    const best =
-      id === "snake"
-        ? Math.max(
-            store.load<number>("best", 0),
-            store.load<number>("best-relaxed", 0),
-          )
-        : store.load<number>("best", 0);
+    const best = store.load<number>('best', 0);
     return best
       ? `Best ${best.toLocaleString()}`
-      : games.find((g) => g.id === id)?.category === "Arcade"
-        ? "Chase a high score"
-        : "Make your first move";
+      : games.find((g) => g.id === id)?.category === 'Arcade'
+        ? 'Chase a high score'
+        : 'Make your first move';
   }
   function show(category: string) {
     filters
-      .querySelectorAll("button")
+      .querySelectorAll('button')
       .forEach((b) =>
-        b.setAttribute("aria-pressed", String(b.textContent === category)),
+        b.setAttribute('aria-pressed', String(b.textContent === category))
       );
-    grid.innerHTML = "";
-    games.forEach((game) => {
+    grid.innerHTML = '';
+    games.forEach((game, index) => {
       if (
-        (category !== "All games" &&
-          category !== "3D" &&
+        (category !== 'All games' &&
+          category !== '3D' &&
           category !== game.category) ||
-        (category === "3D" && !game.dimension)
+        (category === '3D' && !game.dimension)
       )
         return;
-      const card = document.createElement("button");
-      card.className = "hub-card";
-      card.style.setProperty("--accent", game.accent);
-      if (game.dimension) card.classList.add("featured-card");
+      const card = document.createElement('button');
+      card.className = 'hub-card';
+      card.style.setProperty('--accent', game.accent);
+      if (game.dimension) card.classList.add('featured-card');
       card.innerHTML = `
-        <img class="card-art" src="/assets/${game.id === "sky" ? "sky-rush" : game.id === "cargo" ? "pocket-cargo" : game.id}.svg" alt="" />
-        <div class="hub-card-top"><span class="hub-card-index">${game.dimension ? "3D ADVENTURE" : game.category === "Arcade" ? "ARCADE" : "PUZZLE"}</span></div>
+        ${game.dimension ? `<img class="card-art" src="/assets/${game.id === 'sky' ? 'sky-rush' : 'pocket-cargo'}.svg" alt="" />` : ''}
+        <div class="hub-card-top"><div class="hub-card-icon">${game.icon}</div><span class="hub-card-index">${game.dimension ? 'NEW · 3D' : String(index + 1).padStart(2, '0')}</span></div>
         <div class="hub-card-title">${game.name}</div>
         <div class="hub-card-desc">${game.description}</div>
         <div class="hub-card-foot"><span>${record(game.id)}</span><span aria-hidden="true">↗</span></div>
       `;
-      card.addEventListener("click", () => {
+      card.addEventListener('click', () => {
         location.hash = game.id;
       });
       grid.appendChild(card);
     });
   }
-  ["All games", "3D", "Arcade", "Puzzles"].forEach((category) => {
-    const button = document.createElement("button");
-    button.className = "hub-filter";
+  ['All games', '3D', 'Arcade', 'Puzzles'].forEach((category) => {
+    const button = document.createElement('button');
+    button.className = 'hub-filter';
     button.textContent = category;
-    button.addEventListener("click", () => show(category));
+    button.addEventListener('click', () => show(category));
     filters.append(button);
   });
-  const footer = document.createElement("div");
-  footer.className = "hub-footer";
+  const footer = document.createElement('div');
+  footer.className = 'hub-footer';
   footer.textContent =
-    "No ads. No accounts. Just one more round. · Progress stays on this device.";
+    'No ads. No accounts. Just one more round. · Progress stays on this device.';
   app.append(top, hero, section, grid, footer);
-  show("All games");
+  show('All games');
 }
 
-async function startGame(id: string, profile: PlayProfile = "human") {
+async function startGame(id: string, profile: PlayProfile = 'human') {
   const game = games.find((game) => game.id === id);
   if (!game) return;
   const version = ++navigationVersion;
-  mounting?.abort();
-  const controller = new AbortController();
-  mounting = controller;
   teardown?.();
   teardown = null;
   document.title = `${game.name} | AeroPlay`;
-  history.replaceState(null, "", `#${id}`);
+  history.replaceState(null, '', `#${id}`);
   app.innerHTML =
     '<div class="game-loading" role="status">Getting your game ready…</div>';
   try {
     const module = await game.load();
     if (version !== navigationVersion) return;
-    save("last-game", id);
+    save('last-game', id);
     setPlayProfile(profile);
-    const gameTeardown = await module.default.mount(
-      app,
-      () => {
-        location.hash = "hub";
-      },
-      controller.signal,
-    );
-    if (version !== navigationVersion || controller.signal.aborted) {
-      gameTeardown();
-      return;
-    }
-    const controls = mountLayaControls(app, profile, (next) => {
-      void startGame(id, next);
+    const gameTeardown = module.default.mount(app, () => {
+      location.hash = 'hub';
     });
-    teardown = () => {
-      controls.dispose();
-      gameTeardown();
-    };
-    if (profile === "laya") controls.startWatching();
+    const controls = mountLayaControls(app, profile, (next) => { void startGame(id, next); });
+    teardown = () => { controls.dispose(); gameTeardown(); };
+    if (profile === 'laya') controls.startWatching();
   } catch (error) {
     if (version !== navigationVersion) return;
     app.innerHTML =
       '<div class="game-loading"><p>This game could not open. Please try again.</p><button class="touch-btn">Back to games</button></div>';
-    app.querySelector("button")!.addEventListener("click", () => {
-      location.hash = "hub";
+    app.querySelector('button')!.addEventListener('click', () => {
+      location.hash = 'hub';
     });
-    console.error("Game loading failed", error);
+    console.error('Game loading failed', error);
   }
 }
 
 function handleHash() {
-  const hash = location.hash.replace("#", "");
-  if (!hash || hash === "hub") {
+  const hash = location.hash.replace('#', '');
+  if (!hash || hash === 'hub') {
     renderHub();
     return;
   }
@@ -210,16 +178,12 @@ function handleHash() {
   }
 }
 
-window.addEventListener("hashchange", handleHash);
+window.addEventListener('hashchange', handleHash);
 handleHash();
 
-window.addEventListener("keydown", (event) => {
-  if (
-    event.target instanceof HTMLElement &&
-    event.target.closest("dialog,input,textarea,select")
-  )
-    return;
-  if (event.key.toLowerCase() !== "f" || event.repeat) return;
+window.addEventListener('keydown', (event) => {
+  if (event.target instanceof HTMLElement && event.target.closest('dialog,input,textarea,select')) return;
+  if (event.key.toLowerCase() !== 'f' || event.repeat) return;
   if (document.fullscreenElement) void document.exitFullscreen();
   else if (document.documentElement.requestFullscreen)
     void document.documentElement.requestFullscreen().catch(() => {});

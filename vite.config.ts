@@ -57,7 +57,7 @@ export default defineConfig({
     outDir: "dist",
     assetsDir: "assets",
     rollupOptions: {
-      output: { manualChunks: { three: ["three"], phaser: ["phaser"] } },
+      output: { manualChunks: { three: ["three"] } },
     },
   },
 });
