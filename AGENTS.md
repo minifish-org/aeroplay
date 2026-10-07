@@ -2,7 +2,7 @@
 
 AGENT: FlightMode Games Project
 
-This project builds an offline-first frontend game collection optimized for iPhone flight-mode usage, using HTML, TypeScript, CSS, and locally bundled game libraries such as Three.js. All games share a unified Game Hub UI. Optional Laya watch mode uses a separately configured decision service; personal gameplay and game assets remain fully offline.
+This project builds an offline-first frontend game collection optimized for child-friendly iPhone flight-mode usage, using HTML, TypeScript, CSS, locally bundled Phaser for all eight 2D games, and Three.js for the two 3D games. All games share a unified Game Hub UI. Optional Laya watch mode uses a separately configured decision service; personal gameplay and game assets remain fully offline.
 
 Goal: produce a lightweight, responsive, mobile-friendly experience that runs entirely offline and can be added to Home Screen.
 
@@ -30,10 +30,10 @@ Goal: produce a lightweight, responsive, mobile-friendly experience that runs en
 
 Included Games
 Difficulty A (must implement)
-- Snake (Canvas)
-- Tetris (Canvas)
-- 2048 (DOM)
-- Flappy Bird (Canvas)
+- Snake (Phaser)
+- Tetris (Phaser)
+- 2048 (Phaser)
+- Flappy Bird (Phaser)
 - Maze Escape (random maze generator + movement)
 
 Difficulty B (must implement)
@@ -106,7 +106,7 @@ Game Hub
 
 In-Game Layout
 - Minimal top bar with back button and title
-- Canvas or DOM game area centered
+- Phaser or Three.js game area centered
 - Touch controls where needed
   - Swipe (Snake, Maze)
   - Tap (Flappy Bird)
@@ -118,9 +118,13 @@ In-Game Layout
 
 General
 - Use TypeScript
-- Use Canvas or Three.js for animation-heavy games
+- Use Phaser Scenes for 2D games and Three.js for 3D games
+- Prefer Phaser input, scaling, textures, tweens, particles and sound to custom equivalents
+- Keep board rules and solvers separate from rendering
+- Use bright, readable artwork, gentle starter modes and encouraging feedback for children
 - Load game modules on demand and bundle all dependencies locally
-- Dispose 3D resources, workers, audio contexts, and event handlers on navigation
+- Dispose Phaser games/scenes, 3D resources, workers, audio contexts, and event handlers on navigation
+- Cancel pending asynchronous mounts when navigation supersedes them
 - No external CDN
 - Target 60 FPS
 
@@ -139,7 +143,7 @@ Engine Helpers (engine.ts)
 ## GAME REQUIREMENTS
 
 Snake
-- Canvas rendering
+- Phaser Canvas/WebGL rendering
 - Swipe control
 - Score tracking
 
@@ -148,12 +152,12 @@ Tetris
 - Rotate / left / right / drop mobile controls
 
 2048
-- DOM grid
+- Phaser tile board
 - Touch swipe
 - Smooth animations
 
 Flappy Bird
-- Canvas
+- Phaser Canvas/WebGL rendering
 - Tap to jump
 - Random pipes
 - Score + best score
@@ -200,7 +204,9 @@ Output must run 100% offline.
 ## PERFORMANCE
 
 - Minimize DOM reflow
-- Prefer Canvas for animations
+- Let Phaser own the 2D frame loop; never run a second requestAnimationFrame loop
+- Reuse display objects and textures; update DOM scores only when values change
+- Respect reduced-motion preferences in animations and effects
 - Cap FPS if needed
 - No runtime network usage for an unconfigured installation. Configured Laya mode may check service health and request decisions; never add an external dependency to personal gameplay.
 

@@ -1,9 +1,9 @@
-export type SwipeDirection = 'up' | 'down' | 'left' | 'right';
+export type SwipeDirection = "up" | "down" | "left" | "right";
 
 export function bindSwipe(
   el: HTMLElement,
   handler: (dir: SwipeDirection) => void,
-  threshold = 20
+  threshold = 20,
 ): () => void {
   let startX = 0;
   let startY = 0;
@@ -18,56 +18,45 @@ export function bindSwipe(
     const dy = touch.clientY - startY;
     if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
     if (Math.abs(dx) > Math.abs(dy)) {
-      handler(dx > 0 ? 'right' : 'left');
+      handler(dx > 0 ? "right" : "left");
     } else {
-      handler(dy > 0 ? 'down' : 'up');
+      handler(dy > 0 ? "down" : "up");
     }
   };
-  el.addEventListener('touchstart', start, { passive: true });
-  el.addEventListener('touchend', end, { passive: true });
+  el.addEventListener("touchstart", start, { passive: true });
+  el.addEventListener("touchend", end, { passive: true });
   return () => {
-    el.removeEventListener('touchstart', start);
-    el.removeEventListener('touchend', end);
-  };
-}
-
-export function bindTap(el: HTMLElement, handler: () => void): () => void {
-  const onClick = (e: Event) => {
-    e.preventDefault();
-    handler();
-  };
-  el.addEventListener('click', onClick);
-  return () => {
-    el.removeEventListener('click', onClick);
+    el.removeEventListener("touchstart", start);
+    el.removeEventListener("touchend", end);
   };
 }
 
 export function createGameShell(
   root: HTMLElement,
   title: string,
-  onBack: () => void
+  onBack: () => void,
 ): { area: HTMLElement; backButton: HTMLButtonElement } {
-  root.innerHTML = '';
-  const shell = document.createElement('div');
-  shell.className = 'game-shell';
+  root.innerHTML = "";
+  const shell = document.createElement("div");
+  shell.className = "game-shell";
 
-  const bar = document.createElement('div');
-  bar.className = 'game-bar';
+  const bar = document.createElement("div");
+  bar.className = "game-bar";
 
-  const back = document.createElement('button');
-  back.className = 'back-btn';
-  back.textContent = 'Back';
-  back.addEventListener('click', onBack);
+  const back = document.createElement("button");
+  back.className = "back-btn";
+  back.textContent = "Back";
+  back.addEventListener("click", onBack);
 
-  const heading = document.createElement('div');
-  heading.className = 'game-title';
+  const heading = document.createElement("div");
+  heading.className = "game-title";
   heading.textContent = title;
 
   bar.appendChild(back);
   bar.appendChild(heading);
 
-  const area = document.createElement('div');
-  area.className = 'game-area';
+  const area = document.createElement("div");
+  area.className = "game-area";
 
   shell.appendChild(bar);
   shell.appendChild(area);
@@ -79,22 +68,22 @@ export function createGameShell(
 export function createTouchButton(
   label: string,
   onPress: () => void,
-  className = ''
+  className = "",
 ): HTMLButtonElement {
-  const btn = document.createElement('button');
+  const btn = document.createElement("button");
   btn.className = `touch-btn ${className}`.trim();
   btn.textContent = label;
-  btn.addEventListener('click', (e) => {
+  btn.addEventListener("click", (e) => {
     e.preventDefault();
     onPress();
   });
   const names: Record<string, string> = {
-    '▲': 'Up',
-    '▼': 'Down',
-    '◀': 'Left',
-    '▶': 'Right',
-    '⟳': 'Rotate'
+    "▲": "Up",
+    "▼": "Down",
+    "◀": "Left",
+    "▶": "Right",
+    "⟳": "Rotate",
   };
-  if (names[label]) btn.setAttribute('aria-label', names[label]);
+  if (names[label]) btn.setAttribute("aria-label", names[label]);
   return btn;
 }

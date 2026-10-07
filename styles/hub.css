@@ -89,7 +89,7 @@
   border-radius: 8px;
   font-size: 12px;
 }
-.hub-filter[aria-pressed='true'] {
+.hub-filter[aria-pressed="true"] {
   background: #2b4356;
   color: #fff;
 }
@@ -233,7 +233,7 @@
   order: 0;
 }
 .featured-card .hub-card-index {
-  color: var(--accent);
+  color: #276b56;
   font-size: 10px;
 }
 .featured-card .hub-card-title {
@@ -264,4 +264,74 @@
   .hub-filter {
     padding: 7px 11px;
   }
+}
+
+/* The hub and 2D playground share a warm, light palette. */
+.hub-brand span {
+  color: #47957e;
+}
+.hub-tools .laya-settings-button {
+  background: #eff4ec;
+  border-color: #c7d9ce;
+  color: #45696d;
+}
+.hub-tools .offline-badge {
+  background: #e5efe2;
+  color: #4d7764;
+  border-color: #c5d9c6;
+}
+.hub-hero {
+  background: linear-gradient(110deg, #dcefe0, #edf1db);
+  border-color: #c4ddc9;
+}
+.hub-eyebrow {
+  color: #4e8873;
+}
+.hub-heading {
+  color: #294f4c;
+}
+.hub-subtitle {
+  color: #5b7c77;
+}
+.hub-play {
+  background: #69b395;
+  color: #fff;
+  box-shadow: 0 4px 0 #518e76;
+}
+.hub-filters {
+  background: #e6ece3;
+}
+.hub-filter {
+  color: #5a7674;
+}
+.hub-filter[aria-pressed="true"] {
+  background: #fff;
+  color: #315c51;
+  box-shadow: 0 2px 5px #244d3b10;
+}
+.hub-card {
+  background: #fffdf8;
+  border-color: #e0e7db;
+  box-shadow: 0 4px 0 #dce5d7;
+  gap: 8px;
+}
+.hub-card-desc {
+  color: #647e80;
+}
+.hub-card-index {
+  color: #70978a;
+  font-weight: 700;
+}
+.hub-card-foot {
+  color: #4b8e76;
+  border-color: #e4eadd;
+}
+.hub-footer {
+  color: #78918a;
+}
+.hub-hero .hero-art {
+  box-shadow: none;
+  object-fit: contain;
+  transform: rotate(-4deg);
+  right: 0;
 }

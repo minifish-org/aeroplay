@@ -97,3 +97,21 @@ Original prompt: Revisit all games in this project and make them more fun to pla
 - Production build and the Pages-redirect offline suite pass: 22 cached resources, online/offline reload, all ten games, saved scores, touch controls, and offline worker hints, with no page errors or external requests.
 - Required browser client verified Snake gameplay; the screenshot and game state were inspected.
 - Production publication and existing-session recovery verification follow this commit.
+
+## Phaser playground migration (2026-10-07)
+- User authorized updating constraints, breaking changes, all eight 2D games in Phaser, appealing child-friendly visuals, preserved Laya, and shared-code refactoring. Offline human play is mandatory.
+- Use Phaser 4.2.1 as one locally bundled, lazy-loaded renderer. Keep both Three.js games.
+- Extract pure rules from rendering; centralize scene/input/scale/sound/lifecycle and deterministic browser hooks.
+- Validate native touch, puzzle saves, arcade outcomes, Laya cancellation/takeover, repeated navigation and production offline reload in Chromium and WebKit. No publication requested.
+- Implemented all eight Phaser games, shared scene/board views, six pure rule modules, local illustrated hub cards and four opt-in audio cues. Starter modes include relaxed Snake, gentle Flappy and varied 52-clue Sudoku; native Phaser tweens, particles and input drive the 2D experience.
+- Removed obsolete 2D DOM styles and duplicated loop/tap/overlay helpers. Snake and Tetris redraw only on visible state changes; score DOM updates are memoized.
+- Fixed pointer coordinates after the Laya panel shifts the canvas. A captured native touch-start refreshes Phaser bounds before coordinate conversion.
+- Fixed rapid-navigation cancellation in WebKit: Phaser marks the game booted before its system scene exists. Destruction now waits for a started game and the end of the current frame, including when automated or hidden loops have stopped.
+- Independent model verification passed for 2048 merges, 100 Match-3 starts, 30 perfect mazes, 60 unique generated Sudoku puzzles, 100 independently checked minimum Lights Out solutions, and all Tetris landing paths.
+- Both browser engines passed the eight-game gameplay and Laya adapter suites. Laya verification uses controlled transport and does not claim current real-model performance. The 17 shared Laya core cases and static offline-cache boundary checks passed.
+- The production offline suite passed with 39 cached resources, all ten games, saves, touch input, Cargo worker hints and no external requests. Chromium also passed Pages-style redirects. Playwright WebKit's network-offline override rejects SW reloads internally; shutting down an isolated preview verifies its real cached reload and gameplay instead.
+- Made the inspection clock drive native Phaser tweens as well as simulation, and render the first frame after scene creation even with a stopped loop. Screenshot review now shows complete boards and the maze explorer at the exit.
+- Public artwork/audio contents now participate in the offline cache fingerprint. An isolated build-plugin fixture verified that artwork-only edits invalidate the cache while identical content keeps its version. The final production build and both offline browser suites passed; production dependencies have no reported audit vulnerabilities.
+- Both original Three.js games passed their complete Chromium/WebKit suites after shared-style and helper cleanup. No physical iPhone/Home Screen check or current real-model session is claimed.
+- Local production preview: http://127.0.0.1:4181/. Follow-up QA is a physical iPhone Home Screen flight-mode session and configured-service model gameplay.
+- User subsequently authorized committing and pushing the completed migration to main. The existing push workflow performs the production build and Pages publication.

@@ -7,7 +7,7 @@ export class GameLoop {
 
   constructor(
     private readonly step: StepFn,
-    private readonly maxDt = 0.05
+    private readonly maxDt = 0.05,
   ) {}
 
   start() {
@@ -39,23 +39,5 @@ export class GameLoop {
     this.last = time;
     this.step(dt);
     this.rafId = requestAnimationFrame(this.tick);
-  };
-}
-
-export function runInterval(stepMs: number, step: StepFn) {
-  let last = performance.now();
-  let active = true;
-  let id = requestAnimationFrame(function loop(time) {
-    if (!active) return;
-    if (time - last >= stepMs) {
-      const dt = (time - last) / 1000;
-      last = time;
-      step(dt);
-    }
-    id = requestAnimationFrame(loop);
-  });
-  return () => {
-    active = false;
-    cancelAnimationFrame(id);
   };
 }

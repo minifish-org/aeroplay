@@ -1,4 +1,8 @@
-export type GameMount = (root: HTMLElement, goBack: () => void) => () => void;
+export type GameMount = (
+  root: HTMLElement,
+  goBack: () => void,
+  signal?: AbortSignal,
+) => (() => void) | Promise<() => void>;
 
 export interface GameModule {
   id: string;

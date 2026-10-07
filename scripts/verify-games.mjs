@@ -61,6 +61,13 @@ async function open(game, saved) {
     game
   );
 }
+async function tapCell(index, size) {
+  const box = await page.locator('.pocket-stage canvas').boundingBox();
+  const x = 12 + (index % size + .5) * 376 / size;
+  const y = 12 + (Math.floor(index / size) + .5) * 376 / size;
+  await page.touchscreen.tap(box.x + box.width * x / 400, box.y + box.height * y / 400);
+  await advance(0);
+}
 async function shot(name) {
   await page.screenshot({
     path: path.join(output, `${name}.png`),
@@ -100,6 +107,7 @@ try {
 
   await open('snake');
   assert.equal((await state()).mode, 'ready');
+  await button('Mode: Relaxed').tap();
   await button('Start').tap();
   for (let tick = 0; tick < 500 && (await state()).score < 40; tick++) {
     const s = await state(),
@@ -141,7 +149,7 @@ try {
     }
     assert(route?.length > 1, 'Food remains reachable in test route');
     await page.keyboard.press(keyFor(route[1].x - head.x, route[1].y - head.y));
-    await advance(210);
+    await advance(230);
     assert.equal((await state()).mode, 'playing');
   }
   assert.equal((await state()).score, 40);
@@ -332,13 +340,11 @@ try {
     const { hinted } = await state();
     assert.equal(hinted.length, 2);
     for (const p of hinted)
-      await page
-        .locator(`.match3-cell[data-x="${p.x}"][data-y="${p.y}"]`)
-        .tap();
+      await tapCell(p.y * 8 + p.x, 8);
     assert.equal((await state()).moves, before.moves - 1);
     for (
       let j = 0;
-      j < 100 && ['clearing', 'falling'].includes((await state()).mode);
+      j < 100 && ['swapping', 'clearing', 'falling'].includes((await state()).mode);
       j++
     )
       await advance(400);
@@ -416,29 +422,34 @@ try {
   );
 
   await open('sudoku');
-  await page.locator('.sudoku-cell').nth(2).tap();
+  let sudokuState = await state();
+  assert.equal(sudokuState.givens.length, 52);
+  const editable = sudokuState.board.findIndex((v) => !v);
+  const savedPuzzle = await page.evaluate(() => JSON.parse(localStorage.getItem('aeroplay:sudoku:state-v3')));
+  const expected = savedPuzzle.solution[editable];
+  await tapCell(editable, 9);
   await button('Notes: Off').tap();
   await button('2').tap();
-  assert.deepEqual((await state()).notes[2], [2]);
-  assert.equal((await state()).board[2], 0);
+  assert.deepEqual((await state()).notes[editable], [2]);
+  assert.equal((await state()).board[editable], 0);
   await shot('sudoku-pencil');
   await button('Notes: On').tap();
-  await button('1').tap();
+  await button(String(expected === 1 ? 2 : 1)).tap();
   assert.equal((await state()).mistakes, 1);
   await button('Undo').tap();
-  assert.equal((await state()).board[2], 0);
-  assert.deepEqual((await state()).notes[2], [2]);
+  assert.equal((await state()).board[editable], 0);
+  assert.deepEqual((await state()).notes[editable], [2]);
   await button('Hint · 3').tap();
-  assert.equal((await state()).board[2], 4);
+  assert.equal((await state()).board[editable], expected);
   assert.equal((await state()).hints, 2);
   await shot('sudoku-notes');
   await page.reload();
   await page.waitForFunction(() => window.render_game_to_text);
-  assert.equal((await state()).board[2], 4);
+  assert.equal((await state()).board[editable], expected);
   assert.equal((await state()).hints, 2);
-  const sudokuSource = await fs.readFile('src/games/sudoku.ts', 'utf8');
+  const sudokuSource = await fs.readFile('src/games/models/sudoku.ts', 'utf8');
   const puzzles = [
-    ...sudokuSource.matchAll(/puzzle:\s+'([0-9]+)',\s+solution:\s+'([0-9]+)'/g)
+    ...sudokuSource.matchAll(/puzzle:\s+["']([0-9]+)["'],\s+solution:\s+["']([0-9]+)["']/g)
   ];
   assert.equal(puzzles.length, 3);
   for (const [, puzzle, answer] of puzzles) {
@@ -464,11 +475,11 @@ try {
           9
         );
   }
-  const solution = puzzles[0][2];
+  const solution = savedPuzzle.solution;
   for (let i = 0; i < 81; i++)
     if ((await state()).board[i] !== Number(solution[i])) {
-      await page.locator('.sudoku-cell').nth(i).tap();
-      await page.keyboard.press(solution[i]);
+      await tapCell(i, 9);
+      await page.keyboard.press(String(solution[i]));
     }
   assert.equal((await state()).mode, 'won');
   const solvedTime = (await state()).elapsed;
@@ -484,7 +495,7 @@ try {
 
   await open('lightsout');
   const lightsBefore = await state();
-  await page.locator('.light-cell').nth(12).tap();
+  await tapCell(12, 5);
   assert.equal((await state()).moves, 1);
   await button('Undo').tap();
   assert.deepEqual((await state()).board, lightsBefore.board);
@@ -492,14 +503,14 @@ try {
     await button('Hint').tap();
     const { hinted } = await state();
     assert(hinted >= 0);
-    await page.locator('.light-cell').nth(hinted).tap();
+    await tapCell(hinted, 5);
   }
   assert.equal((await state()).mode, 'won');
   assert.equal((await state()).moves, lightsBefore.par);
   await shot('lightsout-result');
   await button('Next puzzle →').tap();
   assert.equal((await state()).level, 2);
-  await page.locator('.light-cell').nth(0).tap();
+  await tapCell(0, 5);
   await button('Retry').tap();
   assert.equal((await state()).moves, 0);
   await layout();
