@@ -1,4 +1,5 @@
 import { GameModule } from './gameTypes';
+import { LightsView } from './views/puzzles';
 import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
@@ -25,6 +26,7 @@ const lightsOut: GameModule = {
     const boardEl = document.createElement('div');
     boardEl.className = 'lights-grid';
     area.append(info, boardEl);
+    const view = new LightsView(boardEl);
     const status = message(
       area,
       'Tap a light to flip it and its four neighbors. Turn them all off.'
@@ -113,6 +115,7 @@ const lightsOut: GameModule = {
         button.addEventListener('click', () => press(idx));
         boardEl.append(button);
       });
+      view.draw(board, hinted);
       storage.save<SaveState>('state-v2', {
         board,
         initial,
@@ -122,12 +125,15 @@ const lightsOut: GameModule = {
       });
     }
     function press(index: number, fromLaya = false) {
-      if (paused || (isLayaControlling() && !fromLaya) || isSolved(board)) return;
-      if (!Number.isInteger(index) || index < 0 || index >= board.length) return;
+      if (paused || (isLayaControlling() && !fromLaya) || isSolved(board))
+        return;
+      if (!Number.isInteger(index) || index < 0 || index >= board.length)
+        return;
       history.push([...board]);
       moves++;
       hinted = -1;
       applyToggle(board, index % SIZE, Math.floor(index / SIZE));
+      view.press(index);
       render();
     }
     const saved = storage.load<SaveState | null>('state-v2', null);
@@ -141,11 +147,14 @@ const lightsOut: GameModule = {
     } else newBoard();
     render();
     const stateKey = () => `${level}:${moves}:${board.join('')}`;
-    const options = () => solveLights(board).slice(0, 16).map((index) => {
-      const next = [...board];
-      applyToggle(next, index % SIZE, Math.floor(index / SIZE));
-      return { index, lit: next.filter(Boolean).length };
-    });
+    const options = () =>
+      solveLights(board)
+        .slice(0, 16)
+        .map((index) => {
+          const next = [...board];
+          applyToggle(next, index % SIZE, Math.floor(index / SIZE));
+          return { index, lit: next.filter(Boolean).length };
+        });
     const offLaya = registerLayaGame({
       game: 'lightsout',
       observe: () => {
@@ -156,7 +165,12 @@ const lightsOut: GameModule = {
           key: stateKey(),
           context: `Lights Out 5 by 5; 1 is on.\n${Array.from({ length: SIZE }, (_, row) => board.slice(row * SIZE, (row + 1) * SIZE).join('')).join('\n')}\nConstraint assistance supplies taps from a solution of this visible board. Each tap flips itself and four neighbors.\n${candidates.map((c, i) => `Option ${i}: ${c.lit} lights remain on.`).join('\n')}`,
           question: 'Which assisted tap leaves the fewest lights on?',
-          choices: Object.fromEntries(candidates.map((c, i) => [String(i), `Tap r${Math.floor(c.index / SIZE) + 1}c${c.index % SIZE + 1}`]))
+          choices: Object.fromEntries(
+            candidates.map((c, i) => [
+              String(i),
+              `Tap r${Math.floor(c.index / SIZE) + 1}c${(c.index % SIZE) + 1}`
+            ])
+          )
         };
       },
       act: (choice, key) => {
@@ -166,26 +180,44 @@ const lightsOut: GameModule = {
         press(candidate.index, true);
         return true;
       },
-      start: () => { paused = false; if (isSolved(board)) { level++; newBoard(); render(); } },
-      pause: () => { paused = true; },
-      resume: () => { paused = false; },
+      start: () => {
+        paused = false;
+        if (isSolved(board)) {
+          level++;
+          newBoard();
+          render();
+        }
+      },
+      pause: () => {
+        paused = true;
+      },
+      resume: () => {
+        paused = false;
+      },
       isFinished: () => isSolved(board),
       isPaused: () => paused,
       intervalMs: 500,
       assistance: 'Constraint assistance'
     });
-    const off = exposeGame(() => ({
-      game: 'lightsout',
-      mode: isSolved(board) ? 'won' : paused ? 'paused' : 'playing',
-      board,
-      initial,
-      moves,
-      level,
-      hinted,
-      hintsUsed,
-      par: solveLights(initial).length
-    }));
-    return () => { offLaya(); off(); };
+    const off = exposeGame(
+      () => ({
+        game: 'lightsout',
+        mode: isSolved(board) ? 'won' : paused ? 'paused' : 'playing',
+        board,
+        initial,
+        moves,
+        level,
+        hinted,
+        hintsUsed,
+        par: solveLights(initial).length
+      }),
+      (ms) => view.scene.advance(ms)
+    );
+    return () => {
+      offLaya();
+      off();
+      view.dispose();
+    };
   }
 };
 

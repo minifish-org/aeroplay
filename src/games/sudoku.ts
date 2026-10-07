@@ -1,4 +1,5 @@
 import { GameModule } from './gameTypes';
+import { SudokuView } from './views/puzzles';
 import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
@@ -43,7 +44,6 @@ const PUZZLES: Puzzle[] = [
   }
 ];
 
-
 const sudoku: GameModule = {
   id: 'sudoku',
   name: 'Sudoku',
@@ -66,6 +66,7 @@ const sudoku: GameModule = {
     const boardEl = document.createElement('div');
     boardEl.className = 'sudoku-grid';
     area.appendChild(boardEl);
+    const view = new SudokuView(boardEl);
 
     const keypad = document.createElement('div');
     keypad.className = 'sudoku-keypad';
@@ -243,6 +244,7 @@ const sudoku: GameModule = {
           boardEl.appendChild(cell);
         }
       }
+      view.draw(boardEl);
       updateInfo();
     }
 
@@ -255,7 +257,13 @@ const sudoku: GameModule = {
     }
 
     function setValue(val: number, fromLaya = false) {
-      if (paused || (isLayaControlling() && !fromLaya) || selected === null || isSolved()) return;
+      if (
+        paused ||
+        (isLayaControlling() && !fromLaya) ||
+        selected === null ||
+        isSolved()
+      )
+        return;
       if (givens.has(selected)) return;
       if (noteMode && val && !board[selected]) {
         history.push({ board: [...board], notes: notes.map((n) => [...n]) });
@@ -449,15 +457,27 @@ const sudoku: GameModule = {
         if (!moves.length) return null;
         return {
           key: stateKey(),
-          context: `Sudoku. Rows top to bottom; 0 is empty.\n${Array.from({ length: 9 }, (_, row) => board.slice(row * 9, (row + 1) * 9).join('')).join('\n')}\nConstraint assistance checks rows, columns and boxes of this visible board. When no forced digit exists, visible-board search checks possible completions. No answer sheet is used.\n${moves.map((c, i) => `Option ${i}: r${Math.floor(c.index / 9) + 1}c${c.index % 9 + 1} ${c.value ? `= ${c.value}, ${c.candidates.length} legal digits` : 'erase to repair the board'}.`).join('\n')}`,
-          question: moves[0].value ? 'Which assisted placement should be filled next?' : 'Which editable number should be erased to repair this board?',
-          choices: Object.fromEntries(moves.map((c, i) => [String(i), `${c.value ? `Fill ${c.value} in` : 'Erase'} r${Math.floor(c.index / 9) + 1}c${c.index % 9 + 1}`]))
+          context: `Sudoku. Rows top to bottom; 0 is empty.\n${Array.from({ length: 9 }, (_, row) => board.slice(row * 9, (row + 1) * 9).join('')).join('\n')}\nConstraint assistance checks rows, columns and boxes of this visible board. When no forced digit exists, visible-board search checks possible completions. No answer sheet is used.\n${moves.map((c, i) => `Option ${i}: r${Math.floor(c.index / 9) + 1}c${(c.index % 9) + 1} ${c.value ? `= ${c.value}, ${c.candidates.length} legal digits` : 'erase to repair the board'}.`).join('\n')}`,
+          question: moves[0].value
+            ? 'Which assisted placement should be filled next?'
+            : 'Which editable number should be erased to repair this board?',
+          choices: Object.fromEntries(
+            moves.map((c, i) => [
+              String(i),
+              `${c.value ? `Fill ${c.value} in` : 'Erase'} r${Math.floor(c.index / 9) + 1}c${(c.index % 9) + 1}`
+            ])
+          )
         };
       },
       act: (choice, key) => {
         if (paused || isSolved() || key !== stateKey()) return false;
         const candidate = options()[Number(choice)];
-        if (!candidate || String(Number(choice)) !== choice || givens.has(candidate.index)) return false;
+        if (
+          !candidate ||
+          String(Number(choice)) !== choice ||
+          givens.has(candidate.index)
+        )
+          return false;
         selected = candidate.index;
         noteMode = false;
         noteButton.textContent = 'Notes: Off';
@@ -466,32 +486,48 @@ const sudoku: GameModule = {
         setValue(candidate.value, true);
         return before !== stateKey();
       },
-      start: () => { paused = false; if (isSolved()) nextPuzzle(); else startTimer(); },
-      pause: () => { paused = true; stopTimer(); saveState(); updateInfo(); },
-      resume: () => { paused = false; if (!isSolved()) startTimer(); },
+      start: () => {
+        paused = false;
+        if (isSolved()) nextPuzzle();
+        else startTimer();
+      },
+      pause: () => {
+        paused = true;
+        stopTimer();
+        saveState();
+        updateInfo();
+      },
+      resume: () => {
+        paused = false;
+        if (!isSolved()) startTimer();
+      },
       isFinished: isSolved,
       isPaused: () => paused,
       intervalMs: 500,
       assistance: 'Constraint assistance'
     });
-    const off = exposeGame(() => ({
-      game: 'sudoku',
-      mode: isSolved() ? 'won' : paused ? 'paused' : 'playing',
-      board,
-      givens: [...givens],
-      selected,
-      notes,
-      noteMode,
-      hints,
-      mistakes,
-      puzzleIndex,
-      elapsed: getElapsed()
-    }));
+    const off = exposeGame(
+      () => ({
+        game: 'sudoku',
+        mode: isSolved() ? 'won' : paused ? 'paused' : 'playing',
+        board,
+        givens: [...givens],
+        selected,
+        notes,
+        noteMode,
+        hints,
+        mistakes,
+        puzzleIndex,
+        elapsed: getElapsed()
+      }),
+      (ms) => view.scene.advance(ms)
+    );
     return () => {
       offLaya();
       stopTimer();
       saveState();
       off();
+      view.dispose();
       window.removeEventListener('keydown', keyHandler);
       document.removeEventListener('visibilitychange', visibility);
       window.removeEventListener('pagehide', pageHide);

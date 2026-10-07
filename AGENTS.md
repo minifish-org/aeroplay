@@ -118,7 +118,10 @@ In-Game Layout
 
 General
 - Use TypeScript
-- Use Canvas or Three.js for animation-heavy games
+- Use PixiJS for 2D presentation and Three.js for the two 3D games
+- Keep gameplay, native input, storage and Laya adapters separate from renderer classes
+- Reuse one Pixi renderer across 2D scenes; destroy each scene's textures, filters and listeners on navigation
+- Keep particles bounded, stop idle rendering, and respect reduced-motion preferences
 - Load game modules on demand and bundle all dependencies locally
 - Dispose 3D resources, workers, audio contexts, and event handlers on navigation
 - No external CDN

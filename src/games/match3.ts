@@ -4,6 +4,7 @@ import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { exposeGame, message } from '../core/play';
 import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
+import { GemView } from './views/gems';
 
 type Cell = number;
 type Point = { x: number; y: number };
@@ -26,6 +27,7 @@ const match3: GameModule = {
     const boardEl = document.createElement('div');
     boardEl.className = 'match3-board';
     area.append(info, progress, boardEl);
+    const view = new GemView(boardEl);
     const status = message(
       area,
       'Tap two neighbors. Cascades multiply your points.'
@@ -149,9 +151,11 @@ const match3: GameModule = {
           boardEl.append(button);
         })
       );
+      view.draw(grid, selected, hinted, matching, phase, chain, falls);
     }
     function select(p: Point, fromLaya = false) {
-      if (paused || (isLayaControlling() && !fromLaya) || phase !== 'playing') return;
+      if (paused || (isLayaControlling() && !fromLaya) || phase !== 'playing')
+        return;
       hinted = [];
       if (!selected) selected = p;
       else if (p.x === selected.x && p.y === selected.y) selected = null;
@@ -160,6 +164,7 @@ const match3: GameModule = {
         selected = null;
         swap(grid, a, p);
         matching = findMatches(grid);
+        view.swap(a, p, matching.length > 0);
         if (!matching.length) {
           swap(grid, a, p);
           status.textContent =
@@ -191,37 +196,42 @@ const match3: GameModule = {
       persist();
       render();
     }
-    const loop = new GameLoop((dt) => {
-      if (paused || document.hidden) return;
-      if (phase !== 'clearing' && phase !== 'falling') return;
-      timer -= dt;
-      if (timer > 0) return;
-      if (phase === 'clearing') {
-        const gained = matching.length * 10 * chain;
-        score += gained;
-        best = Math.max(best, score);
-        storage.save('best', best);
-        status.textContent = `${chain > 1 ? `Cascade ×${chain}!` : matching.length >= 4 ? 'Big match!' : 'Nice match!'} +${gained}`;
-        matching.forEach(({ x, y }) => {
-          grid[y][x] = -1;
-        });
-        const falls = applyGravityWithMoves(grid);
-        phase = 'falling';
-        timer = 0.23;
-        render(falls);
-      } else {
-        matching = findMatches(grid);
-        if (matching.length) {
-          chain++;
-          phase = 'clearing';
-          timer = 0.16;
-          render();
-        } else finish();
-      }
-    });
+    const loop = new GameLoop(
+      (dt) => {
+        if (paused || document.hidden) return;
+        if (phase !== 'clearing' && phase !== 'falling') return;
+        timer -= dt;
+        if (timer > 0) return;
+        if (phase === 'clearing') {
+          const gained = matching.length * 10 * chain;
+          score += gained;
+          best = Math.max(best, score);
+          storage.save('best', best);
+          status.textContent = `${chain > 1 ? `Cascade ×${chain}!` : matching.length >= 4 ? 'Big match!' : 'Nice match!'} +${gained}`;
+          matching.forEach(({ x, y }) => {
+            grid[y][x] = -1;
+          });
+          const falls = applyGravityWithMoves(grid);
+          phase = 'falling';
+          timer = 0.23;
+          render(falls);
+        } else {
+          matching = findMatches(grid);
+          if (matching.length) {
+            chain++;
+            phase = 'clearing';
+            timer = 0.16;
+            render();
+          } else finish();
+        }
+      },
+      0.05,
+      (dt) => view.tick(paused ? 0 : dt)
+    );
     finish();
     loop.start();
-    const stateKey = () => `${level}:${moves}:${score}:${phase}:${grid.flat().join('')}`;
+    const stateKey = () =>
+      `${level}:${moves}:${score}:${phase}:${grid.flat().join('')}`;
     const options = () => match3Moves(grid).slice(0, 8);
     const offLaya = registerLayaGame({
       game: 'match3',
@@ -233,7 +243,12 @@ const match3: GameModule = {
           key: stateKey(),
           context: `Match-3. Need ${Math.max(0, target() - score)} points in ${moves} moves. Gem types 1-5.\n${grid.map((row) => row.map((value) => value + 1).join('')).join('\n')}\n${candidates.map((c, i) => `Option ${i}: r${c.a.y + 1}c${c.a.x + 1} with r${c.b.y + 1}c${c.b.x + 1}; clears ${c.count} gems.`).join('\n')}`,
           question: 'Which legal swap clears the most gems immediately?',
-          choices: Object.fromEntries(candidates.map((c, i) => [String(i), `Swap r${c.a.y + 1}c${c.a.x + 1} with r${c.b.y + 1}c${c.b.x + 1}`]))
+          choices: Object.fromEntries(
+            candidates.map((c, i) => [
+              String(i),
+              `Swap r${c.a.y + 1}c${c.a.x + 1} with r${c.b.y + 1}c${c.b.x + 1}`
+            ])
+          )
         };
       },
       act: (choice, key) => {
@@ -244,9 +259,16 @@ const match3: GameModule = {
         select(candidate.b, true);
         return phase !== 'playing';
       },
-      start: () => { paused = false; if (phase === 'won' || phase === 'over') restartLevel(); },
-      pause: () => { paused = true; },
-      resume: () => { paused = false; },
+      start: () => {
+        paused = false;
+        if (phase === 'won' || phase === 'over') restartLevel();
+      },
+      pause: () => {
+        paused = true;
+      },
+      resume: () => {
+        paused = false;
+      },
       isFinished: () => phase === 'won' || phase === 'over',
       isPaused: () => paused,
       intervalMs: 400,
@@ -270,6 +292,7 @@ const match3: GameModule = {
     return () => {
       offLaya();
       loop.stop();
+      view.dispose();
       off();
     };
   }
@@ -414,7 +437,10 @@ export function match3Moves(grid: Cell[][]) {
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
       const a = { x, y };
-      for (const b of [{ x: x + 1, y }, { x, y: y + 1 }]) {
+      for (const b of [
+        { x: x + 1, y },
+        { x, y: y + 1 }
+      ]) {
         if (b.x >= SIZE || b.y >= SIZE) continue;
         swap(grid, a, b);
         const count = findMatches(grid).length;

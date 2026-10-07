@@ -1,9 +1,11 @@
 import { GameModule } from './gameTypes';
+import { createGameCanvas } from '../core/pixi/scene';
+import { FlappyView } from './views/flappy';
 import { createGameShell, createTouchButton, bindTap } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
-import { Mode, canvasOverlay, exposeGame, message } from '../core/play';
+import { Mode, exposeGame, message } from '../core/play';
 
 type Pipe = { x: number; gapY: number; gap: number; scored: boolean };
 const W = 360,
@@ -21,16 +23,14 @@ const flappy: GameModule = {
     const { area } = createGameShell(root, 'Flappy Bird', goBack);
     const info = document.createElement('div');
     info.className = 'info-row';
-    const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
+    const canvas = createGameCanvas(W, H);
     canvas.className = 'game-canvas flappy-canvas';
     area.append(info, canvas);
     const status = message(
       area,
       'Tap the sky or press Space. Fly through the center for +2.'
     );
-    const ctx = canvas.getContext('2d')!;
+    const view = new FlappyView(canvas);
     let y = H / 2,
       velocity = 0,
       score = 0,
@@ -104,108 +104,44 @@ const flappy: GameModule = {
             ? 'Perfect flight! +2'
             : 'Through the gate! +1'
           : 'Tap or Space to flap · aim for the dotted center';
-      const sky = ctx.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0, '#b4e5f3');
-      sky.addColorStop(1, '#edf5d6');
-      ctx.fillStyle = sky;
-      ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#ffffff99';
-      for (let i = 0; i < 5; i++) {
-        const cx = ((((i * 110 - distance * 0.18) % 500) + 500) % 500) - 60;
-        ctx.beginPath();
-        ctx.ellipse(cx, 55 + (i % 3) * 55, 35, 13, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      for (const p of pipes) {
-        ctx.fillStyle = '#2d9483';
-        ctx.fillRect(p.x, 0, PIPE_W, p.gapY);
-        ctx.fillRect(p.x, p.gapY + p.gap, PIPE_W, H - p.gapY - p.gap);
-        ctx.fillStyle = '#60cbb0';
-        ctx.fillRect(p.x - 4, p.gapY - 18, PIPE_W + 8, 18);
-        ctx.fillRect(p.x - 4, p.gapY + p.gap, PIPE_W + 8, 18);
-        if (!p.scored) {
-          ctx.strokeStyle = '#287b7977';
-          ctx.setLineDash([3, 5]);
-          ctx.beginPath();
-          ctx.moveTo(p.x, p.gapY + p.gap / 2);
-          ctx.lineTo(p.x + PIPE_W, p.gapY + p.gap / 2);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-      }
-      ctx.fillStyle = '#d4bb87';
-      ctx.fillRect(0, H - 24, W, 24);
-      ctx.fillStyle = '#88b973';
-      ctx.fillRect(0, H - 28, W, 5);
-      ctx.save();
-      ctx.translate(X, y);
-      ctx.rotate(Math.max(-0.4, Math.min(0.8, velocity / 500)));
-      ctx.fillStyle = '#ffc85c';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 15, 12, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#e9a346';
-      ctx.beginPath();
-      ctx.ellipse(-6, 3, 7, 5, -0.4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(6, -4, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#183642';
-      ctx.beginPath();
-      ctx.arc(8, -4, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#f47b52';
-      ctx.fillRect(10, 1, 10, 4);
-      ctx.restore();
-      if (mode !== 'playing')
-        canvasOverlay(
-          ctx,
-          mode === 'ready'
-            ? 'Small wings. Big adventure.'
-            : mode === 'paused'
-              ? 'Flight paused'
-              : `${passed >= 20 ? 'Gold' : passed >= 10 ? 'Silver' : passed >= 5 ? 'Bronze' : 'Keep flying'} · ${score} points`,
-          mode === 'over'
-            ? 'Tap to get ready for another flight'
-            : mode === 'paused'
-              ? 'Press Resume to continue'
-              : 'Tap the sky to begin'
-        );
+      view.draw(y, velocity, pipes, distance, mode, score, perfect);
     }
-    const loop = new GameLoop((dt) => {
-      if (mode !== 'playing') return;
-      if (isLayaControlling()) dt *= 0.18;
-      flightTime += dt;
-      const speed = Math.min(170, 110 + passed * 2);
-      distance += speed * dt;
-      flash = Math.max(0, flash - dt);
-      velocity += 650 * dt;
-      y += velocity * dt;
-      for (const p of pipes) p.x -= speed * dt;
-      if (!pipes.length || pipes.at(-1)!.x < W - 190) spawn();
-      for (const p of pipes) {
-        if (
-          X + R > p.x - 4 &&
-          X - R < p.x + PIPE_W + 4 &&
-          (y - R < p.gapY || y + R > p.gapY + p.gap)
-        )
-          mode = 'over';
-        if (!p.scored && p.x + PIPE_W + 4 < X - R && mode === 'playing') {
-          p.scored = true;
-          passed++;
-          perfect = Math.abs(y - (p.gapY + p.gap / 2)) < 24;
-          score += perfect ? 2 : 1;
-          flash = 1.2;
-          best = Math.max(best, score);
-          storage.save('best', best);
+    const loop = new GameLoop(
+      (dt) => {
+        if (mode !== 'playing') return;
+        if (isLayaControlling()) dt *= 0.18;
+        flightTime += dt;
+        const speed = Math.min(170, 110 + passed * 2);
+        distance += speed * dt;
+        flash = Math.max(0, flash - dt);
+        velocity += 650 * dt;
+        y += velocity * dt;
+        for (const p of pipes) p.x -= speed * dt;
+        if (!pipes.length || pipes.at(-1)!.x < W - 190) spawn();
+        for (const p of pipes) {
+          if (
+            X + R > p.x - 4 &&
+            X - R < p.x + PIPE_W + 4 &&
+            (y - R < p.gapY || y + R > p.gapY + p.gap)
+          )
+            mode = 'over';
+          if (!p.scored && p.x + PIPE_W + 4 < X - R && mode === 'playing') {
+            p.scored = true;
+            passed++;
+            perfect = Math.abs(y - (p.gapY + p.gap / 2)) < 24;
+            score += perfect ? 2 : 1;
+            flash = 1.2;
+            best = Math.max(best, score);
+            storage.save('best', best);
+          }
         }
-      }
-      pipes = pipes.filter((p) => p.x > -PIPE_W - 10);
-      if (y - R < 0 || y + R > H - 28) mode = 'over';
-      draw();
-    });
+        pipes = pipes.filter((p) => p.x > -PIPE_W - 10);
+        if (y - R < 0 || y + R > H - 28) mode = 'over';
+        draw();
+      },
+      0.05,
+      (dt) => view.tick(mode === 'paused' ? 0 : dt)
+    );
     const tapOff = bindTap(canvas, flap);
     const key = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
@@ -235,19 +171,23 @@ const flappy: GameModule = {
       }),
       (ms) => loop.advance(ms)
     );
-    const decisionKey = () => `${flightVersion}:${Math.floor(flightTime / 0.12)}`;
+    const decisionKey = () =>
+      `${flightVersion}:${Math.floor(flightTime / 0.12)}`;
     const layaOff = registerLayaGame({
       game: 'flappy',
       observe: () => {
         if (mode !== 'playing') return null;
-        const pipe = pipes.find((candidate) => candidate.x + PIPE_W + 4 >= X - R);
+        const pipe = pipes.find(
+          (candidate) => candidate.x + PIPE_W + 4 >= X - R
+        );
         const target = pipe ? pipe.gapY + pipe.gap / 2 : H / 2;
         const waitY = Math.round(y + velocity * 0.12 + 325 * 0.12 ** 2);
         const flapY = Math.round(y - 235 * 0.12 + 325 * 0.12 ** 2);
         return {
           key: decisionKey(),
           context: `Bird height y=${Math.round(y)}; velocity=${Math.round(velocity)} (positive falls). Ceiling y=12; ground y=440. Target center y=${Math.round(target)}. ${pipe ? `Next gap top=${Math.round(pipe.gapY + R)}, bottom=${Math.round(pipe.gapY + pipe.gap - R)}, horizontal distance=${Math.max(0, Math.round(pipe.x - X))}.` : ''} In 0.12 seconds, waiting gives y=${waitY}; flapping gives y=${flapY}. Smaller y is higher.`,
-          question: 'Should the bird flap or wait to stay near the gap center and avoid the ceiling and ground?',
+          question:
+            'Should the bird flap or wait to stay near the gap center and avoid the ceiling and ground?',
           choices: { '0': 'Flap upward now', '1': 'Wait and keep flying' }
         };
       },
@@ -263,15 +203,23 @@ const flappy: GameModule = {
         else if (mode === 'ready') flap();
         draw();
       },
-      pause: () => { if (mode === 'playing') mode = 'paused'; draw(); },
-      resume: () => { if (mode === 'paused') mode = 'playing'; draw(); },
+      pause: () => {
+        if (mode === 'playing') mode = 'paused';
+        draw();
+      },
+      resume: () => {
+        if (mode === 'paused') mode = 'playing';
+        draw();
+      },
       isFinished: () => mode === 'over',
       isPaused: () => mode === 'paused',
       intervalMs: 40,
-      assistance: 'Watch mode runs at 18% speed. Short-term heights are calculated; Laya chooses flap or wait.'
+      assistance:
+        'Watch mode runs at 18% speed. Short-term heights are calculated; Laya chooses flap or wait.'
     });
     return () => {
       loop.stop();
+      view.dispose();
       layaOff();
       tapOff();
       off();

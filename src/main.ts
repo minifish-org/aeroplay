@@ -1,8 +1,15 @@
 import { games } from './games/registry';
-import { load, save, namespace, setPlayProfile, type PlayProfile } from './core/storage';
+import {
+  load,
+  save,
+  namespace,
+  setPlayProfile,
+  type PlayProfile
+} from './core/storage';
 import { createLayaSettingsButton } from './core/laya-settings';
 import { mountLayaControls } from './core/laya-controls';
 import '../styles/laya.css';
+import '../styles/pixi.css';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -42,13 +49,13 @@ function renderHub() {
   const hero = document.createElement('div');
   hero.className = 'hub-hero';
   hero.innerHTML = `
-    <div class="hub-eyebrow">AEROPLAY ORIGINALS · NOW IN 3D</div>
-    <h1 class="hub-heading">A bigger world.<br>In your pocket.</h1>
-    <div class="hub-subtitle">Fly above the clouds. Deliver a little joy. Discover two new 3D adventures, alongside eight pocket classics.</div>
+    <div class="hub-eyebrow">YOUR OFFLINE ARCADE</div>
+    <h1 class="hub-heading">One more round.<br>Anywhere.</h1>
+    <div class="hub-subtitle">Chase a record. Solve a challenge. Eight recharged classics and two 3D adventures, ready when you are.</div>
   `;
   const last = games.find((g) => g.id === load('last-game', 'sky')) ?? games[0];
   const artwork = document.createElement('img');
-  artwork.src = '/assets/sky-rush.svg';
+  artwork.src = `/assets/previews/${last.id}.jpg`;
   artwork.alt = '';
   artwork.className = 'hero-art';
   hero.append(artwork);
@@ -102,11 +109,13 @@ function renderHub() {
         return;
       const card = document.createElement('button');
       card.className = 'hub-card';
+      card.dataset.game = game.id;
       card.style.setProperty('--accent', game.accent);
       if (game.dimension) card.classList.add('featured-card');
+      else card.classList.add('preview-card');
       card.innerHTML = `
-        ${game.dimension ? `<img class="card-art" src="/assets/${game.id === 'sky' ? 'sky-rush' : 'pocket-cargo'}.svg" alt="" />` : ''}
-        <div class="hub-card-top"><div class="hub-card-icon">${game.icon}</div><span class="hub-card-index">${game.dimension ? 'NEW · 3D' : String(index + 1).padStart(2, '0')}</span></div>
+        <img class="card-art ${game.dimension ? '' : 'card-preview'}" src="/assets/previews/${game.id}.jpg" alt="" loading="lazy" />
+        <div class="hub-card-top"><div class="hub-card-icon">${game.icon}</div><span class="hub-card-index">${game.dimension ? '3D' : String(index + 1).padStart(2, '0')}</span></div>
         <div class="hub-card-title">${game.name}</div>
         <div class="hub-card-desc">${game.description}</div>
         <div class="hub-card-foot"><span>${record(game.id)}</span><span aria-hidden="true">↗</span></div>
@@ -150,8 +159,13 @@ async function startGame(id: string, profile: PlayProfile = 'human') {
     const gameTeardown = module.default.mount(app, () => {
       location.hash = 'hub';
     });
-    const controls = mountLayaControls(app, profile, (next) => { void startGame(id, next); });
-    teardown = () => { controls.dispose(); gameTeardown(); };
+    const controls = mountLayaControls(app, profile, (next) => {
+      void startGame(id, next);
+    });
+    teardown = () => {
+      controls.dispose();
+      gameTeardown();
+    };
     if (profile === 'laya') controls.startWatching();
   } catch (error) {
     if (version !== navigationVersion) return;
@@ -182,7 +196,11 @@ window.addEventListener('hashchange', handleHash);
 handleHash();
 
 window.addEventListener('keydown', (event) => {
-  if (event.target instanceof HTMLElement && event.target.closest('dialog,input,textarea,select')) return;
+  if (
+    event.target instanceof HTMLElement &&
+    event.target.closest('dialog,input,textarea,select')
+  )
+    return;
   if (event.key.toLowerCase() !== 'f' || event.repeat) return;
   if (document.fullscreenElement) void document.exitFullscreen();
   else if (document.documentElement.requestFullscreen)

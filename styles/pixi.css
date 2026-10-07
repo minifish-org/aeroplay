@@ -1,0 +1,115 @@
+.pixi-board {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  isolation: isolate;
+  border: 1px solid #405679;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 15px 35px #03071466,
+    inset 0 1px #bcdcff19;
+}
+.pixi-board > canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none;
+}
+.pixi-board > :last-child {
+  position: absolute;
+  inset: 3%;
+  width: 94%;
+  height: 94%;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  background: transparent;
+}
+.pixi-ready .match3-cell,
+.pixi-ready .light-cell,
+.pixi-ready .sudoku-cell,
+.pixi-ready .tile {
+  background: transparent !important;
+  color: transparent;
+  border-color: transparent;
+  outline: none;
+  box-shadow: none;
+  animation: none;
+  transform: none;
+  transition: none;
+}
+.pixi-ready .match3-cell:focus-visible,
+.pixi-ready .light-cell:focus-visible,
+.pixi-ready .sudoku-cell:focus-visible {
+  outline: 3px solid #e7f6ff;
+  outline-offset: -4px;
+}
+.pixi-ready .sudoku-notes,
+.pixi-ready .sudoku-notes span {
+  color: transparent;
+}
+.pixi-ready .sudoku-cell {
+  border-width: 0;
+}
+.pixi-sudoku {
+  max-width: 400px;
+}
+.pixi-lights {
+  max-width: 380px;
+}
+.game-canvas[data-renderer='pixi'] {
+  width: 100% !important;
+  height: auto !important;
+  box-shadow: 0 14px 30px #040b1855;
+  border-color: #405679;
+}
+.tetris-canvas[data-renderer='pixi'] {
+  max-width: min(240px, calc((100svh - 410px) * 0.5));
+}
+@media (max-width: 360px) {
+  .tetris-canvas[data-renderer='pixi'] {
+    max-width: min(210px, calc((100svh - 480px) * 0.5));
+  }
+}
+.tetris-previews {
+  border: 1px solid #304861;
+  background: linear-gradient(120deg, #162940, #0d192c);
+}
+.preview-card .hub-card-icon {
+  display: none;
+}
+.preview-card .hub-card-index {
+  color: var(--accent);
+}
+.card-preview {
+  aspect-ratio: 1.6;
+  object-position: center;
+  background: #101a2e;
+}
+.hub-card[data-game='tetris'] .card-preview {
+  object-position: center bottom;
+}
+.hub-tools .laya-settings-button {
+  color: #edf5ff;
+  border-color: #527291;
+  background: #20384f;
+}
+.mini-piece i[style] {
+  box-shadow:
+    inset 0 1px #ffffff77,
+    inset 1px 0 #ffffff33,
+    inset 0 -2px #00000033;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .match3-cell,
+  .light-cell,
+  .sudoku-cell {
+    animation: none;
+    transition: none;
+  }
+}

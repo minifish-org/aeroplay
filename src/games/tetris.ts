@@ -1,9 +1,11 @@
 import { GameModule } from './gameTypes';
+import { createGameCanvas } from '../core/pixi/scene';
+import { TetrisView } from './views/tetris';
 import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
-import { Mode, canvasOverlay, exposeGame, message } from '../core/play';
+import { Mode, exposeGame, message } from '../core/play';
 
 type Matrix = number[][];
 
@@ -90,12 +92,10 @@ const tetris: GameModule = {
     info.className = 'info-row';
     const previews = document.createElement('div');
     previews.className = 'tetris-previews';
-    const canvas = document.createElement('canvas');
-    canvas.width = WIDTH * CELL;
-    canvas.height = HEIGHT * CELL;
+    const canvas = createGameCanvas(WIDTH * CELL, HEIGHT * CELL);
     canvas.className = 'game-canvas tetris-canvas';
     area.append(info, previews, canvas);
-    const ctx = canvas.getContext('2d')!;
+    const view = new TetrisView(canvas);
     const status = message(
       area,
       'Arrows move and rotate · Space drops · C holds · P pauses'
@@ -194,6 +194,7 @@ const tetris: GameModule = {
     }
     function lock() {
       merge(board, piece);
+      view.clear(board.flatMap((row, y) => (row.every(Boolean) ? [y] : [])));
       const cleared = clearLines(board);
       combo = cleared ? combo + 1 : -1;
       if (cleared) {
@@ -248,6 +249,7 @@ const tetris: GameModule = {
         piece.y++;
         score += 2;
       }
+      view.impact(piece.x, piece.y);
       lock();
       draw();
     }
@@ -261,59 +263,32 @@ const tetris: GameModule = {
             : mode === 'over'
               ? 'Play again'
               : 'Start';
-      ctx.fillStyle = '#101e32';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = '#1c2d43';
-      ctx.lineWidth = 0.5;
-      for (let x = 0; x <= WIDTH; x++) {
-        ctx.beginPath();
-        ctx.moveTo(x * CELL, 0);
-        ctx.lineTo(x * CELL, HEIGHT * CELL);
-        ctx.stroke();
-      }
-      for (let y = 0; y <= HEIGHT; y++) {
-        ctx.beginPath();
-        ctx.moveTo(0, y * CELL);
-        ctx.lineTo(WIDTH * CELL, y * CELL);
-        ctx.stroke();
-      }
-      drawMatrix(ctx, board, { x: 0, y: 0 });
       let ghostY = piece.y;
       while (!collides(board, { ...piece, y: ghostY + 1 })) ghostY++;
-      ctx.globalAlpha = 0.22;
-      drawMatrix(ctx, piece.matrix, { x: piece.x, y: ghostY });
-      ctx.globalAlpha = 1;
-      drawMatrix(ctx, piece.matrix, piece);
-      if (mode !== 'playing')
-        canvasOverlay(
-          ctx,
-          mode === 'ready'
-            ? 'Make room for more.'
-            : mode === 'paused'
-              ? 'Paused'
-              : `${score} points`,
-          mode === 'ready'
-            ? 'Press Start · ghost shows landing'
-            : mode === 'paused'
-              ? 'Press Resume'
-              : 'Stack complete. Play again?'
-        );
+      view.draw(board, piece, ghostY, mode, lines, score);
     }
-    const loop = new GameLoop((dt) => {
-      if (mode !== 'playing') return;
-      if (isLayaControlling()) dt *= 0.18;
-      dropTimer += dt;
-      const speed = Math.max(0.09, 0.8 * Math.pow(0.8, Math.floor(lines / 10)));
-      if (dropTimer >= speed) {
-        dropTimer = 0;
-        if (!collides(board, { ...piece, y: piece.y + 1 })) piece.y++;
-      }
-      if (collides(board, { ...piece, y: piece.y + 1 })) {
-        lockTimer += dt;
-        if (lockTimer >= 0.45) lock();
-      } else lockTimer = 0;
-      draw();
-    });
+    const loop = new GameLoop(
+      (dt) => {
+        if (mode !== 'playing') return;
+        if (isLayaControlling()) dt *= 0.18;
+        dropTimer += dt;
+        const speed = Math.max(
+          0.09,
+          0.8 * Math.pow(0.8, Math.floor(lines / 10))
+        );
+        if (dropTimer >= speed) {
+          dropTimer = 0;
+          if (!collides(board, { ...piece, y: piece.y + 1 })) piece.y++;
+        }
+        if (collides(board, { ...piece, y: piece.y + 1 })) {
+          lockTimer += dt;
+          if (lockTimer >= 0.45) lock();
+        } else lockTimer = 0;
+        draw();
+      },
+      0.05,
+      (dt) => view.tick(mode === 'paused' ? 0 : dt)
+    );
     const key = (e: KeyboardEvent) => {
       if (e.key.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
       if (e.key === 'ArrowLeft') move(-1);
@@ -380,15 +355,22 @@ const tetris: GameModule = {
         return {
           key: placementKey(),
           context: `Tetris: board width 10, height 20. Current piece ${shapeNames[current]}; next ${next.map((id) => shapeNames[id]).join(',')}. Column heights left to right: ${heights.join(',')}. Reachable placements are shortlisted using visible board outcomes. A hole is an empty cell below a block. Roughness is the sum of adjacent height differences.`,
-          question: 'Which landing clears lines while keeping holes, height and roughness low?',
-          choices: Object.fromEntries(landings.map((landing, index) => [
-            String(index),
-            `rotation ${landing.rotation * 90}, x ${landing.piece.x}: lines ${landing.lines}, holes ${landing.holes}, height ${landing.height}, roughness ${landing.roughness}`
-          ]))
+          question:
+            'Which landing clears lines while keeping holes, height and roughness low?',
+          choices: Object.fromEntries(
+            landings.map((landing, index) => [
+              String(index),
+              `rotation ${landing.rotation * 90}, x ${landing.piece.x}: lines ${landing.lines}, holes ${landing.holes}, height ${landing.height}, roughness ${landing.roughness}`
+            ])
+          )
         };
       },
       act: (choice, key) => {
-        if (mode !== 'playing' || key !== placementKey() || !/^\d+$/.test(choice))
+        if (
+          mode !== 'playing' ||
+          key !== placementKey() ||
+          !/^\d+$/.test(choice)
+        )
           return false;
         const landing = placements()[Number(choice)];
         if (!landing) return false;
@@ -399,7 +381,8 @@ const tetris: GameModule = {
         if (
           piece.x !== landing.piece.x ||
           piece.matrix.flat().join('') !== landing.piece.matrix.flat().join('')
-        ) return false;
+        )
+          return false;
         let y = piece.y;
         while (!collides(board, { ...piece, y: y + 1 })) y++;
         if (y !== landing.piece.y) return false;
@@ -411,15 +394,23 @@ const tetris: GameModule = {
         mode = 'playing';
         draw();
       },
-      pause: () => { if (mode === 'playing') mode = 'paused'; draw(); },
-      resume: () => { if (mode === 'paused') mode = 'playing'; draw(); },
+      pause: () => {
+        if (mode === 'playing') mode = 'paused';
+        draw();
+      },
+      resume: () => {
+        if (mode === 'paused') mode = 'playing';
+        draw();
+      },
       isFinished: () => mode === 'over',
       isPaused: () => mode === 'paused',
       intervalMs: 500,
-      assistance: 'Reachable landings are calculated and shortlisted by board features. Laya chooses the placement. Watch gravity runs at 18% speed.'
+      assistance:
+        'Reachable landings are calculated and shortlisted by board features. Laya chooses the placement. Watch gravity runs at 18% speed.'
     });
     return () => {
       loop.stop();
+      view.dispose();
       layaOff();
       off();
       window.removeEventListener('keydown', key);
@@ -482,7 +473,13 @@ function rotateMatrix(matrix: Matrix): Matrix {
 function rotatedPiece(board: Matrix, piece: Piece): Piece | null {
   const matrix = rotateMatrix(piece.matrix);
   for (const [dx, dy] of [
-    [0, 0], [-1, 0], [1, 0], [-2, 0], [2, 0], [0, -1], [0, -2]
+    [0, 0],
+    [-1, 0],
+    [1, 0],
+    [-2, 0],
+    [2, 0],
+    [0, -1],
+    [0, -2]
   ]) {
     const candidate = { matrix, x: piece.x + dx, y: piece.y + dy };
     if (!collides(board, candidate)) return candidate;
@@ -506,24 +503,33 @@ function findLandings(board: Matrix, initial: Piece): Landing[] {
   while (queue.length && visited.size < 200) {
     const state = queue.shift()!;
     const key = `${state.piece.x}:${state.piece.y}:${state.piece.matrix.flat().join('')}`;
-    if (visited.has(key) || state.piece.y < -4 || collides(board, state.piece)) continue;
+    if (visited.has(key) || state.piece.y < -4 || collides(board, state.piece))
+      continue;
     visited.add(key);
     const landing = { ...state.piece };
     while (!collides(board, { ...landing, y: landing.y + 1 })) landing.y++;
     const cells: string[] = [];
-    landing.matrix.forEach((row, y) => row.forEach((value, x) => {
-      if (value) cells.push(`${landing.x + x},${landing.y + y}`);
-    }));
+    landing.matrix.forEach((row, y) =>
+      row.forEach((value, x) => {
+        if (value) cells.push(`${landing.x + x},${landing.y + y}`);
+      })
+    );
     const landingKey = cells.sort().join(';');
-    if (!landings.has(landingKey) && cells.every((cell) => Number(cell.split(',')[1]) >= 0)) {
+    if (
+      !landings.has(landingKey) &&
+      cells.every((cell) => Number(cell.split(',')[1]) >= 0)
+    ) {
       const result = board.map((row) => [...row]);
       merge(result, landing);
       const lines = clearLines(result);
       const heights = boardHeights(result);
       const height = Math.max(...heights);
-      const roughness = heights.slice(1).reduce(
-        (sum, value, index) => sum + Math.abs(value - heights[index]), 0
-      );
+      const roughness = heights
+        .slice(1)
+        .reduce(
+          (sum, value, index) => sum + Math.abs(value - heights[index]),
+          0
+        );
       let holes = 0;
       for (let x = 0; x < WIDTH; x++) {
         let covered = false;
@@ -540,45 +546,37 @@ function findLandings(board: Matrix, initial: Piece): Landing[] {
         holes,
         height,
         roughness,
-        quality: lines * 10000 - holes * 600 - height * 100 - roughness * 20 -
+        quality:
+          lines * 10000 -
+          holes * 600 -
+          height * 100 -
+          roughness * 20 -
           heights.reduce((sum, value) => sum + value, 0) * 5
       });
     }
-    for (const [action, dx] of [['left', -1], ['right', 1]] as const) {
+    for (const [action, dx] of [
+      ['left', -1],
+      ['right', 1]
+    ] as const) {
       const candidate = { ...state.piece, x: state.piece.x + dx };
       if (!collides(board, candidate))
-        queue.push({ piece: candidate, path: [...state.path, action], rotation: state.rotation });
+        queue.push({
+          piece: candidate,
+          path: [...state.path, action],
+          rotation: state.rotation
+        });
     }
     const rotated = rotatedPiece(board, state.piece);
     if (rotated)
-      queue.push({ piece: rotated, path: [...state.path, 'rotate'], rotation: (state.rotation + 1) % 4 });
+      queue.push({
+        piece: rotated,
+        path: [...state.path, 'rotate'],
+        rotation: (state.rotation + 1) % 4
+      });
   }
-  return [...landings.values()].sort((a, b) => b.quality - a.quality).slice(0, 12);
-}
-
-function drawMatrix(
-  ctx: CanvasRenderingContext2D,
-  matrix: Matrix,
-  offset: Point
-) {
-  for (let y = 0; y < matrix.length; y++) {
-    for (let x = 0; x < matrix[y].length; x++) {
-      const value = matrix[y][x];
-      if (!value) continue;
-      ctx.fillStyle = COLORS[value];
-      ctx.fillRect(
-        (x + offset.x) * CELL,
-        (y + offset.y) * CELL,
-        CELL - 1,
-        CELL - 1
-      );
-    }
-  }
-}
-
-interface Point {
-  x: number;
-  y: number;
+  return [...landings.values()]
+    .sort((a, b) => b.quality - a.quality)
+    .slice(0, 12);
 }
 
 export default tetris;

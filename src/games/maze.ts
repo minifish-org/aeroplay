@@ -1,4 +1,6 @@
 import { GameModule } from './gameTypes';
+import { createGameCanvas } from '../core/pixi/scene';
+import { MazeView } from './views/maze';
 import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
 import { GameLoop } from '../core/engine';
 import { namespace } from '../core/storage';
@@ -20,15 +22,14 @@ const maze: GameModule = {
     const { area } = createGameShell(root, 'Maze Escape', goBack);
     const info = document.createElement('div');
     info.className = 'info-row';
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 360;
+    const canvas = createGameCanvas(360);
     canvas.className = 'game-canvas';
     area.append(info, canvas);
     const status = message(
       area,
       'Find the green exit. Take a detour for the three stars.'
     );
-    const ctx = canvas.getContext('2d')!;
+    const view = new MazeView(canvas);
     let level = Math.max(1, storage.load('level', 1));
     let size = 8,
       grid: Cell[][] = [],
@@ -128,62 +129,16 @@ const maze: GameModule = {
       hint.textContent = `Hint · ${hints}`;
       hint.disabled = !hints || finished;
       next.textContent = finished ? 'Next expedition →' : 'New maze';
-      const c = 356 / size;
-      ctx.fillStyle = '#132638';
-      ctx.fillRect(0, 0, 360, 360);
-      if (showTrail) {
-        ctx.fillStyle = '#24465a';
-        for (const pos of trail) {
-          const [x, y] = pos.split(',').map(Number);
-          ctx.beginPath();
-          ctx.arc(2 + (x + 0.5) * c, 2 + (y + 0.5) * c, 2.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-      ctx.strokeStyle = '#7795ac';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      for (let y = 0; y < size; y++)
-        for (let x = 0; x < size; x++) {
-          const w = grid[y][x].walls,
-            px = x * c + 2,
-            py = y * c + 2;
-          if (w.top) drawLine(ctx, px, py, px + c, py);
-          if (w.right) drawLine(ctx, px + c, py, px + c, py + c);
-          if (w.bottom) drawLine(ctx, px, py + c, px + c, py + c);
-          if (w.left) drawLine(ctx, px, py, px, py + c);
-        }
-      ctx.stroke();
-      ctx.fillStyle = '#79dab0';
-      ctx.fillRect(
-        2 + (size - 1) * c + 5,
-        2 + (size - 1) * c + 5,
-        c - 10,
-        c - 10
+      view.draw(
+        grid,
+        player,
+        stars,
+        trail,
+        path,
+        showTrail,
+        collected,
+        finished
       );
-      ctx.fillStyle = '#ffdb82';
-      ctx.font = `${c * 0.65}px system-ui`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      stars.forEach((p) =>
-        ctx.fillText('★', 2 + (p.x + 0.5) * c, 2 + (p.y + 0.5) * c)
-      );
-      ctx.fillStyle = '#8bd9ff';
-      path.forEach((p) => {
-        ctx.beginPath();
-        ctx.arc(2 + (p.x + 0.5) * c, 2 + (p.y + 0.5) * c, 3, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      ctx.fillStyle = '#edf8ff';
-      ctx.beginPath();
-      ctx.arc(
-        2 + (player.x + 0.5) * c,
-        2 + (player.y + 0.5) * c,
-        c * 0.27,
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
     }
     function move(dx: number, dy: number, fromLaya = false) {
       if (paused || (isLayaControlling() && !fromLaya) || finished) return;
@@ -235,32 +190,36 @@ const maze: GameModule = {
       }
     };
     window.addEventListener('keydown', key);
-    const loop = new GameLoop((dt) => {
-      if (paused || document.hidden) return;
-      if (planned.length && !isLayaControlling()) planned = [];
-      if (planned.length && !finished) {
-        routeTimer -= dt;
-        if (routeTimer <= 0) {
-          const next = planned.shift()!;
-          const before = steps;
-          move(next.x - player.x, next.y - player.y, true);
-          if (before === steps) planned = [];
-          routeTimer = 0.15;
+    const loop = new GameLoop(
+      (dt) => {
+        if (paused || document.hidden) return;
+        if (planned.length && !isLayaControlling()) planned = [];
+        if (planned.length && !finished) {
+          routeTimer -= dt;
+          if (routeTimer <= 0) {
+            const next = planned.shift()!;
+            const before = steps;
+            move(next.x - player.x, next.y - player.y, true);
+            if (before === steps) planned = [];
+            routeTimer = 0.15;
+          }
         }
-      }
-      if (steps && !finished) {
-        elapsed += dt;
-        info.textContent = `Expedition ${level} · ${elapsed.toFixed(1)}s · ${steps} steps · Stars ${collected}/3`;
-      }
-    });
+        if (steps && !finished) {
+          elapsed += dt;
+          info.textContent = `Expedition ${level} · ${elapsed.toFixed(1)}s · ${steps} steps · Stars ${collected}/3`;
+        }
+      },
+      0.05,
+      (dt) => view.tick(paused ? 0 : dt)
+    );
     reset();
     loop.start();
-    const stateKey = () => `${revision}:${steps}:${player.x},${player.y}:${stars.map((p) => `${p.x},${p.y}`).join(';')}`;
-    const targets = () => mazeLayaTargets(
-      stars,
-      { x: size - 1, y: size - 1 },
-      (target) => route(player, target).slice(1)
-    );
+    const stateKey = () =>
+      `${revision}:${steps}:${player.x},${player.y}:${stars.map((p) => `${p.x},${p.y}`).join(';')}`;
+    const targets = () =>
+      mazeLayaTargets(stars, { x: size - 1, y: size - 1 }, (target) =>
+        route(player, target).slice(1)
+      );
     const offLaya = registerLayaGame({
       game: 'maze',
       observe: () => {
@@ -270,21 +229,38 @@ const maze: GameModule = {
         return {
           key: stateKey(),
           context: `Maze ${size} by ${size}. Player row ${player.y + 1}, column ${player.x + 1}. Stars collected ${collected}/3. Routes use the visible maze walls. The exit ends the round, so stars beyond it are unavailable.\n${candidates.map((c, i) => `Option ${i}: ${c.kind} at row ${c.target.y + 1}, column ${c.target.x + 1}, route length ${c.way.length}.`).join('\n')}`,
-          question: candidates[0].kind === 'star' ? 'Which remaining star has the shortest route?' : 'Which route reaches the exit?',
-          choices: Object.fromEntries(candidates.map((c, i) => [String(i), `${c.kind === 'star' ? 'Star' : 'Exit'} at row ${c.target.y + 1}, column ${c.target.x + 1}`]))
+          question:
+            candidates[0].kind === 'star'
+              ? 'Which remaining star has the shortest route?'
+              : 'Which route reaches the exit?',
+          choices: Object.fromEntries(
+            candidates.map((c, i) => [
+              String(i),
+              `${c.kind === 'star' ? 'Star' : 'Exit'} at row ${c.target.y + 1}, column ${c.target.x + 1}`
+            ])
+          )
         };
       },
       act: (choice, key) => {
-        if (paused || finished || planned.length || key !== stateKey()) return false;
+        if (paused || finished || planned.length || key !== stateKey())
+          return false;
         const candidate = targets()[Number(choice)];
         if (!candidate || String(Number(choice)) !== choice) return false;
         planned = candidate.way;
         routeTimer = 0;
         return true;
       },
-      start: () => { paused = false; if (finished) reset(); },
-      pause: () => { paused = true; planned = []; },
-      resume: () => { paused = false; },
+      start: () => {
+        paused = false;
+        if (finished) reset();
+      },
+      pause: () => {
+        paused = true;
+        planned = [];
+      },
+      resume: () => {
+        paused = false;
+      },
       isFinished: () => finished,
       isPaused: () => paused,
       intervalMs: 300,
@@ -311,6 +287,7 @@ const maze: GameModule = {
     return () => {
       offLaya();
       loop.stop();
+      view.dispose();
       swipeOff();
       off();
       window.removeEventListener('keydown', key);
@@ -319,11 +296,18 @@ const maze: GameModule = {
 };
 
 /** Route steps exclude the player cell; entering the exit ends the round. */
-export function mazeLayaTargets(stars: Point[], exit: Point, routeTo: (target: Point) => Point[]) {
+export function mazeLayaTargets(
+  stars: Point[],
+  exit: Point,
+  routeTo: (target: Point) => Point[]
+) {
   const candidates = stars
     .map((target) => ({ target, way: routeTo(target), kind: 'star' as const }))
-    .filter((candidate) => candidate.way.length > 0 &&
-      !candidate.way.some((point) => point.x === exit.x && point.y === exit.y));
+    .filter(
+      (candidate) =>
+        candidate.way.length > 0 &&
+        !candidate.way.some((point) => point.x === exit.x && point.y === exit.y)
+    );
   if (candidates.length) return candidates;
   const way = routeTo(exit);
   return way.length ? [{ target: exit, way, kind: 'exit' as const }] : [];
@@ -372,17 +356,6 @@ function generateMaze(size: number): Cell[][] {
   }
 
   return grid;
-}
-
-function drawLine(
-  ctx: CanvasRenderingContext2D,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-) {
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
 }
 
 export default maze;

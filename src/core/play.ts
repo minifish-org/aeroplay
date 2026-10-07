@@ -51,20 +51,3 @@ export function directionPad(
   });
   area.appendChild(pad);
 }
-
-export function canvasOverlay(
-  ctx: CanvasRenderingContext2D,
-  title: string,
-  subtitle: string
-) {
-  const { width, height } = ctx.canvas;
-  ctx.fillStyle = 'rgba(9, 19, 35, .82)';
-  ctx.fillRect(0, height / 2 - 53, width, 106);
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#f2f8ff';
-  ctx.font = `700 ${Math.min(24, width / 12)}px system-ui`;
-  ctx.fillText(title, width / 2, height / 2 - 7);
-  ctx.font = `${Math.min(13, width / 20)}px system-ui`;
-  ctx.fillStyle = '#b6c9dd';
-  ctx.fillText(subtitle, width / 2, height / 2 + 22);
-}

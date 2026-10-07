@@ -1,6 +1,6 @@
 # AeroPlay — FlightMode Offline Game Hub
 
-A lightweight, offline-first collection of ten games (Sky Rush, Pocket Cargo, Snake, Tetris, 2048, Flappy Bird, Maze, Match-3, Sudoku, Lights Out) built with TypeScript, Vite, and Three.js. Designed for mobile, touch-friendly play in airplane mode with add-to-homescreen support.
+A lightweight, offline-first collection of ten games (Sky Rush, Pocket Cargo, Snake, Tetris, 2048, Flappy Bird, Maze, Match-3, Sudoku, Lights Out) built with TypeScript, Vite, PixiJS, and Three.js. Designed for mobile, touch-friendly play in airplane mode with add-to-homescreen support.
 
 **Use this as a template:** In GitHub, click “Use this template” to bootstrap a new repo without inheriting issues or history. Keep `main` clean (no build artifacts) for easy forking.
 
@@ -29,7 +29,7 @@ For local layout testing only, use `npm run dev -- --host 0.0.0.0`. The developm
 | --- | --- | --- |
 | Sky Rush | 3D lane flight, ring streaks, boost, shield, sector progression, optional sound | Swipe or ←/→ to steer; Space boosts; P pauses |
 | Pocket Cargo | 12 solvable 3D Sokoban islands, worker hints, minimum-push targets, undo, stars | Swipe or arrows; Z undoes; level selector |
-| Snake | Classic acceleration, relaxed edge wrapping, timed golden fruit, results | Swipe board, arrows, Start/Pause; Space or P |
+| Snake | Classic acceleration, relaxed edge wrapping, timed golden crystals, results | Swipe board, arrows, Start/Pause; Space or P |
 | Tetris | Seven-bag pieces, three previews, hold, landing ghost, wall kicks, lock delay, combo scoring | Arrows; Space drops; C holds; P pauses; touch buttons |
 | 2048 | Saved run, 20-step undo, milestones, game-over detection | Swipe board, arrows, Z to undo |
 | Flappy Bird | Fair pipe spacing, progressive gaps, perfect-flight bonus, medals | Tap board or Space; P pauses |
@@ -41,7 +41,13 @@ For local layout testing only, use `npm run dev -- --host 0.0.0.0`. The developm
 Arcade games pause when the page is hidden. Press F for fullscreen where supported. Puzzle saves include 2048, Match-3 (after cascades settle), Sudoku, and Lights Out; Maze saves expedition progress.
 
 ## Gameplay verification
+Eight 2D games use PixiJS presentation classes in `src/games/views`, separated from their existing gameplay, controls, save data and Laya adapters. The shared scene in `src/core/pixi` provides reusable materials, bounded particles, temporary glow and shockwave filters, deterministic animation time, and reduced-motion behavior. Grid puzzles retain native buttons above their canvas for touch, keyboard focus and accessibility.
+
+One Pixi renderer is reused across 2D scenes to avoid WebKit's context exhaustion when repeatedly creating and losing WebGL contexts. Navigation destroys the scene, textures, filters and event listeners; the renderer sleeps on the hub and is destroyed when leaving the page. Pixel density is capped at 2. Human play uses local dependencies and procedurally generated materials. The Canvas backend keeps the 2D games playable without GPU acceleration, with GPU filters omitted.
+
 With Playwright available, run `node scripts/verify-games.mjs` against the development server. Set `PLAYWRIGHT_MODULE` to an existing Playwright module path if it is installed outside the project. `TEST_BROWSER=webkit` selects WebKit, and `TEST_URL` changes the server address. The script exercises wins/losses, scoring, hints, undo, persistence, and 320/390/768px layouts, and writes screenshots to `output/`.
+
+Run `node scripts/verify-pixi.mjs` to verify visible rendering after native input, cascades, merges, notes, idle and paused rendering, reduced motion and rapid navigation with a bounded GPU context count. `node scripts/capture-previews.mjs` captures representative synthetic boards from the actual presentation classes, plus live Maze and 3D scenes, on the development server into the local hub artwork.
 
 Run `node scripts/verify-offline.mjs` against `npm run preview` to verify production precaching, offline reload, all ten game mounts, and touch swipes. It uses the same Playwright environment overrides, including `TEST_BROWSER=webkit`. The WebKit check installs an isolated preview and then stops the server to verify cached reload and play without Playwright's service-worker offline override.
 
@@ -75,8 +81,10 @@ Browsers can require [local network permission](https://developer.chrome.com/blo
 
 Run `node scripts/verify-laya-core.mjs` for transport, cancellation, input validation, controller lifecycle and save isolation tests. These use fake transport to exercise failures and do not count as real-model gameplay verification.
 
+Run `node scripts/verify-laya-ui.mjs` for fake-transport integration of all ten games, including decisions, pause, rejected stale responses, save isolation and human takeover. It supports the same Playwright browser and server overrides.
+
 ## Tech Notes
-- Static frontend: Three.js is bundled locally; no external CDN or remote game assets. Optional Laya inference is a separate service.
+- Static frontend: PixiJS, its filters and Three.js are bundled locally and loaded on demand; no external CDN or remote game assets. Optional Laya inference is a separate service.
 - Offline: service worker + manifest; localStorage per-game saves. Cache versions include built page HTML and public asset contents, so policy and artwork changes refresh installed copies.
 - The page restricts scripts and workers to its own origin. Hosting-injected analytics cannot run or make external requests; the configured Laya decision connection remains available.
 - Mobile UX: touch controls, double-tap zoom disabled, overscroll reduced.

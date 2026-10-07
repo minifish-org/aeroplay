@@ -7,7 +7,8 @@ export class GameLoop {
 
   constructor(
     private readonly step: StepFn,
-    private readonly maxDt = 0.05
+    private readonly maxDt = 0.05,
+    private readonly present?: StepFn
   ) {}
 
   start() {
@@ -28,8 +29,11 @@ export class GameLoop {
     // Manual stepping takes ownership until the loop is stopped and started again.
     cancelAnimationFrame(this.rafId);
     for (let remaining = ms / 1000; remaining > 0; remaining -= 1 / 60) {
-      this.step(Math.min(remaining, 1 / 60));
+      const dt = Math.min(remaining, 1 / 60);
+      this.step(dt);
+      this.present?.(dt);
     }
+    if (ms === 0) this.present?.(0);
   }
 
   private tick = (time: number) => {
@@ -38,6 +42,7 @@ export class GameLoop {
     const dt = Math.min(this.maxDt, rawDt);
     this.last = time;
     this.step(dt);
+    this.present?.(dt);
     this.rafId = requestAnimationFrame(this.tick);
   };
 }

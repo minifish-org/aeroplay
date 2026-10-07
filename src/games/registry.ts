@@ -21,7 +21,7 @@ export const games: GameEntry[] = [
     id: 'cargo',
     name: 'Pocket Cargo',
     description:
-      'Twelve little islands. Twelve clever deliveries. Take the scenic route.',
+      'Twelve islands. Plan your route. Make every push count.',
     icon: '📦',
     category: 'Puzzles',
     accent: '#9bd3bd',
@@ -31,7 +31,7 @@ export const games: GameEntry[] = [
   {
     id: 'snake',
     name: 'Snake',
-    description: 'Chase golden fruit. Find your rhythm as the pace rises.',
+    description: 'Chase golden crystals. Find your rhythm as the pace rises.',
     icon: '🐍',
     category: 'Arcade',
     accent: '#a9dfba',

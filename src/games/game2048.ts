@@ -1,4 +1,5 @@
 import { GameModule } from './gameTypes';
+import { MergeView } from './views/puzzles';
 import { createGameShell, bindSwipe, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
@@ -44,6 +45,7 @@ const game2048: GameModule = {
     const gridEl = document.createElement('div');
     gridEl.className = 'grid-2048';
     area.append(info, gridEl);
+    const view = new MergeView(gridEl);
 
     const controls = document.createElement('div');
     controls.className = 'control-grid';
@@ -139,6 +141,7 @@ const game2048: GameModule = {
           : `Next milestone: ${target} · Moves ${moves}${history.length ? ' · Undo available' : ''}`;
       storage.save('state', { grid, score, moves });
 
+      view.draw(grid, animations);
       animations = {};
     };
 
@@ -242,7 +245,10 @@ const game2048: GameModule = {
     const stateKey = () => `${moves}:${gridToString(grid)}`;
     const candidates = () =>
       (['left', 'right', 'up', 'down'] as MoveDirection[])
-        .map((direction) => ({ direction, ...preview2048Move(grid, direction) }))
+        .map((direction) => ({
+          direction,
+          ...preview2048Move(grid, direction)
+        }))
         .filter((candidate) => candidate.changed);
     const offLaya = registerLayaGame({
       game: '2048',
@@ -253,8 +259,11 @@ const game2048: GameModule = {
         return {
           key: stateKey(),
           context: `2048. Rows top to bottom; 0 is empty.\n${grid.map((row) => row.join(' ')).join('\n')}\n${options.map((c, i) => `Option ${i}: ${c.direction}, merge points ${c.gained}, empty cells ${c.empty}.`).join('\n')}`,
-          question: 'Which legal slide best combines matching tiles while keeping empty space?',
-          choices: Object.fromEntries(options.map((c, i) => [String(i), c.direction]))
+          question:
+            'Which legal slide best combines matching tiles while keeping empty space?',
+          choices: Object.fromEntries(
+            options.map((c, i) => [String(i), c.direction])
+          )
         };
       },
       act: (choice, key) => {
@@ -265,26 +274,37 @@ const game2048: GameModule = {
         move(candidate.direction, true);
         return before !== stateKey();
       },
-      start: () => { paused = false; if (!canMove()) restartGame(); },
-      pause: () => { paused = true; },
-      resume: () => { paused = false; },
+      start: () => {
+        paused = false;
+        if (!canMove()) restartGame();
+      },
+      pause: () => {
+        paused = true;
+      },
+      resume: () => {
+        paused = false;
+      },
       isFinished: () => !canMove(),
       isPaused: () => paused,
       intervalMs: 450,
       assistance: 'Move planning'
     });
-    const off = exposeGame(() => ({
-      game: '2048',
-      mode: !canMove() ? 'over' : paused ? 'paused' : 'playing',
-      grid,
-      score,
-      moves,
-      undoCount: history.length
-    }));
+    const off = exposeGame(
+      () => ({
+        game: '2048',
+        mode: !canMove() ? 'over' : paused ? 'paused' : 'playing',
+        grid,
+        score,
+        moves,
+        undoCount: history.length
+      }),
+      (ms) => view.scene.advance(ms)
+    );
 
     return () => {
       offLaya();
       off();
+      view.dispose();
       swipeOff();
       window.removeEventListener('keydown', keyHandler);
     };
@@ -353,10 +373,15 @@ export function preview2048Move(grid: Grid, direction: MoveDirection) {
   for (let index = 0; index < SIZE; index++) {
     const horizontal = direction === 'left' || direction === 'right';
     const line = horizontal ? grid[index] : grid.map((row) => row[index]);
-    const merged = compressAndMerge(line, direction === 'left' || direction === 'up');
+    const merged = compressAndMerge(
+      line,
+      direction === 'left' || direction === 'up'
+    );
     gained += merged.gained;
     if (horizontal) next[index] = merged.newRow;
-    else for (let row = 0; row < SIZE; row++) next[row][index] = merged.newRow[row];
+    else
+      for (let row = 0; row < SIZE; row++)
+        next[row][index] = merged.newRow[row];
   }
   return {
     grid: next,

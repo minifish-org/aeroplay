@@ -60,8 +60,10 @@ async function open(game, saved) {
       JSON.parse(window.render_game_to_text()).game === game,
     game
   );
+  await page.waitForSelector('canvas[data-renderer="pixi"][data-ready="true"]');
 }
 async function shot(name) {
+  await page.evaluate(() => window.advanceTime?.(0));
   await page.screenshot({
     path: path.join(output, `${name}.png`),
     fullPage: true

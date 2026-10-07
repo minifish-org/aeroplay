@@ -1,15 +1,11 @@
 import { GameModule } from './gameTypes';
+import { createGameCanvas } from '../core/pixi/scene';
+import { SnakeView } from './views/snake';
 import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
-import {
-  Mode,
-  canvasOverlay,
-  directionPad,
-  exposeGame,
-  message
-} from '../core/play';
+import { Mode, directionPad, exposeGame, message } from '../core/play';
 
 type Point = { x: number; y: number };
 const SIZE = 20;
@@ -18,20 +14,19 @@ const snake: GameModule = {
   id: 'snake',
   name: 'Snake',
   icon: '🐍',
-  description: 'Chase golden fruit. Find your rhythm as the pace rises.',
+  description: 'Chase golden crystals. Find your rhythm as the pace rises.',
   mount(root, goBack) {
     const storage = namespace('snake');
     const { area } = createGameShell(root, 'Snake', goBack);
     const info = document.createElement('div');
     info.className = 'info-row';
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = SIZE * CELL;
+    const canvas = createGameCanvas(SIZE * CELL);
     canvas.className = 'game-canvas';
     area.append(info, canvas);
-    const ctx = canvas.getContext('2d')!;
+    const view = new SnakeView(canvas);
     const status = message(
       area,
-      'Swipe the board or use arrows. Golden fruit is worth 30 points.'
+      'Swipe the board or use arrows. Golden crystals are worth 30 points.'
     );
     let segments: Point[] = [];
     let dir = { x: 1, y: 0 };
@@ -162,85 +157,34 @@ const snake: GameModule = {
               ? 'Play again'
               : 'Start';
       if (bonus)
-        status.textContent = `Golden fruit! ${Math.ceil(bonusTime)}s left · +30 points`;
+        status.textContent = `Golden crystal! ${Math.ceil(bonusTime)}s left · +30 points`;
       else
         status.textContent = relaxed
           ? 'Relaxed: cross the edges. Avoid your own tail.'
-          : 'Swipe or use arrows. Every 5 fruits, the pace rises.';
-      ctx.fillStyle = '#102b30';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = '#18383d';
-      ctx.lineWidth = 1;
-      for (let i = 0; i <= SIZE; i++) {
-        ctx.beginPath();
-        ctx.moveTo(i * CELL, 0);
-        ctx.lineTo(i * CELL, SIZE * CELL);
-        ctx.moveTo(0, i * CELL);
-        ctx.lineTo(SIZE * CELL, i * CELL);
-        ctx.stroke();
-      }
-      segments.forEach((p, i) => {
-        ctx.fillStyle = i === segments.length - 1 ? '#c7ffb2' : '#59d9a2';
-        ctx.beginPath();
-        ctx.roundRect(p.x * CELL + 1, p.y * CELL + 1, CELL - 2, CELL - 2, 5);
-        ctx.fill();
-      });
-      const head = segments.at(-1)!;
-      ctx.fillStyle = '#163c36';
-      for (const side of [-1, 1]) {
-        ctx.beginPath();
-        ctx.arc(
-          head.x * CELL + 9 + dir.x * 4 + dir.y * side * 4,
-          head.y * CELL + 9 + dir.y * 4 + dir.x * side * 4,
-          2,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
-      }
-      for (const [p, color] of [
-        [food, '#ff8592'],
-        [bonus, '#ffe08a']
-      ] as const)
-        if (p) {
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.arc(p.x * CELL + 9, p.y * CELL + 9, 7, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      if (mode !== 'playing')
-        canvasOverlay(
-          ctx,
-          {
-            ready: 'A little longer. A little faster.',
-            paused: 'Take a breath',
-            over: `Nice run · ${score} points`,
-            won: 'Garden complete!'
-          }[mode],
-          mode === 'ready'
-            ? 'Press Start or choose a direction'
-            : mode === 'paused'
-              ? 'Press Resume when you are ready'
-              : 'Your record is saved. Play again?'
-        );
+          : 'Swipe or use arrows. Every 5 crystals, the pace rises.';
+      view.draw(segments, dir, food, bonus, mode, score);
     }
-    const loop = new GameLoop((dt) => {
-      if (mode !== 'playing') return;
-      const speed = relaxed
-        ? 0.22
-        : Math.max(0.09, 0.21 - Math.floor(eaten / 5) * 0.02);
-      if (isLayaControlling()) dt *= speed / 0.9;
-      if (bonus) {
-        bonusTime -= dt;
-        if (bonusTime <= 0) bonus = null;
-      }
-      acc += dt;
-      while (acc >= speed && mode === 'playing') {
-        acc -= speed;
-        step();
-      }
-      draw();
-    });
+    const loop = new GameLoop(
+      (dt) => {
+        if (mode !== 'playing') return;
+        const speed = relaxed
+          ? 0.22
+          : Math.max(0.09, 0.21 - Math.floor(eaten / 5) * 0.02);
+        if (isLayaControlling()) dt *= speed / 0.9;
+        if (bonus) {
+          bonusTime -= dt;
+          if (bonusTime <= 0) bonus = null;
+        }
+        acc += dt;
+        while (acc >= speed && mode === 'playing') {
+          acc -= speed;
+          step();
+        }
+        draw();
+      },
+      0.05,
+      (dt) => view.tick(mode === 'paused' ? 0 : dt)
+    );
     const swipeOff = bindSwipe(canvas, (d) => {
       const p = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[d];
       turn(p[0], p[1]);
@@ -306,9 +250,13 @@ const snake: GameModule = {
           (next.x === bonus?.x && next.y === bonus?.y);
         const body = grows ? segments : segments.slice(1);
         if (
-          next.x < 0 || next.x >= SIZE || next.y < 0 || next.y >= SIZE ||
+          next.x < 0 ||
+          next.x >= SIZE ||
+          next.y < 0 ||
+          next.y >= SIZE ||
           body.some((point) => point.x === next.x && point.y === next.y)
-        ) return [];
+        )
+          return [];
         return [{ name, direction, next }];
       });
     }
@@ -322,11 +270,14 @@ const snake: GameModule = {
         return {
           key: String(stepVersion),
           context: `Snake on a ${SIZE} by ${SIZE} grid. Coordinates: x right, y down. Head (${head.x},${head.y}); direction (${dir.x},${dir.y}). Fruit ${food ? `(${food.x},${food.y})` : 'none'}; golden fruit ${bonus ? `(${bonus.x},${bonus.y})` : 'none'}. Body length ${segments.length}. ${relaxed ? 'Edges wrap.' : 'Edges are walls.'} Only collision-free next moves are offered.`,
-          question: 'Which next direction approaches fruit while avoiding collision?',
-          choices: Object.fromEntries(moves.map(({ name, next }) => [
-            name,
-            `Move ${name} to (${next.x},${next.y})${food ? `; fruit distance ${Math.abs(food.x - next.x) + Math.abs(food.y - next.y)}` : ''}${bonus ? `; golden fruit distance ${Math.abs(bonus.x - next.x) + Math.abs(bonus.y - next.y)}` : ''}`
-          ]))
+          question:
+            'Which next direction approaches fruit while avoiding collision?',
+          choices: Object.fromEntries(
+            moves.map(({ name, next }) => [
+              name,
+              `Move ${name} to (${next.x},${next.y})${food ? `; fruit distance ${Math.abs(food.x - next.x) + Math.abs(food.y - next.y)}` : ''}${bonus ? `; golden fruit distance ${Math.abs(bonus.x - next.x) + Math.abs(bonus.y - next.y)}` : ''}`
+            ])
+          )
         };
       },
       act: (choice, key) => {
@@ -344,15 +295,23 @@ const snake: GameModule = {
         mode = 'playing';
         draw();
       },
-      pause: () => { if (mode === 'playing') mode = 'paused'; draw(); },
-      resume: () => { if (mode === 'paused') mode = 'playing'; draw(); },
+      pause: () => {
+        if (mode === 'playing') mode = 'paused';
+        draw();
+      },
+      resume: () => {
+        if (mode === 'paused') mode = 'playing';
+        draw();
+      },
       isFinished: () => mode === 'over' || mode === 'won',
       isPaused: () => mode === 'paused',
       intervalMs: 50,
-      assistance: 'Watch mode moves one cell every 0.9 seconds. Collision-free directions are calculated; Laya chooses the direction.'
+      assistance:
+        'Watch mode moves one cell every 0.9 seconds. Collision-free directions are calculated; Laya chooses the direction.'
     });
     return () => {
       loop.stop();
+      view.dispose();
       layaOff();
       off();
       swipeOff();
