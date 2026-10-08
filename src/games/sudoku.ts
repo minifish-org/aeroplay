@@ -509,6 +509,7 @@ const sudoku: GameModule = {
     const off = exposeGame(
       () => ({
         game: 'sudoku',
+        visual: view.snapshot(),
         mode: isSolved() ? 'won' : paused ? 'paused' : 'playing',
         board,
         givens: [...givens],

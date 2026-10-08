@@ -5,7 +5,10 @@ export class GameOverlay {
   private readonly root = new Container();
   private readonly title: Text;
   private readonly subtitle: Text;
-  constructor(scene: PixiScene) {
+  private titleText = '';
+  constructor(private readonly scene: PixiScene) {
+    this.root.visible = false;
+    this.root.alpha = 0;
     const y = scene.height * 0.42;
     const bg = new Graphics()
       .rect(0, y - 16, scene.width, 104)
@@ -41,8 +44,27 @@ export class GameOverlay {
     scene.hud.addChild(this.root);
   }
   set(title: string, subtitle = '') {
-    this.root.visible = !!title;
+    if (title === this.titleText && subtitle === this.subtitle.text) return;
+    this.titleText = title;
     this.title.text = title;
     this.subtitle.text = subtitle;
+    this.scene.cancel(this.root);
+    if (title === 'PAUSED' || this.scene.reducedMotion) {
+      this.root.alpha = title ? 1 : 0;
+      this.root.y = 0;
+      this.root.visible = !!title;
+    } else if (title) {
+      this.root.visible = true;
+      this.root.y = 9;
+      this.scene.tween(this.root, { alpha: 1, y: 0 }, 0.24, { ease: 'smooth' });
+    } else {
+      this.scene.tween(this.root, { alpha: 0, y: -8 }, 0.16, {
+        ease: 'smooth',
+        onComplete: () => {
+          this.root.visible = false;
+        }
+      });
+    }
+    this.scene.invalidate();
   }
 }

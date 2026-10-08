@@ -1,5 +1,5 @@
 import { GameModule } from './gameTypes';
-import { MergeView } from './views/puzzles';
+import { MergeView, type MergeAnimation } from './views/merge';
 import { createGameShell, bindSwipe, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
@@ -11,7 +11,7 @@ type Grid = number[][];
 
 type MoveDirection = 'left' | 'right' | 'up' | 'down';
 
-type AnimationMeta = {
+type AnimationMeta = MergeAnimation & {
   dir?: MoveDirection;
   shift?: number;
   merged?: boolean;
@@ -193,6 +193,7 @@ const game2048: GameModule = {
             animations[`${record.target}-${y}`] = {
               dir,
               shift,
+              sources: record.sources.map((x) => ({ x, y })),
               merged: record.merged || undefined
             };
           });
@@ -210,6 +211,7 @@ const game2048: GameModule = {
             animations[`${x}-${record.target}`] = {
               dir,
               shift,
+              sources: record.sources.map((y) => ({ x, y })),
               merged: record.merged || undefined
             };
           });
@@ -296,7 +298,8 @@ const game2048: GameModule = {
         grid,
         score,
         moves,
-        undoCount: history.length
+        undoCount: history.length,
+        visual: view.snapshot()
       }),
       (ms) => view.scene.advance(ms)
     );

@@ -3,6 +3,7 @@ import { gemTextures } from '../../core/pixi/materials';
 import { gridCanvas, panel, PALETTE, PixiScene } from '../../core/pixi/scene';
 type Point = { x: number; y: number };
 type Fall = { x: number; from: number; to: number; isNew: boolean };
+export const GEM_TIMING = { swap: 0.16, clear: 0.2, fall: 0.32 };
 
 export class GemView {
   readonly scene: PixiScene;
@@ -12,6 +13,8 @@ export class GemView {
   private phase = '';
   private signature = '';
   private swapPending?: { a: Point; b: Point; valid: boolean };
+  private visualPhase = 'idle';
+  private cancelCue = () => {};
   constructor(board: HTMLElement) {
     this.scene = new PixiScene(gridCanvas(board, 400, 'gems'), 400, 400, true);
     panel(this.scene, 8);
@@ -37,7 +40,9 @@ export class GemView {
   ) {
     const signature = grid.flat().join('');
     const changed = this.phase !== phase || this.signature !== signature;
-    if (changed)
+    if (changed) {
+      this.cancelCue();
+      this.visualPhase = phase === 'playing' ? 'idle' : phase;
       grid.forEach((row, y) =>
         row.forEach((value, x) => {
           const gem = this.gems[y * 8 + x];
@@ -48,11 +53,23 @@ export class GemView {
           gem.scale.set(41 / 128);
           const fall = falls.find((item) => item.x === x && item.to === y);
           gem.position.set(35.5 + x * 47, 35.5 + (fall?.from ?? y) * 47);
-          if (fall) this.scene.tween(gem, { y: 35.5 + y * 47 }, 0.23);
+          if (fall)
+            this.scene.tween(
+              gem,
+              { y: 35.5 + y * 47 },
+              GEM_TIMING.fall - 0.04,
+              {
+                ease: 'smooth',
+                delay: x * 0.004
+              }
+            );
         })
       );
+    }
+    const clearDelay = this.swapPending?.valid ? GEM_TIMING.swap : 0;
     if (this.swapPending) {
       const { a, b, valid } = this.swapPending;
+      this.visualPhase = valid ? 'swap' : 'return';
       for (const [from, to] of [
         [a, b],
         [b, a]
@@ -63,44 +80,62 @@ export class GemView {
           this.scene.tween(
             gem,
             { x: 35.5 + to.x * 47, y: 35.5 + to.y * 47 },
-            0.09
+            GEM_TIMING.swap,
+            { ease: 'smooth' }
           );
         } else {
           this.scene.tween(
             gem,
-            { x: gem.x + (from.x - to.x) * 9, y: gem.y + (from.y - to.y) * 9 },
-            0.07,
-            () =>
-              this.scene.tween(
-                gem,
-                { x: 35.5 + to.x * 47, y: 35.5 + to.y * 47 },
-                0.07
-              )
+            { x: 35.5 + from.x * 47, y: 35.5 + from.y * 47 },
+            GEM_TIMING.swap,
+            {
+              ease: 'smooth',
+              onComplete: () =>
+                this.scene.tween(
+                  gem,
+                  { x: 35.5 + to.x * 47, y: 35.5 + to.y * 47 },
+                  GEM_TIMING.swap,
+                  {
+                    ease: 'smooth',
+                    onComplete: () => {
+                      this.visualPhase = 'idle';
+                    }
+                  }
+                )
+            }
           );
         }
       }
       this.swapPending = undefined;
     }
     if (phase === 'clearing' && changed) {
-      const center = matching.reduce(
-        (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
-        { x: 0, y: 0 }
-      );
-      for (const { x, y } of matching) {
-        const gem = this.gems[y * 8 + x];
-        this.scene.burst(gem.x, gem.y, PALETTE[grid[y][x]], 12);
-        this.scene.tween(gem, { scaleX: 0.09, scaleY: 0.09, alpha: 0 }, 0.16);
-      }
-      if (matching.length) {
-        const x = 35.5 + (center.x / matching.length) * 47,
-          y = 35.5 + (center.y / matching.length) * 47;
-        this.scene.ripple(x, y);
-        this.scene.popup(
-          chain > 1 ? `CASCADE ×${chain}` : `+${matching.length * 10}`,
-          x,
-          y
+      this.cancelCue = this.scene.after(clearDelay, () => {
+        this.visualPhase = 'clear';
+        const center = matching.reduce(
+          (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
+          { x: 0, y: 0 }
         );
-      }
+        for (const { x, y } of matching) {
+          const gem = this.gems[y * 8 + x];
+          this.scene.burst(gem.x, gem.y, PALETTE[grid[y][x]], 12);
+          this.scene.tween(
+            gem,
+            { scaleX: 0, scaleY: 0, alpha: 0 },
+            GEM_TIMING.clear,
+            { ease: 'smooth' }
+          );
+        }
+        if (matching.length) {
+          const x = 35.5 + (center.x / matching.length) * 47,
+            y = 35.5 + (center.y / matching.length) * 47;
+          this.scene.ripple(x, y);
+          this.scene.popup(
+            chain > 1 ? `CASCADE ×${chain}` : `+${matching.length * 10}`,
+            x,
+            y
+          );
+        }
+      });
     }
     if (phase === 'won' && this.phase !== 'won') {
       this.scene.burst(200, 180, 0xffd15e, 80);
@@ -122,7 +157,19 @@ export class GemView {
   swap(a: Point, b: Point, valid: boolean) {
     this.swapPending = { a, b, valid };
   }
+  snapshot() {
+    return {
+      phase: this.visualPhase,
+      gems: this.gems.map((gem) => ({
+        x: +gem.x.toFixed(2),
+        y: +gem.y.toFixed(2),
+        scale: +gem.scale.x.toFixed(3),
+        alpha: +gem.alpha.toFixed(3)
+      }))
+    };
+  }
   dispose() {
+    this.cancelCue();
     this.scene.dispose();
   }
 }

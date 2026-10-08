@@ -202,6 +202,7 @@ const lightsOut: GameModule = {
     const off = exposeGame(
       () => ({
         game: 'lightsout',
+        visual: view.snapshot(),
         mode: isSolved(board) ? 'won' : paused ? 'paused' : 'playing',
         board,
         initial,

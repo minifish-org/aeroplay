@@ -194,7 +194,11 @@ const tetris: GameModule = {
     }
     function lock() {
       merge(board, piece);
-      view.clear(board.flatMap((row, y) => (row.every(Boolean) ? [y] : [])));
+      view.lock(
+        board,
+        piece,
+        board.flatMap((row, y) => (row.every(Boolean) ? [y] : []))
+      );
       const cleared = clearLines(board);
       combo = cleared ? combo + 1 : -1;
       if (cleared) {
@@ -249,7 +253,7 @@ const tetris: GameModule = {
         piece.y++;
         score += 2;
       }
-      view.impact(piece.x, piece.y);
+      view.hardDrop();
       lock();
       draw();
     }
@@ -269,7 +273,7 @@ const tetris: GameModule = {
     }
     const loop = new GameLoop(
       (dt) => {
-        if (mode !== 'playing') return;
+        if (mode !== 'playing' || view.animating) return;
         if (isLayaControlling()) dt *= 0.18;
         dropTimer += dt;
         const speed = Math.max(
@@ -324,6 +328,7 @@ const tetris: GameModule = {
     const off = exposeGame(
       () => ({
         game: 'tetris',
+        visual: view.snapshot(),
         mode,
         board,
         piece,

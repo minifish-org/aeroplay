@@ -12,11 +12,15 @@ export class MazeView {
   private readonly route = new Graphics();
   private readonly traveler = new Container();
   private readonly portal = new Container();
-  private readonly stars: Sprite[] = [];
+  private readonly stars = new Map<string, Sprite>();
+  private readonly collectedStars = new Set<string>();
+  private readonly fadingStars = new Set<string>();
+  private readonly journey: Point[] = [];
+  private walking = false;
+  private escaped = false;
   private readonly gem;
   private grid?: Cell[][];
   private position = '';
-  private collected = 0;
   private finished = false;
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new PixiScene(canvas, 360, 360, true);
@@ -55,12 +59,23 @@ export class MazeView {
     trail: Set<string>,
     path: Point[],
     showTrail: boolean,
-    collected: number,
     finished: boolean
   ) {
     const size = grid.length,
       c = 356 / size;
     if (this.grid !== grid) {
+      const replacing = !!this.grid;
+      this.scene.cancel(this.traveler);
+      this.scene.cancel(this.portal);
+      this.journey.length = 0;
+      this.walking = this.escaped = false;
+      for (const star of this.stars.values()) {
+        this.scene.cancel(star);
+        star.destroy();
+      }
+      this.stars.clear();
+      this.collectedStars.clear();
+      this.fadingStars.clear();
       this.walls.clear();
       const trace = () => {
         for (let y = 0; y < size; y++)
@@ -84,8 +99,13 @@ export class MazeView {
       this.walls.stroke({ color: 0xa5c5e4, width: 0.65, alpha: 0.8 });
       this.grid = grid;
       this.position = '';
-      this.collected = 0;
       this.finished = false;
+      if (replacing) {
+        this.scene.world.alpha = 0.3;
+        this.scene.tween(this.scene.world, { alpha: 1 }, 0.3, {
+          ease: 'smooth'
+        });
+      }
     }
     this.route.clear();
     if (showTrail)
@@ -99,51 +119,100 @@ export class MazeView {
       this.route
         .circle(2 + (p.x + 0.5) * c, 2 + (p.y + 0.5) * c, 3)
         .fill(0x6cdbff);
-    stars.forEach((p, i) => {
-      let star = this.stars[i];
+    stars.forEach((p) => {
+      const key = `${p.x},${p.y}`;
+      let star = this.stars.get(key);
       if (!star) {
         star = new Sprite(this.gem);
         star.anchor.set(0.5);
         this.scene.world.addChild(star);
-        this.stars.push(star);
+        this.stars.set(key, star);
       }
       star.visible = true;
       star.width = star.height = c * 0.65;
       star.position.set(2 + (p.x + 0.5) * c, 2 + (p.y + 0.5) * c);
     });
-    this.stars.slice(stars.length).forEach((star) => {
-      star.visible = false;
-    });
+    const remaining = new Set(stars.map((p) => `${p.x},${p.y}`));
+    for (const key of this.stars.keys())
+      if (!remaining.has(key) && !this.fadingStars.has(key))
+        this.collectedStars.add(key);
     this.portal.position.set(2 + (size - 0.5) * c, 2 + (size - 0.5) * c);
     this.portal.scale.set(c / 36);
     this.traveler.scale.set(c / 36);
+    this.finished = finished;
     const position = `${player.x},${player.y}`;
     if (position !== this.position) {
-      this.scene.tween(
-        this.traveler,
-        { x: 2 + (player.x + 0.5) * c, y: 2 + (player.y + 0.5) * c },
-        this.position ? 0.09 : 0
-      );
+      if (!this.position)
+        this.traveler.position.set(
+          2 + (player.x + 0.5) * c,
+          2 + (player.y + 0.5) * c
+        );
+      else {
+        this.journey.push({ ...player });
+        if (!this.walking) this.walk();
+      }
       this.position = position;
     }
-    if (collected > this.collected)
-      this.scene.burst(
-        2 + (player.x + 0.5) * c,
-        2 + (player.y + 0.5) * c,
-        0xffd368,
-        20
-      );
-    if (finished && !this.finished) {
+    if (!this.walking) this.celebrate();
+    this.scene.invalidate();
+  }
+  private walk() {
+    const point = this.journey.shift();
+    if (!point) {
+      this.walking = false;
+      this.celebrate();
+      return;
+    }
+    this.walking = true;
+    const c = 356 / this.grid!.length;
+    this.scene.tween(
+      this.traveler,
+      { x: 2 + (point.x + 0.5) * c, y: 2 + (point.y + 0.5) * c },
+      Math.max(0.025, 0.16 / (1 + this.journey.length * 0.35)),
+      {
+        ease: 'smooth',
+        onComplete: () => {
+          const key = `${point.x},${point.y}`,
+            star = this.stars.get(key);
+          if (star && this.collectedStars.delete(key)) {
+            this.fadingStars.add(key);
+            this.scene.burst(star.x, star.y, 0xffd368, 20);
+            this.scene.tween(
+              star,
+              { y: star.y - 16, alpha: 0, scaleX: 0, scaleY: 0 },
+              0.24,
+              {
+                onComplete: () => {
+                  star.destroy();
+                  this.stars.delete(key);
+                  this.fadingStars.delete(key);
+                }
+              }
+            );
+          }
+          this.walk();
+        }
+      }
+    );
+  }
+  private celebrate() {
+    if (this.finished && !this.escaped) {
+      this.escaped = true;
       this.scene.ripple(this.portal.x, this.portal.y);
       this.scene.burst(this.portal.x, this.portal.y, 0x69edcd, 50);
       this.scene.popup('ESCAPED', 180, 170, 0x91f5de);
     }
-    this.collected = collected;
-    this.finished = finished;
-    this.scene.invalidate();
   }
   tick(dt: number) {
     this.scene.tick(dt);
+  }
+  snapshot() {
+    return {
+      x: +this.traveler.x.toFixed(2),
+      y: +this.traveler.y.toFixed(2),
+      queued: this.journey.length,
+      walking: this.walking
+    };
   }
   dispose() {
     this.scene.dispose();

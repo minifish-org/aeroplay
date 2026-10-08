@@ -1,140 +1,31 @@
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
-import { tileTexture } from '../../core/pixi/materials';
 import { gridCanvas, panel, PixiScene } from '../../core/pixi/scene';
-
-type Animation = {
-  dir?: 'left' | 'right' | 'up' | 'down';
-  shift?: number;
-  merged?: boolean;
-  spawned?: boolean;
-};
-const TILE_COLORS = [
-  0x385f89, 0x3c7da6, 0x249cae, 0x318ebd, 0x6276cd, 0x9863d2, 0xba5ec4,
-  0xc96978, 0xe28e47, 0xf1b842, 0xf3d65a
-];
-
-export class MergeView {
-  readonly scene: PixiScene;
-  private readonly tiles: { root: Container; sprite: Sprite; label: Text }[] =
-    [];
-  private readonly materials;
-  constructor(board: HTMLElement) {
-    this.scene = new PixiScene(gridCanvas(board, 400, 'merge'), 400, 400);
-    panel(this.scene, 4);
-    this.materials = TILE_COLORS.map((color) =>
-      tileTexture(this.scene, color, 16)
-    );
-    for (let i = 0; i < 16; i++) {
-      const root = new Container(),
-        sprite = new Sprite(this.materials[0]);
-      sprite.anchor.set(0.5);
-      sprite.width = sprite.height = 91;
-      const label = new Text({
-        text: '',
-        style: {
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: 34,
-          fontWeight: '800',
-          fill: 0xffffff,
-          dropShadow: { color: 0x071423, alpha: 0.4, blur: 2, distance: 2 }
-        }
-      });
-      label.anchor.set(0.5);
-      root.addChild(sprite);
-      this.scene.world.addChild(root);
-      this.scene.hud.addChild(label);
-      this.tiles.push({ root, sprite, label });
-    }
-    this.scene.afterFrame = () => this.alignLabels();
-  }
-  private alignLabels() {
-    for (const { root, label } of this.tiles) {
-      label.visible = root.visible;
-      label.alpha = root.alpha;
-      label.position.set(root.x, root.y - 3 * root.scale.y);
-      label.scale.copyFrom(root.scale);
-    }
-  }
-  draw(grid: number[][], animations: Record<string, Animation>) {
-    grid.forEach((row, y) =>
-      row.forEach((value, x) => {
-        const { root, sprite, label } = this.tiles[y * 4 + x],
-          anim = animations[`${x}-${y}`];
-        this.scene.cancel(root);
-        root.visible = !!value;
-        root.alpha = 1;
-        root.scale.set(1);
-        root.position.set(59 + x * 94, 59 + y * 94);
-        if (!value) return;
-        const index = Math.max(
-          0,
-          Math.min(TILE_COLORS.length - 1, Math.log2(value) - 1)
-        );
-        sprite.texture = this.materials[index];
-        label.text = String(value);
-        label.style.fontSize = value >= 10000 ? 24 : value >= 1000 ? 29 : 34;
-        label.style.fill = index >= 9 ? 0x172133 : 0xffffff;
-        if (anim?.shift && anim.dir) {
-          const offset = anim.shift * 94,
-            endX = root.x,
-            endY = root.y;
-          root.x +=
-            anim.dir === 'left' ? offset : anim.dir === 'right' ? -offset : 0;
-          root.y +=
-            anim.dir === 'up' ? offset : anim.dir === 'down' ? -offset : 0;
-          this.scene.tween(
-            root,
-            { x: endX, y: endY, scaleX: 1, scaleY: 1 },
-            0.16
-          );
-        }
-        if (anim?.merged || anim?.spawned) {
-          root.scale.set(anim.spawned ? 0.15 : 1.14);
-          this.scene.tween(
-            root,
-            { x: 59 + x * 94, y: 59 + y * 94, scaleX: 1, scaleY: 1 },
-            0.18
-          );
-          if (anim.merged) {
-            this.scene.burst(59 + x * 94, 59 + y * 94, TILE_COLORS[index], 20);
-            if (value >= 128)
-              this.scene.popup(
-                String(value),
-                59 + x * 94,
-                40 + y * 94,
-                0xffdb79
-              );
-          }
-        }
-      })
-    );
-    this.alignLabels();
-    this.scene.invalidate();
-  }
-  dispose() {
-    this.scene.dispose();
-  }
-}
 
 export class LightsView {
   readonly scene: PixiScene;
-  private readonly lamps: Sprite[] = [];
+  private readonly lamps: { root: Container; light: Sprite }[] = [];
   private readonly selector = new Graphics();
   private readonly onTexture;
   private readonly offTexture;
   private previous: number[] = [];
+  private pressed = -1;
   constructor(board: HTMLElement) {
     this.scene = new PixiScene(gridCanvas(board, 400, 'lights'), 400, 400);
     panel(this.scene, 5);
     this.onTexture = this.lampTexture(true);
     this.offTexture = this.lampTexture(false);
     for (let i = 0; i < 25; i++) {
-      const lamp = new Sprite(this.offTexture);
-      lamp.anchor.set(0.5);
-      lamp.width = lamp.height = 71;
-      lamp.position.set(49.6 + (i % 5) * 75.2, 49.6 + Math.floor(i / 5) * 75.2);
-      this.lamps.push(lamp);
-      this.scene.world.addChild(lamp);
+      const root = new Container();
+      root.position.set(49.6 + (i % 5) * 75.2, 49.6 + Math.floor(i / 5) * 75.2);
+      const base = new Sprite(this.offTexture),
+        light = new Sprite(this.onTexture);
+      for (const sprite of [base, light]) {
+        sprite.anchor.set(0.5);
+        sprite.width = sprite.height = 71;
+      }
+      root.addChild(base, light);
+      this.lamps.push({ root, light });
+      this.scene.world.addChild(root);
     }
     this.scene.effects.addChild(this.selector);
   }
@@ -173,12 +64,25 @@ export class LightsView {
   }
   draw(board: number[], hinted: number) {
     board.forEach((value, i) => {
-      const lamp = this.lamps[i];
-      lamp.texture = value ? this.onTexture : this.offTexture;
+      const { root, light } = this.lamps[i];
+      if (!this.previous.length) light.alpha = value;
       if (this.previous.length && value !== this.previous[i]) {
-        lamp.scale.set((71 / 128) * 0.88);
-        this.scene.tween(lamp, { scaleX: 71 / 128, scaleY: 71 / 128 }, 0.2);
-        if (value) this.scene.burst(lamp.x, lamp.y, 0xffd47b, 5);
+        const distance =
+          this.pressed < 0
+            ? 0
+            : Math.abs((i % 5) - (this.pressed % 5)) +
+              Math.abs(Math.floor(i / 5) - Math.floor(this.pressed / 5));
+        this.scene.tween(light, { alpha: value }, 0.28, {
+          ease: 'smooth',
+          delay: distance * 0.035
+        });
+        this.scene.tween(root, { scaleX: 0.94, scaleY: 0.94 }, 0.08, {
+          onComplete: () =>
+            this.scene.tween(root, { scaleX: 1, scaleY: 1 }, 0.22, {
+              ease: 'back'
+            })
+        });
+        if (value) this.scene.burst(root.x, root.y, 0xffd47b, 5);
       }
     });
     this.selector.clear();
@@ -197,13 +101,20 @@ export class LightsView {
       this.scene.burst(200, 200, 0xffd47b, 60);
     }
     this.previous = [...board];
+    this.pressed = -1;
     this.scene.invalidate();
   }
   press(index: number) {
+    this.pressed = index;
     this.scene.ripple(
       49.6 + (index % 5) * 75.2,
       49.6 + Math.floor(index / 5) * 75.2
     );
+  }
+  snapshot() {
+    return {
+      brightness: this.lamps.map(({ light }) => +light.alpha.toFixed(3))
+    };
   }
   dispose() {
     this.scene.dispose();
@@ -212,10 +123,17 @@ export class LightsView {
 
 export class SudokuView {
   readonly scene: PixiScene;
-  private readonly cells: { sprite: Sprite; label: Text }[] = [];
+  private readonly cells: {
+    sprite: Sprite;
+    shade: Sprite;
+    label: Text;
+    material: number;
+    ghost?: Text;
+  }[] = [];
   private readonly materials;
   private readonly selected = new Graphics();
   private values: string[] = [];
+  private selection = -1;
   constructor(board: HTMLElement) {
     this.scene = new PixiScene(gridCanvas(board, 400, 'sudoku'), 400, 400);
     panel(this.scene, 9);
@@ -236,6 +154,10 @@ export class SudokuView {
         13 + ((i % 9) * 376) / 9,
         13 + (Math.floor(i / 9) * 376) / 9
       );
+      const shade = new Sprite(this.materials[0]);
+      shade.width = shade.height = 39.8;
+      shade.position.copyFrom(sprite.position);
+      shade.alpha = 0;
       const label = new Text({
         text: '',
         style: {
@@ -248,8 +170,8 @@ export class SudokuView {
       });
       label.anchor.set(0.5);
       label.position.set(sprite.x + 20, sprite.y + 19);
-      this.cells.push({ sprite, label });
-      this.scene.world.addChild(sprite);
+      this.cells.push({ sprite, shade, label, material: 0 });
+      this.scene.world.addChild(sprite, shade);
       this.scene.hud.addChild(label);
     }
     const divisions = new Graphics();
@@ -259,41 +181,62 @@ export class SudokuView {
     }
     divisions.stroke({ color: 0x7496b7, width: 1.7, alpha: 0.8 });
     this.scene.world.addChild(divisions);
+    this.selected
+      .roundRect(0, 0, 41.8, 41.8, 4)
+      .stroke({ color: 0x80ecff, width: 2 });
+    this.selected.visible = false;
     this.scene.effects.addChild(this.selected);
   }
   draw(board: HTMLElement) {
-    this.selected.clear();
+    let selection = -1;
     Array.from(board.children).forEach((element, i) => {
-      const { sprite, label } = this.cells[i],
+      const cell = this.cells[i],
+        { sprite, shade, label } = cell,
         classes = element.classList;
-      sprite.texture =
-        this.materials[
-          classes.contains('invalid')
-            ? 4
-            : classes.contains('selected')
-              ? 3
-              : classes.contains('same-value')
-                ? 2
-                : classes.contains('peer')
-                  ? 1
-                  : 0
-        ];
+      const material = classes.contains('invalid')
+        ? 4
+        : classes.contains('selected')
+          ? 3
+          : classes.contains('same-value')
+            ? 2
+            : classes.contains('peer')
+              ? 1
+              : 0;
+      if (this.values[i] === undefined)
+        sprite.texture = this.materials[material];
+      else if (material !== cell.material) {
+        shade.texture = this.materials[material];
+        shade.alpha = 0;
+        this.scene.tween(shade, { alpha: 1 }, 0.18, {
+          ease: 'smooth',
+          onComplete: () => {
+            sprite.texture = shade.texture;
+            shade.alpha = 0;
+            this.scene.invalidate();
+          }
+        });
+      }
+      cell.material = material;
       const notes = element.querySelector('.sudoku-notes');
+      const previous = label.text;
+      const digits = notes
+        ? Array.from(notes.children, (node) => node.textContent || ' ')
+        : [];
+      const next = notes
+        ? [
+            digits.slice(0, 3).join(' '),
+            digits.slice(3, 6).join(' '),
+            digits.slice(6).join(' ')
+          ].join('\n')
+        : (element.textContent ?? '');
+      const previousStyle =
+        previous && previous !== next ? label.style.clone() : undefined;
+      label.text = next;
       if (notes) {
-        const digits = Array.from(
-          notes.children,
-          (node) => node.textContent || ' '
-        );
-        label.text = [
-          digits.slice(0, 3).join(' '),
-          digits.slice(3, 6).join(' '),
-          digits.slice(6).join(' ')
-        ].join('\n');
         label.style.fontFamily = 'monospace';
         label.style.fontSize = 9;
         label.style.fontWeight = '500';
       } else {
-        label.text = element.textContent ?? '';
         label.style.fontFamily = 'system-ui, sans-serif';
         label.style.fontSize = 23;
         label.style.fontWeight = classes.contains('given') ? '600' : '700';
@@ -303,10 +246,44 @@ export class SudokuView {
         : classes.contains('given')
           ? 0xeaf2ff
           : 0x74dcff;
-      if (classes.contains('selected'))
-        this.selected
-          .roundRect(sprite.x - 1, sprite.y - 1, 41.8, 41.8, 4)
-          .stroke({ color: 0x80ecff, width: 2 });
+      if (classes.contains('selected')) selection = i;
+      if (
+        this.values[i] !== undefined &&
+        previous !== label.text &&
+        !this.scene.reducedMotion
+      ) {
+        if (cell.ghost) {
+          this.scene.cancel(cell.ghost);
+          cell.ghost.destroy();
+          cell.ghost = undefined;
+        }
+        if (previous) {
+          const ghost = new Text({ text: previous, style: previousStyle });
+          ghost.anchor.set(0.5);
+          ghost.position.copyFrom(label.position);
+          ghost.alpha = label.alpha;
+          this.scene.hud.addChild(ghost);
+          cell.ghost = ghost;
+          this.scene.tween(
+            ghost,
+            { alpha: 0, y: ghost.y - 5, scaleX: 0.9, scaleY: 0.9 },
+            0.14,
+            {
+              onComplete: () => {
+                ghost.destroy();
+                cell.ghost = undefined;
+              }
+            }
+          );
+        }
+        this.scene.cancel(label);
+        label.alpha = 0;
+        label.scale.set(notes ? 0.9 : 0.55);
+        this.scene.tween(label, { alpha: 1 }, 0.14, { ease: 'smooth' });
+        this.scene.tween(label, { scaleX: 1, scaleY: 1 }, 0.24, {
+          ease: notes ? 'out' : 'back'
+        });
+      }
       if (
         this.values[i] !== undefined &&
         this.values[i] !== label.text &&
@@ -321,7 +298,38 @@ export class SudokuView {
         );
       this.values[i] = label.text;
     });
+    if (selection !== this.selection) {
+      this.scene.cancel(this.selected);
+      if (selection >= 0) {
+        const { sprite } = this.cells[selection];
+        if (this.selection < 0)
+          this.selected.position.set(sprite.x - 1, sprite.y - 1);
+        this.selected.visible = true;
+        this.scene.tween(
+          this.selected,
+          { x: sprite.x - 1, y: sprite.y - 1 },
+          0.18,
+          { ease: 'smooth' }
+        );
+      } else this.selected.visible = false;
+      this.selection = selection;
+    }
     this.scene.invalidate();
+  }
+  snapshot() {
+    return {
+      selection: this.selection,
+      x: +this.selected.x.toFixed(2),
+      y: +this.selected.y.toFixed(2),
+      cells: this.cells.map(({ label, ghost }) => ({
+        value: label.text,
+        alpha: +label.alpha.toFixed(3),
+        scale: +label.scale.x.toFixed(3),
+        outgoing: ghost
+          ? { value: ghost.text, alpha: +ghost.alpha.toFixed(3) }
+          : undefined
+      }))
+    };
   }
   dispose() {
     this.scene.dispose();

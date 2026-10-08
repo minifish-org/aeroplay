@@ -102,7 +102,7 @@ try {
         );
       }
       if (game === '2048') {
-        const { MergeView } = await import('/src/games/views/puzzles.ts');
+        const { MergeView } = await import('/src/games/views/merge.ts');
         canvas.remove();
         view = new MergeView(board);
         view.draw(

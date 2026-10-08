@@ -23,7 +23,13 @@ type Tween = {
   to: Record<string, number>;
   age: number;
   duration: number;
+  ease: 'out' | 'smooth' | 'linear' | 'back';
   done?: () => void;
+};
+type TweenOptions = {
+  delay?: number;
+  ease?: Tween['ease'];
+  onComplete?: () => void;
 };
 type Spark = {
   particle: Particle;
@@ -120,6 +126,7 @@ export class PixiScene {
   private shaders = true;
   private seed = 0x6d2b79f5;
   private tweens: Tween[] = [];
+  private timers: { remaining: number; done: () => void }[] = [];
   private sparks: Spark[] = [];
   private readonly particles: ParticleContainer;
   private readonly glow = new GlowFilter({
@@ -230,24 +237,51 @@ export class PixiScene {
   cancel(target: Container) {
     this.tweens = this.tweens.filter((item) => item.target !== target);
   }
+  after(seconds: number, done: () => void) {
+    if (this.disposed) return () => {};
+    if (this.reducedMotion || seconds <= 0) {
+      done();
+      return () => {};
+    }
+    const timer = { remaining: seconds, done };
+    this.timers.push(timer);
+    this.wake();
+    return () => {
+      this.timers = this.timers.filter((item) => item !== timer);
+    };
+  }
 
   tween(
     target: Container,
     to: Record<string, number>,
     duration = 0.2,
-    done?: () => void
+    options: TweenOptions = {}
   ) {
-    this.tweens = this.tweens.filter(
-      (item) =>
-        item.target !== target || !Object.keys(to).some((key) => key in item.to)
-    );
+    // Retarget only overlapping channels; a pulse must not cancel a slide.
+    for (const item of this.tweens) {
+      if (item.target !== target) continue;
+      for (const key of Object.keys(to)) {
+        delete item.to[key];
+        delete item.from[key];
+      }
+    }
+    this.tweens = this.tweens.filter((item) => Object.keys(item.to).length);
     const from: Record<string, number> = {};
     for (const key of Object.keys(to)) from[key] = this.property(target, key);
     if (this.reducedMotion || duration === 0) {
       for (const [key, value] of Object.entries(to))
         this.setProperty(target, key, value);
-      done?.();
-    } else this.tweens.push({ target, from, to, age: 0, duration, done });
+      options.onComplete?.();
+    } else
+      this.tweens.push({
+        target,
+        from,
+        to: { ...to },
+        age: -(options.delay ?? 0),
+        duration,
+        ease: options.ease ?? 'out',
+        done: options.onComplete
+      });
     this.invalidate();
   }
   private property(target: Container, key: string) {
@@ -325,20 +359,41 @@ export class PixiScene {
       this.sparks.length ||
       this.popups.length ||
       this.waveAge < 0.65;
-    const pending = this.tweens;
+    const pending = this.tweens,
+      completed: (() => void)[] = [];
     this.tweens = [];
     for (const item of pending) {
       item.age += dt;
-      const t = Math.min(1, item.age / item.duration),
-        eased = 1 - (1 - t) ** 3;
+      if (item.age < 0) {
+        this.tweens.push(item);
+        continue;
+      }
+      const t = Math.min(1, item.age / item.duration);
+      const eased =
+        item.ease === 'linear'
+          ? t
+          : item.ease === 'smooth'
+            ? t * t * (3 - 2 * t)
+            : item.ease === 'back'
+              ? 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2
+              : 1 - (1 - t) ** 3;
       for (const [key, value] of Object.entries(item.to))
         this.setProperty(
           item.target,
           key,
           item.from[key] + (value - item.from[key]) * eased
         );
-      if (t === 1) item.done?.();
-      else this.tweens.push(item);
+      if (t === 1) {
+        if (item.done) completed.push(item.done);
+      } else this.tweens.push(item);
+    }
+    for (const done of completed) done();
+    const timers = this.timers;
+    this.timers = [];
+    for (const timer of timers) {
+      timer.remaining -= dt;
+      if (timer.remaining <= 0) timer.done();
+      else this.timers.push(timer);
     }
     this.sparks = this.sparks.filter((spark) => {
       spark.age += dt;
@@ -400,6 +455,7 @@ export class PixiScene {
       this.tweens.length ||
       this.sparks.length ||
       this.popups.length ||
+      this.timers.length ||
       this.waveAge < 0.65
     )
       this.wake();
@@ -421,6 +477,7 @@ export class PixiScene {
     this.tweens = [];
     this.sparks = [];
     this.popups = [];
+    this.timers = [];
     this.destroyResources();
     if (owner === this) {
       owner = undefined;

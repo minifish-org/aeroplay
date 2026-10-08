@@ -162,7 +162,19 @@ const snake: GameModule = {
         status.textContent = relaxed
           ? 'Relaxed: cross the edges. Avoid your own tail.'
           : 'Swipe or use arrows. Every 5 crystals, the pace rises.';
-      view.draw(segments, dir, food, bonus, mode, score);
+      view.draw(
+        segments,
+        dir,
+        food,
+        bonus,
+        mode,
+        score,
+        isLayaControlling()
+          ? 0.9
+          : relaxed
+            ? 0.22
+            : Math.max(0.09, 0.21 - Math.floor(eaten / 5) * 0.02)
+      );
     }
     const loop = new GameLoop(
       (dt) => {
@@ -216,6 +228,7 @@ const snake: GameModule = {
     const off = exposeGame(
       () => ({
         game: 'snake',
+        visual: view.snapshot(),
         mode,
         segments,
         food,

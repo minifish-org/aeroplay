@@ -77,6 +77,7 @@ const flappy: GameModule = {
         spawn();
       }
       velocity = -235;
+      view.flap();
     }
     function spawn() {
       const gap = Math.max(142, 200 - passed * 3);
@@ -163,6 +164,7 @@ const flappy: GameModule = {
     const off = exposeGame(
       () => ({
         game: 'flappy',
+        visual: view.snapshot(),
         mode,
         bird: { x: X, y, radius: R, velocity },
         pipes,

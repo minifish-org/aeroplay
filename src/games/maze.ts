@@ -129,16 +129,7 @@ const maze: GameModule = {
       hint.textContent = `Hint · ${hints}`;
       hint.disabled = !hints || finished;
       next.textContent = finished ? 'Next expedition →' : 'New maze';
-      view.draw(
-        grid,
-        player,
-        stars,
-        trail,
-        path,
-        showTrail,
-        collected,
-        finished
-      );
+      view.draw(grid, player, stars, trail, path, showTrail, finished);
     }
     function move(dx: number, dy: number, fromLaya = false) {
       if (paused || (isLayaControlling() && !fromLaya) || finished) return;
@@ -269,6 +260,7 @@ const maze: GameModule = {
     const off = exposeGame(
       () => ({
         game: 'maze',
+        visual: view.snapshot(),
         mode: finished ? 'won' : paused ? 'paused' : 'playing',
         size,
         player,

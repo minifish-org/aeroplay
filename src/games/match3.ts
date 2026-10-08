@@ -4,7 +4,7 @@ import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { exposeGame, message } from '../core/play';
 import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
-import { GemView } from './views/gems';
+import { GemView, GEM_TIMING } from './views/gems';
 
 type Cell = number;
 type Point = { x: number; y: number };
@@ -173,7 +173,7 @@ const match3: GameModule = {
           moves--;
           chain = 1;
           phase = 'clearing';
-          timer = 0.16;
+          timer = GEM_TIMING.swap + GEM_TIMING.clear + 0.02;
         }
       } else selected = p;
       render();
@@ -213,14 +213,14 @@ const match3: GameModule = {
           });
           const falls = applyGravityWithMoves(grid);
           phase = 'falling';
-          timer = 0.23;
+          timer = GEM_TIMING.fall + 0.02;
           render(falls);
         } else {
           matching = findMatches(grid);
           if (matching.length) {
             chain++;
             phase = 'clearing';
-            timer = 0.16;
+            timer = GEM_TIMING.clear + 0.02;
             render();
           } else finish();
         }
@@ -278,6 +278,7 @@ const match3: GameModule = {
       () => ({
         game: 'match3',
         mode: paused ? 'paused' : phase,
+        visual: view.snapshot(),
         grid,
         selected,
         hinted,

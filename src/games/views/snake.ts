@@ -14,6 +14,8 @@ export class SnakeView {
   private readonly overlay: GameOverlay;
   private signature = '';
   private score = 0;
+  private direction = '';
+  private foodPosition = ['', ''];
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new PixiScene(canvas, 360, 360, true);
     panel(this.scene, 1, 1, 0);
@@ -56,7 +58,8 @@ export class SnakeView {
     food: Point | null,
     bonus: Point | null,
     mode: string,
-    score: number
+    score: number,
+    cadence = 0.21
   ) {
     const signature = segments.map((p) => `${p.x},${p.y}`).join(';');
     if (signature !== this.signature) {
@@ -75,7 +78,12 @@ export class SnakeView {
         sprite.visible = i !== segments.length - 1;
         sprite.alpha = 0.5 + (i / segments.length) * 0.5;
         const jump = Math.abs(sprite.x - x) + Math.abs(sprite.y - y) > 36;
-        this.scene.tween(sprite, { x, y }, jump ? 0 : 0.065);
+        this.scene.tween(
+          sprite,
+          { x, y },
+          jump ? 0 : Math.min(0.2, cadence * 0.88),
+          { ease: 'linear' }
+        );
       }
       this.body.slice(segments.length).forEach((sprite) => {
         sprite.visible = false;
@@ -88,18 +96,46 @@ export class SnakeView {
         { x, y },
         this.signature &&
           Math.abs(this.head.x - x) + Math.abs(this.head.y - y) < 36
-          ? 0.065
-          : 0
+          ? Math.min(0.2, cadence * 0.88)
+          : 0,
+        { ease: 'linear' }
       );
       this.signature = signature;
     }
-    this.head.rotation = Math.atan2(direction.y, direction.x);
+    const facing = `${direction.x},${direction.y}`;
+    if (facing !== this.direction) {
+      const target = Math.atan2(direction.y, direction.x);
+      const rotation =
+        this.head.rotation +
+        Math.atan2(
+          Math.sin(target - this.head.rotation),
+          Math.cos(target - this.head.rotation)
+        );
+      this.scene.tween(this.head, { rotation }, this.direction ? 0.12 : 0, {
+        ease: 'smooth'
+      });
+      this.direction = facing;
+    }
+    let index = 0;
     for (const [sprite, point] of [
       [this.food, food],
       [this.bonus, bonus]
     ] as const) {
       sprite.visible = !!point;
-      if (point) sprite.position.set(point.x * 18 + 9, point.y * 18 + 9);
+      const position = point ? `${point.x},${point.y}` : '';
+      if (point) {
+        sprite.position.set(point.x * 18 + 9, point.y * 18 + 9);
+        if (position !== this.foodPosition[index]) {
+          sprite.scale.set(8 / 128);
+          this.scene.tween(
+            sprite,
+            { scaleX: 18 / 128, scaleY: 18 / 128 },
+            0.24,
+            { ease: 'back' }
+          );
+        }
+      }
+      this.foodPosition[index++] = position;
     }
     if (score > this.score) {
       this.scene.burst(
@@ -136,6 +172,13 @@ export class SnakeView {
   }
   tick(dt: number) {
     this.scene.tick(dt);
+  }
+  snapshot() {
+    return {
+      x: +this.head.x.toFixed(2),
+      y: +this.head.y.toFixed(2),
+      rotation: +this.head.rotation.toFixed(3)
+    };
   }
   dispose() {
     this.scene.dispose();

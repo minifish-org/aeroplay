@@ -12,6 +12,20 @@
     0 15px 35px #03071466,
     inset 0 1px #bcdcff19;
 }
+.pixi-ready,
+.game-canvas[data-ready='true'] {
+  animation: reveal-game 0.24s ease-out;
+}
+@keyframes reveal-game {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 .pixi-board > canvas {
   position: absolute;
   inset: 0;
@@ -105,6 +119,8 @@
     inset 0 -2px #00000033;
 }
 @media (prefers-reduced-motion: reduce) {
+  .pixi-ready,
+  .game-canvas[data-ready='true'],
   .tile,
   .match3-cell,
   .light-cell,

@@ -21,6 +21,7 @@ export class FlappyView {
   private score = 0;
   private mode = 'ready';
   private trailTime = 0;
+  private pitch = 0;
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new PixiScene(canvas, 360, 480, true);
     const sky = new Sprite(
@@ -185,6 +186,8 @@ export class FlappyView {
     this.overlay = new GameOverlay(this.scene);
     this.scene.onFrame = (dt) => {
       if (this.mode !== 'playing' || this.scene.reducedMotion) return;
+      this.bird.rotation +=
+        (this.pitch - this.bird.rotation) * Math.min(1, dt * 14);
       this.wing.scale.y = 0.55 + Math.sin(this.scene.time * 22) * 0.45;
       this.trailTime += dt;
       if (this.trailTime > 0.07) {
@@ -206,7 +209,9 @@ export class FlappyView {
     const previousMode = this.mode;
     this.mode = mode;
     this.bird.y = y;
-    this.bird.rotation = Math.max(-0.4, Math.min(0.8, velocity / 500));
+    this.pitch = Math.max(-0.4, Math.min(0.8, velocity / 500));
+    if (this.scene.reducedMotion || mode !== 'playing')
+      this.bird.rotation = this.pitch;
     this.mountains.x = -((distance * 0.1) % 420);
     this.skyline.x = -((distance * 0.26) % 420);
     this.clouds.forEach((cloud, i) => {
@@ -281,6 +286,23 @@ export class FlappyView {
   }
   tick(dt: number) {
     this.scene.tick(dt);
+  }
+  flap() {
+    this.scene.tween(this.bird, { scaleX: 1.09, scaleY: 0.88 }, 0.07, {
+      onComplete: () =>
+        this.scene.tween(this.bird, { scaleX: 1, scaleY: 1 }, 0.18, {
+          ease: 'back'
+        })
+    });
+    this.scene.burst(67, this.bird.y + 5, 0xffe6ac, 5);
+  }
+  snapshot() {
+    return {
+      x: this.bird.x,
+      y: +this.bird.y.toFixed(2),
+      rotation: +this.bird.rotation.toFixed(3),
+      scale: +this.bird.scale.y.toFixed(3)
+    };
   }
   dispose() {
     this.scene.dispose();
