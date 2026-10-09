@@ -77,7 +77,9 @@ Run `node scripts/verify-3d.mjs` with the same Playwright environment overrides 
 
 Laya and assisted runs use separate local saves and records. Taking over an AI run does not add its score to your personal best. Human controls are disabled while Laya is in charge. Clear the service address to return to a fully local installation.
 
-Every AI action comes from the model's selected option; there is no rule-player fallback. Move planning supplies legal candidate moves and their visible outcomes. Sudoku and Lights Out additionally use visible-board constraint assistance, shown in the session label; Sudoku never provides its stored answer sheet to the AI adapter. Snake, Flappy Bird and Tetris run more slowly in watch mode to accommodate inference latency, while personal gameplay keeps its original speed. Connecting a game does not guarantee that the model will win it.
+Every AI action comes from the model's selected option; there is no rule-player fallback. Move planning supplies legal candidate moves and their visible outcomes. Sudoku and Lights Out additionally use visible-board constraint assistance, shown in the session label; Sudoku never provides its stored answer sheet to the AI adapter. Snake and Tetris run more slowly in watch mode to accommodate inference latency, while personal gameplay keeps its original speed. Connecting a game does not guarantee that the model will win it.
+
+Flappy Bird uses visible flight predictions to offer flap/wait candidates. Planning checks the upward arc and approaching pipes, excluding predicted collisions when a safe option exists. Laya chooses the action from concise outcome descriptions. The bird and pipes wait during inference, then fly one short step at reduced speed. This keeps the observation valid even when the service responds slowly. Personal flight keeps its continuous physics and normal speed.
 
 The static site is deployed by the existing Pages workflow; the Python model service runs separately. Self-hosting instructions, protocol, CORS and resource limits are in [services/laya/README.md](services/laya/README.md). A tailnet-only endpoint requires the player's device to be connected to that tailnet.
 
@@ -86,6 +88,8 @@ Browsers can require [local network permission](https://developer.chrome.com/blo
 Run `node scripts/verify-laya-core.mjs` for transport, cancellation, input validation, controller lifecycle and save isolation tests. These use fake transport to exercise failures and do not count as real-model gameplay verification.
 
 Run `node scripts/verify-laya-ui.mjs` for fake-transport integration of all ten games, including decisions, pause, rejected stale responses, save isolation and human takeover. It supports the same Playwright browser and server overrides.
+
+Run `node scripts/verify-flappy-planning.mjs` for flight prediction boundaries, held inference, pause/resume, rejected late replies, takeover and save isolation. Run `node scripts/verify-laya-flappy.mjs` for seeded native-browser flights. By default it uses a model-independent transport fixture; set `LAYA_URL` to your real service address to verify actual model choices. `TEST_SEEDS=42,2026 TEST_GATES=25` reaches the minimum pipe gap, and `TEST_REALTIME=1` uses the browser's animation frames instead of controlled stepping. Real-service tests relay browser requests through Node to avoid headless private-network permission differences; they do not verify a physical device's network permissions. Both scripts support the usual browser/server overrides and save screenshots and flight traces under `output/`.
 
 ## Tech Notes
 - Static frontend: PixiJS, its filters and Three.js are bundled locally and loaded on demand; no external CDN or remote game assets. Optional Laya inference is a separate service.

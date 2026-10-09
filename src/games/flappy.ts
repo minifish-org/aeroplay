@@ -6,13 +6,17 @@ import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
 import { Mode, exposeGame, message } from '../core/play';
+import {
+  FLIGHT,
+  FLIGHT_STEP,
+  WATCH_SPEED,
+  flightCollision,
+  flightSpeed,
+  planFlight,
+  type FlightPipe
+} from './flappyFlight';
 
-type Pipe = { x: number; gapY: number; gap: number; scored: boolean };
-const W = 360,
-  H = 480,
-  X = 82,
-  R = 12,
-  PIPE_W = 54;
+const { width: W, height: H, birdX: X, radius: R, pipeWidth: PIPE_W } = FLIGHT;
 const flappy: GameModule = {
   id: 'flappy',
   name: 'Flappy Bird',
@@ -36,12 +40,13 @@ const flappy: GameModule = {
       score = 0,
       passed = 0,
       best = storage.load('best', 0);
-    let pipes: Pipe[] = [],
+    let pipes: FlightPipe[] = [],
       mode: Mode = 'ready';
     let distance = 0,
       flash = 0,
       perfect = false;
-    let flightTime = 0;
+    let flightRemaining = 0;
+    let flightTurn = 0;
     let flightVersion = 0;
     const controls = document.createElement('div');
     controls.className = 'control-row';
@@ -55,7 +60,8 @@ const flappy: GameModule = {
     area.append(controls);
     function reset() {
       flightVersion++;
-      flightTime = 0;
+      flightRemaining = 0;
+      flightTurn = 0;
       y = H / 2;
       velocity = 0;
       score = 0;
@@ -76,7 +82,7 @@ const flappy: GameModule = {
         mode = 'playing';
         spawn();
       }
-      velocity = -235;
+      velocity = FLIGHT.flapVelocity;
       view.flap();
     }
     function spawn() {
@@ -110,22 +116,24 @@ const flappy: GameModule = {
     const loop = new GameLoop(
       (dt) => {
         if (mode !== 'playing') return;
-        if (isLayaControlling()) dt *= 0.18;
-        flightTime += dt;
-        const speed = Math.min(170, 110 + passed * 2);
+        if (isLayaControlling()) {
+          if (flightRemaining <= 0) return;
+          dt = Math.min(dt * WATCH_SPEED, flightRemaining);
+          flightRemaining = Math.max(0, flightRemaining - dt);
+          if (flightRemaining < 1e-9) {
+            flightRemaining = 0;
+            flightTurn++;
+          }
+        }
+        const speed = flightSpeed(passed);
         distance += speed * dt;
         flash = Math.max(0, flash - dt);
-        velocity += 650 * dt;
+        velocity += FLIGHT.gravity * dt;
         y += velocity * dt;
         for (const p of pipes) p.x -= speed * dt;
         if (!pipes.length || pipes.at(-1)!.x < W - 190) spawn();
+        if (flightCollision(y, pipes)) mode = 'over';
         for (const p of pipes) {
-          if (
-            X + R > p.x - 4 &&
-            X - R < p.x + PIPE_W + 4 &&
-            (y - R < p.gapY || y + R > p.gapY + p.gap)
-          )
-            mode = 'over';
           if (!p.scored && p.x + PIPE_W + 4 < X - R && mode === 'playing') {
             p.scored = true;
             passed++;
@@ -137,7 +145,6 @@ const flappy: GameModule = {
           }
         }
         pipes = pipes.filter((p) => p.x > -PIPE_W - 10);
-        if (y - R < 0 || y + R > H - 28) mode = 'over';
         draw();
       },
       0.05,
@@ -169,34 +176,39 @@ const flappy: GameModule = {
         bird: { x: X, y, radius: R, velocity },
         pipes,
         score,
-        passed
+        passed,
+        laya: isLayaControlling()
+          ? {
+              turn: flightTurn,
+              thinking: mode === 'playing' && flightRemaining === 0
+            }
+          : undefined
       }),
       (ms) => loop.advance(ms)
     );
-    const decisionKey = () =>
-      `${flightVersion}:${Math.floor(flightTime / 0.12)}`;
+    const decisionKey = () => `${flightVersion}:${flightTurn}`;
     const layaOff = registerLayaGame({
       game: 'flappy',
       observe: () => {
-        if (mode !== 'playing') return null;
-        const pipe = pipes.find(
-          (candidate) => candidate.x + PIPE_W + 4 >= X - R
-        );
-        const target = pipe ? pipe.gapY + pipe.gap / 2 : H / 2;
-        const waitY = Math.round(y + velocity * 0.12 + 325 * 0.12 ** 2);
-        const flapY = Math.round(y - 235 * 0.12 + 325 * 0.12 ** 2);
+        if (mode !== 'playing' || flightRemaining > 0) return null;
+        const plan = planFlight(y, velocity, pipes, passed);
         return {
           key: decisionKey(),
-          context: `Bird height y=${Math.round(y)}; velocity=${Math.round(velocity)} (positive falls). Ceiling y=12; ground y=440. Target center y=${Math.round(target)}. ${pipe ? `Next gap top=${Math.round(pipe.gapY + R)}, bottom=${Math.round(pipe.gapY + pipe.gap - R)}, horizontal distance=${Math.max(0, Math.round(pipe.x - X))}.` : ''} In 0.12 seconds, waiting gives y=${waitY}; flapping gives y=${flapY}. Smaller y is higher.`,
-          question:
-            'Should the bird flap or wait to stay near the gap center and avoid the ceiling and ground?',
-          choices: { '0': 'Flap upward now', '1': 'Wait and keep flying' }
+          context: plan.context,
+          question: 'Which flight action ends closest to the gap center?',
+          choices: plan.choices
         };
       },
       act: (choice, key) => {
-        if (mode !== 'playing' || key !== decisionKey()) return false;
+        if (mode !== 'playing' || key !== decisionKey() || flightRemaining > 0)
+          return false;
+        if (
+          !Object.hasOwn(planFlight(y, velocity, pipes, passed).choices, choice)
+        )
+          return false;
         if (choice === '0') flap();
         else if (choice !== '1') return false;
+        flightRemaining = FLIGHT_STEP;
         return true;
       },
       start: () => {
@@ -217,7 +229,7 @@ const flappy: GameModule = {
       isPaused: () => mode === 'paused',
       intervalMs: 40,
       assistance:
-        'Watch mode runs at 18% speed. Short-term heights are calculated; Laya chooses flap or wait.'
+        'Flight predictions help Laya choose each move. Flight pauses while it thinks.'
     });
     return () => {
       loop.stop();
