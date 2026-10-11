@@ -1,4 +1,4 @@
-"""Optional, bounded CPU decision service for AeroPlay's Laya adapters."""
+"""Bounded AeroPlay protocol adapter for native or PyTorch Laya inference."""
 
 import argparse
 import json
@@ -25,6 +25,7 @@ DEFAULT_ORIGINS = (
 )
 agent = None
 torch = None
+backend = None
 inference_slot = threading.Lock()
 
 
@@ -75,15 +76,18 @@ def validate_payload(payload):
 
 def decide(payload):
     context, question = validate_payload(payload)
-    if agent is None:
+    if backend is None and agent is None:
         raise ApiError(503, "Model is not ready")
     if not inference_slot.acquire(blocking=False):
         raise ApiError(429, "Laya is busy; try again shortly")
     started = time.perf_counter()
     try:
-        with torch.inference_mode():
-            result = agent.system_one(context, {"action": question}, lang="en",
-                                      max_len=1024, head_max_len=512)
+        if backend is not None:
+            result = backend.decide(context, question)
+        else:
+            with torch.inference_mode():
+                result = agent.system_one(context, {"action": question}, lang="en",
+                                          max_len=1024, head_max_len=512)
         usage = result.get("usage", {})
         if usage.get("truncated"):
             raise ApiError(422, "Observation exceeds the model token budget; shorten the context")
@@ -94,7 +98,7 @@ def decide(payload):
         if not isinstance(choice, str) or choice not in question["criteria"]:
             raise ApiError(502, "Model returned an invalid choice")
         return {"choice": choice, "latency_ms": round((time.perf_counter() - started) * 1000, 2),
-                "model": MODEL}
+                "model": backend.model if backend is not None else MODEL}
     finally:
         inference_slot.release()
 
@@ -182,8 +186,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/health":
             self.reply(404, {"error": "Not found"})
             return
-        self.reply(200, {"ready": agent is not None, "model": MODEL, "revision": REVISION,
-                         "protocol": PROTOCOL, "games": list(GAMES), "device": "cpu", "threads": 4})
+        health = backend.health() if backend is not None else {
+            "ready": agent is not None, "model": MODEL, "revision": REVISION,
+            "device": "cpu", "threads": 4}
+        self.reply(200, {**health, "protocol": PROTOCOL, "games": list(GAMES)})
 
     def do_POST(self):
         if not self.origin_allowed():
@@ -220,23 +226,28 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global agent, torch
+    global agent, torch, backend
     parser = argparse.ArgumentParser()
     parser.add_argument("--prepare", action="store_true", help="Download and warm the pinned model, then exit")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8771)
+    parser.add_argument("--backend", choices=("torch", "llama-cpp"), default="torch")
     args = parser.parse_args()
     allowed_origins()
-    import torch as torch_module
-    import laya
-    torch = torch_module
-    torch.set_num_threads(4)
-    torch.set_num_interop_threads(1)
-    agent = laya.load(MODEL, device="cpu", revision=REVISION)
+    if args.backend == "llama-cpp":
+        from native_backend import NativeBackend
+        backend = NativeBackend(ApiError)
+    else:
+        import torch as torch_module
+        import laya
+        torch = torch_module
+        torch.set_num_threads(4)
+        torch.set_num_interop_threads(1)
+        agent = laya.load(MODEL, device="cpu", revision=REVISION)
     warmup = decide({"game": "sky", "context": "The golden ring is in the left lane.",
                      "question": {"type": "choice", "instructions": "Which lane contains the golden ring?",
                                   "criteria": {"0": "left", "1": "middle", "2": "right"}}})
-    logging.info("Model ready: %s; warmup choice: %s", MODEL, warmup["choice"])
+    logging.info("Model ready: %s; warmup choice: %s", warmup["model"], warmup["choice"])
     if not args.prepare:
         with Server((args.host, args.port)) as server:
             logging.info("Serving %s on %s:%s", PROTOCOL, args.host, args.port)

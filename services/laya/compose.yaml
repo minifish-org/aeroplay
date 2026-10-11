@@ -1,0 +1,66 @@
+name: aeroplay-laya-q8
+services:
+  inference:
+    image: ${LAYA_RUNTIME_IMAGE:-local-ai-runtime-vulkan:0.2.2}
+    container_name: aeroplay-laya-inference
+    networks: [inference]
+    restart: unless-stopped
+    entrypoint: /runtime/llama-server
+    command: [--model, /models/Laya-Q8_0.gguf, --host, 0.0.0.0, --port, "8080", --threads, "4", --threads-batch, "4", --parallel, "1", --ctx-size, "1024", --batch-size, "1024", --ubatch-size, "1024", --device, Vulkan0, --n-gpu-layers, "999", --no-webui]
+    environment:
+      LD_LIBRARY_PATH: /runtime
+      GGML_BACKEND_PATH: /runtime/libggml-vulkan.so
+      XDG_CACHE_HOME: /shader-cache
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    group_add:
+      - ${LAYA_RENDER_GID:-992}
+    volumes:
+      - ./runtime:/runtime:ro
+      - ./models:/models:ro
+      - ./shader-cache:/shader-cache
+    cpus: 4
+    mem_limit: 4g
+    pids_limit: 256
+    read_only: true
+    tmpfs: ["/tmp:rw,size=128m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 30s
+      retries: 3
+  api:
+    image: ${LAYA_RUNTIME_IMAGE:-local-ai-runtime-vulkan:0.2.2}
+    container_name: ${LAYA_API_CONTAINER_NAME:-aeroplay-laya}
+    networks: [default, inference]
+    restart: unless-stopped
+    entrypoint: [python3, /service/server.py]
+    command: [--backend, llama-cpp]
+    environment:
+      LAYA_NATIVE_URL: http://inference:8080
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - 127.0.0.1:${LAYA_API_PORT:-18771}:8771
+    volumes:
+      - ./:/service:ro
+    cpus: 0.5
+    mem_limit: 256m
+    pids_limit: 64
+    read_only: true
+    tmpfs: ["/tmp:rw,size=16m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      inference:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python3, -c, "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8771/health',timeout=2))['ready']"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+networks:
+  inference:
+    internal: true

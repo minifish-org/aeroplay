@@ -9,14 +9,15 @@ import { Mode, exposeGame, message } from '../core/play';
 import {
   FLIGHT,
   FLIGHT_STEP,
+  FLIGHT_TICK,
   WATCH_SPEED,
-  flightCollision,
-  flightSpeed,
+  advanceFlight,
+  predictFlight,
   planFlight,
   type FlightPipe
 } from './flappyFlight';
 
-const { width: W, height: H, birdX: X, radius: R, pipeWidth: PIPE_W } = FLIGHT;
+const { width: W, height: H, birdX: X, radius: R } = FLIGHT;
 const flappy: GameModule = {
   id: 'flappy',
   name: 'Flappy Bird',
@@ -48,12 +49,16 @@ const flappy: GameModule = {
     let flightRemaining = 0;
     let flightTurn = 0;
     let flightVersion = 0;
+    let flightClock = 0;
+    let queuedFlight: { turn: number; choice: string } | null = null;
+    let appliedFlights = 0;
+    let missedFlights = 0;
     const controls = document.createElement('div');
     controls.className = 'control-row';
     const flapButton = createTouchButton('Take flight', flap);
     const pause = createTouchButton('Pause', () => {
-      if (mode === 'playing') mode = 'paused';
-      else if (mode === 'paused') mode = 'playing';
+      if (mode === 'playing') pauseFlight();
+      else if (mode === 'paused') resumeFlight();
       draw();
     });
     controls.append(flapButton, pause);
@@ -62,6 +67,10 @@ const flappy: GameModule = {
       flightVersion++;
       flightRemaining = 0;
       flightTurn = 0;
+      flightClock = 0;
+      queuedFlight = null;
+      appliedFlights = 0;
+      missedFlights = 0;
       y = H / 2;
       velocity = 0;
       score = 0;
@@ -94,6 +103,51 @@ const flappy: GameModule = {
       );
       pipes.push({ x: W + 28, gapY, gap, scored: false });
     }
+    function pauseFlight() {
+      if (mode === 'playing') mode = 'paused';
+      // Keep an already accepted plan, but invalidate any outstanding reply.
+      flightVersion++;
+      draw();
+    }
+    function resumeFlight() {
+      if (!isLayaControlling()) {
+        queuedFlight = null;
+        flightClock = 0;
+        flightVersion++;
+      }
+      if (mode === 'paused') mode = 'playing';
+      draw();
+    }
+    function stepFlight(dt: number) {
+      const result = advanceFlight({ y, velocity, pipes, passed }, dt);
+      ({ y, velocity, pipes, passed } = result.state);
+      distance += result.distance;
+      flash = Math.max(0, flash - dt);
+      if (!result.alive) mode = 'over';
+      for (perfect of result.gates) {
+        score += perfect ? 2 : 1;
+        flash = 1.2;
+        best = Math.max(best, score);
+        storage.save('best', best);
+      }
+      if (!pipes.length || pipes.at(-1)!.x < W - 190) spawn();
+    }
+    function nextFlight() {
+      flightTurn++;
+      const action = queuedFlight;
+      queuedFlight = null;
+      // Missing or late answers never hold the animation or invent an action.
+      if (
+        action?.turn === flightTurn &&
+        Object.hasOwn(planFlight(y, velocity, pipes, passed).choices, action.choice)
+      ) {
+        if (action.choice === '0') flap();
+        appliedFlights++;
+      } else {
+        missedFlights++;
+      }
+      flightRemaining = FLIGHT_STEP;
+    }
     function draw() {
       info.textContent = `Score ${score}   ·   Best ${best}   ·   Gates ${passed}`;
       flapButton.textContent =
@@ -117,34 +171,18 @@ const flappy: GameModule = {
       (dt) => {
         if (mode !== 'playing') return;
         if (isLayaControlling()) {
-          if (flightRemaining <= 0) return;
-          dt = Math.min(dt * WATCH_SPEED, flightRemaining);
-          flightRemaining = Math.max(0, flightRemaining - dt);
-          if (flightRemaining < 1e-9) {
-            flightRemaining = 0;
-            flightTurn++;
+          flightClock += dt * WATCH_SPEED;
+          while (mode === 'playing') {
+            const slice = Math.min(FLIGHT_TICK, flightRemaining);
+            if (flightClock + 1e-9 < slice) break;
+            flightClock = Math.max(0, flightClock - slice);
+            flightRemaining = Math.max(0, flightRemaining - slice);
+            stepFlight(slice);
+            if (flightRemaining < 1e-9 && mode === 'playing') nextFlight();
           }
+        } else {
+          stepFlight(dt);
         }
-        const speed = flightSpeed(passed);
-        distance += speed * dt;
-        flash = Math.max(0, flash - dt);
-        velocity += FLIGHT.gravity * dt;
-        y += velocity * dt;
-        for (const p of pipes) p.x -= speed * dt;
-        if (!pipes.length || pipes.at(-1)!.x < W - 190) spawn();
-        if (flightCollision(y, pipes)) mode = 'over';
-        for (const p of pipes) {
-          if (!p.scored && p.x + PIPE_W + 4 < X - R && mode === 'playing') {
-            p.scored = true;
-            passed++;
-            perfect = Math.abs(y - (p.gapY + p.gap / 2)) < 24;
-            score += perfect ? 2 : 1;
-            flash = 1.2;
-            best = Math.max(best, score);
-            storage.save('best', best);
-          }
-        }
-        pipes = pipes.filter((p) => p.x > -PIPE_W - 10);
         draw();
       },
       0.05,
@@ -160,8 +198,7 @@ const flappy: GameModule = {
     };
     const hidden = () => {
       if (document.hidden && mode === 'playing') {
-        mode = 'paused';
-        draw();
+        pauseFlight();
       }
     };
     window.addEventListener('keydown', key);
@@ -175,23 +212,35 @@ const flappy: GameModule = {
         mode,
         bird: { x: X, y, radius: R, velocity },
         pipes,
+        distance,
         score,
         passed,
         laya: isLayaControlling()
           ? {
               turn: flightTurn,
-              thinking: mode === 'playing' && flightRemaining === 0
+              thinking: mode === 'playing' && queuedFlight === null,
+              queued: queuedFlight?.choice ?? null,
+              applied: appliedFlights,
+              missed: missedFlights
             }
           : undefined
       }),
       (ms) => loop.advance(ms)
     );
-    const decisionKey = () => `${flightVersion}:${flightTurn}`;
+    const decisionKey = () => `${flightVersion}:${flightTurn + 1}`;
+    const futurePlan = () => {
+      const future = predictFlight({ y, velocity, pipes, passed }, flightRemaining);
+      return (
+        future &&
+        planFlight(future.y, future.velocity, future.pipes, future.passed)
+      );
+    };
     const layaOff = registerLayaGame({
       game: 'flappy',
       observe: () => {
-        if (mode !== 'playing' || flightRemaining > 0) return null;
-        const plan = planFlight(y, velocity, pipes, passed);
+        if (mode !== 'playing' || queuedFlight) return null;
+        const plan = futurePlan();
+        if (!plan) return null;
         return {
           key: decisionKey(),
           context: plan.context,
@@ -200,36 +249,34 @@ const flappy: GameModule = {
         };
       },
       act: (choice, key) => {
-        if (mode !== 'playing' || key !== decisionKey() || flightRemaining > 0)
-          return false;
         if (
-          !Object.hasOwn(planFlight(y, velocity, pipes, passed).choices, choice)
+          mode !== 'playing' ||
+          !isLayaControlling() ||
+          key !== decisionKey() ||
+          queuedFlight
         )
           return false;
-        if (choice === '0') flap();
-        else if (choice !== '1') return false;
-        flightRemaining = FLIGHT_STEP;
+        const plan = futurePlan();
+        if (!plan || !Object.hasOwn(plan.choices, choice)) return false;
+        queuedFlight = { turn: flightTurn + 1, choice };
         return true;
       },
       start: () => {
         if (mode === 'over') reset();
+        if (flightRemaining <= 0) flightRemaining = FLIGHT_STEP;
         if (mode === 'paused') mode = 'playing';
-        else if (mode === 'ready') flap();
+        else if (mode === 'ready') {
+          flap();
+        }
         draw();
       },
-      pause: () => {
-        if (mode === 'playing') mode = 'paused';
-        draw();
-      },
-      resume: () => {
-        if (mode === 'paused') mode = 'playing';
-        draw();
-      },
+      pause: pauseFlight,
+      resume: resumeFlight,
       isFinished: () => mode === 'over',
       isPaused: () => mode === 'paused',
-      intervalMs: 40,
+      intervalMs: 0,
       assistance:
-        'Flight predictions help Laya choose each move. Flight pauses while it thinks.'
+        'Flight predictions help Laya plan ahead while the bird keeps flying.'
     });
     return () => {
       loop.stop();

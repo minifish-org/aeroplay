@@ -19,7 +19,7 @@ const seeds = (process.env.TEST_SEEDS ?? '1,42,2026').split(',').map(Number);
 const gates = Number(process.env.TEST_GATES ?? 12);
 const realTime = process.env.TEST_REALTIME === '1';
 const output = path.resolve(
-  `output/laya-flappy-${real ? 'real' : 'fixture'}-${name}${realTime ? '-realtime' : ''}`
+  process.env.TEST_OUTPUT ?? `output/laya-flappy-${real ? 'real' : 'fixture'}-${name}${realTime ? '-realtime' : ''}`
 );
 await fs.mkdir(output, { recursive: true });
 const results = [];
@@ -127,6 +127,27 @@ try {
     await page.locator('.laya-watch').tap();
     await page.waitForSelector('.game-shell[data-player="laya"]');
     await page.waitForSelector('canvas[data-ready="true"]');
+    if (!realTime) {
+      await page.evaluate(async () => {
+        const { PixiScene } = await import('/src/core/pixi/scene.ts');
+        const tick = PixiScene.prototype.tick, scenes = new Set();
+        PixiScene.prototype.tick = function (dt) {
+          scenes.add(this);
+          const render = this.app?.render;
+          if (window.flightTestBatch && render) this.app.render = () => {};
+          try { return tick.call(this, dt); }
+          finally { if (render) this.app.render = render; }
+        };
+        const advance = window.advanceTime;
+        window.advanceTime = (ms) => {
+          // Preserve every simulation step, render once per controlled burst.
+          window.flightTestBatch = true;
+          try { advance(ms); }
+          finally { window.flightTestBatch = false; }
+          for (const scene of scenes) { scene.dirty = true; scene.tick(0); }
+        };
+      });
+    }
     let lastGate = 0;
     const limit = realTime ? gates * 200 : 600;
     for (let turn = 0; turn < limit && (await state()).passed < gates; turn++) {
@@ -135,26 +156,20 @@ try {
       if (realTime) {
         await page.waitForTimeout(100);
       } else {
+        // Wait for the next step's plan, then advance only to that boundary.
         await page.waitForFunction(
           () =>
-            Number(
-              document.querySelector('.game-shell').dataset.layaDecisions
-            ) > JSON.parse(window.render_game_to_text()).laya.turn,
+            JSON.parse(window.render_game_to_text()).laya.queued !== null ||
+            JSON.parse(window.render_game_to_text()).mode !== 'playing',
           null,
           { polling: 20 }
         );
         const decided = await state();
-        assert.equal(
-          decided.bird.y,
-          before.bird.y,
-          'Position stays stable throughout inference'
-        );
-        assert.deepEqual(
-          decided.pipes,
-          before.pipes,
-          'Pipes wait with the bird'
-        );
-        await advance(500);
+        if (decided.mode !== 'playing') break;
+        await advance(100);
+        const moving = await state();
+        assert(moving.distance > decided.distance, 'The scene moves while the future plan waits');
+        await advance(357.143);
       }
       const after = await state();
       if (after.passed > lastGate) {

@@ -15,7 +15,14 @@ export const FLIGHT = {
   ground: 452
 };
 export const FLIGHT_STEP = 0.16;
+export const FLIGHT_TICK = 1 / 120;
 export const WATCH_SPEED = 0.35;
+export type FlightMotion = {
+  y: number;
+  velocity: number;
+  pipes: FlightPipe[];
+  passed: number;
+};
 export const flightSpeed = (passed: number) => Math.min(170, 110 + passed * 2);
 export function flightCollision(y: number, pipes: FlightPipe[], margin = 0) {
   const radius = FLIGHT.radius + margin;
@@ -26,6 +33,49 @@ export function flightCollision(y: number, pipes: FlightPipe[], margin = 0) {
       FLIGHT.birdX - FLIGHT.radius < pipe.x + FLIGHT.pipeWidth + 4 &&
       (y - radius < pipe.gapY || y + radius > pipe.gapY + pipe.gap)
   );
+}
+
+/** The same physics step is used by live flight and its future observation. */
+export function advanceFlight(state: FlightMotion, dt: number) {
+  const distance = flightSpeed(state.passed) * dt;
+  const velocity = state.velocity + FLIGHT.gravity * dt;
+  const y = state.y + velocity * dt;
+  const pipes = state.pipes.map((pipe) => ({ ...pipe, x: pipe.x - distance }));
+  const alive = !flightCollision(y, pipes);
+  const gates: boolean[] = [];
+  for (const pipe of pipes) {
+    if (
+      !pipe.scored &&
+      pipe.x + FLIGHT.pipeWidth + 4 < FLIGHT.birdX - FLIGHT.radius &&
+      alive
+    ) {
+      pipe.scored = true;
+      gates.push(Math.abs(y - (pipe.gapY + pipe.gap / 2)) < 24);
+    }
+  }
+  return {
+    state: {
+      y,
+      velocity,
+      pipes: pipes.filter((pipe) => pipe.x > -FLIGHT.pipeWidth - 10),
+      passed: state.passed + gates.length
+    },
+    distance,
+    alive,
+    gates
+  };
+}
+
+export function predictFlight(state: FlightMotion, remaining: number) {
+  let future = state;
+  while (remaining > 1e-9) {
+    const dt = Math.min(FLIGHT_TICK, remaining);
+    const result = advanceFlight(future, dt);
+    future = result.state;
+    if (!result.alive) return null;
+    remaining -= dt;
+  }
+  return future;
 }
 
 export function planFlight(

@@ -80,10 +80,11 @@ export function mountLayaControls(root: HTMLElement, profile: PlayProfile, repla
     void tick();
   }
   async function tick() {
-    if (disposed || player !== 'laya' || status !== 'playing' || pending || document.hidden) return;
+    if (disposed || player !== 'laya' || status !== 'playing' || document.hidden) return;
     if (game.isFinished()) { abort(); status = 'finished'; update(); return; }
     if (game.isPaused()) { abort(); status = 'paused'; update(); return; }
     if (!available()) { disconnect('Laya lost its connection.'); return; }
+    if (pending) return;
     if (performance.now() < nextDecision) return;
     const observation = game.observe();
     if (!observation || observation.key === lastKey) return;

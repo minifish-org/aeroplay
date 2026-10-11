@@ -193,7 +193,7 @@ function gameFixture(h, options = {}) {
     pause: () => { paused = true; pauseCount++; },
     resume: () => { paused = false; },
     isPaused: () => paused,
-    isFinished: () => false,
+    isFinished: () => options.isFinished?.() ?? false,
     intervalMs: 0
   });
   const controls = h.api.mountLayaControls(root, 'laya', () => {});
@@ -469,6 +469,23 @@ test('A stale game observation never counts as an applied decision', async () =>
   assert.equal(game.moves.length, 0);
   assert.equal(game.shell.dataset.layaDecisions, '0');
   assert.equal(game.shell.dataset.layaStatus, 'playing');
+  game.dispose();
+});
+
+test('A continuously running game finishes without waiting for its pending response', async () => {
+  const pending = deferred();
+  const h = harness(url => url.endsWith('/health') ? response(health()) : pending.promise);
+  await connect(h);
+  let finished = false;
+  const game = gameFixture(h, { isFinished: () => finished });
+  game.controls.startWatching();
+  await flush();
+  finished = true;
+  await h.tick();
+  assert.equal(game.shell.dataset.layaStatus, 'finished');
+  pending.resolve(response({ choice: '0' }));
+  await flush();
+  assert.equal(game.moves.length, 0);
   game.dispose();
 });
 

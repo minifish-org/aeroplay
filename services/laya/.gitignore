@@ -1,3 +1,5 @@
+models/
+runtime/
+shader-cache/
+.env
 __pycache__/
-cache/
-.venv/
