@@ -5,7 +5,7 @@ A lightweight, offline-first collection of ten games (Sky Rush, Pocket Cargo, Sn
 **Use this as a template:** In GitHub, click “Use this template” to bootstrap a new repo without inheriting issues or history. Keep `main` clean (no build artifacts) for easy forking.
 
 ## About
-AeroPlay is an offline-first, mobile-first game hub optimized for flight-mode usage. All game assets are local and games save progress with `localStorage`. A service worker and manifest enable add-to-homescreen behavior and offline play. Optional Laya watch mode uses a separately configured online decision service; no external requests occur before one is configured.
+AeroPlay is an offline-first, mobile-first game hub optimized for flight-mode usage. All game assets are local and games save progress with `localStorage`. A service worker and manifest enable add-to-homescreen behavior and offline play. Optional AI watch mode uses TAMEV with controller-owned planning, entirely on the device. The player makes no external requests.
 
 ## Quick Start (desktop)
 ```bash
@@ -69,38 +69,30 @@ Run `node scripts/verify-script-policy.mjs` against the production preview to co
 
 Run `node scripts/verify-3d.mjs` with the same Playwright environment overrides to check all 12 Cargo solutions, flight rules, a complete 3D flight, worker hints, undo, stars, saving and mobile rendering. Both Chromium and WebKit are supported by the verifier. Screenshots are saved to `output/3d-*`.
 
-## Watching Laya play
+## Players and offline AI
 
-1. Open **Laya settings** on the hub or inside any game. Enter the base HTTPS address of an [AeroPlay Laya service](services/laya/README.md), test the connection, then save it. One connection is shared by all ten games and saved on this device.
-2. Open a game and select **Watch Laya**. The service must be reachable and report that it supports this game; browser online status alone does not enable watch mode.
-3. Use **Pause**, **Resume**, or **Take over**. A connection failure pauses the game and keeps the board available for takeover. Switching back to **Play yourself** starts a personal run with your personal saves.
+TAMEV is the active AI player. Human and AI players share the same game instance, rules, speed, physics and native input handler across all ten games. Select **Watch TAMEV** to hand over the current round without resetting the board or difficulty. **Take over** returns control to the human in that same round. AI runs retain separate saves and records after takeover.
 
-Laya and assisted runs use separate local saves and records. Taking over an AI run does not add its score to your personal best. Human controls are disabled while Laya is in charge. Clear the service address to return to a fully local installation.
+Run `npm run build:decision` to prepare the pinned, checksum-verified TAMEV-Nano INT8 model and include it in the static offline build. Preparation downloads files at build time; browser inference uses bundled, same-origin resources through ONNX Runtime Web and one WASM thread. No Python conversion is required. Model binaries are ignored by Git, so a fresh checkout needs preparation before AI play. Deployment builds must explicitly include this preparation.
 
-Every AI action comes from the model's selected option; there is no rule-player fallback. Move planning supplies legal candidate moves and their visible outcomes. Sudoku and Lights Out additionally use visible-board constraint assistance, shown in the session label; Sudoku never provides its stored answer sheet to the AI adapter. Snake and Tetris run more slowly in watch mode to accommodate inference latency, while personal gameplay keeps its original speed. Connecting a game does not guarantee that the model will win it.
+Open **AI player** and load the model, or start **Watch TAMEV**. Wait for model readiness and the hub's **Offline ready** indicator before disconnecting. The model and tokenizer stay resident in one dedicated worker across game navigation. Personal play does not initialize the model.
 
-Flappy Bird uses flight predictions to offer flap/wait candidates. Planning checks the upward arc and approaching pipes, excluding predicted collisions when a safe option exists. Laya chooses the action from concise outcome descriptions for the next flight boundary. The bird and pipes keep moving at reduced watch speed while that answer is requested; accepted actions wait in a queue until their matching boundary. Late or no-longer-safe answers are discarded without stopping flight or substituting a rule-player action. Slow or unavailable inference can therefore end a round. Explicit pause, retry and human takeover remain available. Personal flight keeps its normal speed and controls.
+Games keep advancing while planning and inference are pending. A dedicated controller worker calculates candidate plans from read-only visible snapshots; TAMEV selects a plan. The controller executes one ordinary input at a time, validates every step, and discards expired or divergent plans. Inference errors leave the game running. Explicit **Pause**, **Resume**, **Retry** and **Take over** remain available. There is no remote or rule-player fallback. The model can miss a timing window or lose a round.
 
-The static site is deployed by the existing Pages workflow; the Python model service runs separately. Self-hosting instructions, protocol, CORS and resource limits are in [services/laya/README.md](services/laya/README.md). A tailnet-only endpoint requires the player's device to be connected to that tailnet.
+Flappy Bird, Snake and Tetris keep their normal human speeds. Flappy prefetches the next trajectory while the current plan executes. Snake plans future direction inputs; Tetris searches reachable placements but performs each move, rotation and drop through the native controls. Maze and Cargo routes, Lights Out toggle sequences, Sudoku constraint completions, Match-3 swaps and 2048 lookahead are computed inside the AI controller. Sudoku uses only the displayed board, never its stored answer. Unknown spawns are not read or predicted from RNG. Plans cannot move a character or change a board directly. TAMEV receives concise plan summaries within its 128-token state/question and 48-token option limits.
 
-Browsers can require [local network permission](https://developer.chrome.com/blog/local-network-access) before a public site can reach a private service. CORS alone does not grant that permission. Some embedded browsers block private destinations; use a browser that permits the configured connection. A failed connection keeps personal play available and watch mode disabled.
-
-Run `node scripts/verify-laya-core.mjs` for transport, cancellation, input validation, controller lifecycle and save isolation tests. These use fake transport to exercise failures and do not count as real-model gameplay verification.
-
-Run `node scripts/verify-laya-ui.mjs` for fake-transport integration of all ten games, including decisions, pause, rejected stale responses, save isolation and human takeover. It supports the same Playwright browser and server overrides.
-
-Run `node scripts/verify-flappy-planning.mjs` for continuous motion during delayed inference, queued-action boundaries, pause/resume, rejected late replies, model failure/recovery, cancellation at game over, takeover and save isolation. Run `node scripts/verify-laya-flappy.mjs` for seeded native-browser flights. By default it uses a model-independent transport fixture; set `LAYA_URL` to your real service address to verify actual model choices. `TEST_SEEDS=42,2026 TEST_GATES=25` reaches the minimum pipe gap, and `TEST_REALTIME=1` uses normal browser animation frames instead of controlled stepping. Controlled runs preserve all simulation steps while batching presentation; real-time runs render normally. `TEST_OUTPUT` selects an evidence directory. Real-service tests relay browser requests through Node to avoid headless private-network permission differences; they do not verify a physical device's network permissions. Both scripts support the usual browser/server overrides and save screenshots and flight traces under `output/`.
+The shared contract is in `src/core/player.ts`; read-only planning data and guards are in `ai-planning-state.ts`, and the bounded searches are in the dedicated `ai-planning.worker.ts`. `verify-ai-planning.mjs` checks all ten planners and timed trajectory guards. `verify-player-core.mjs` covers ownership, cancellation and stale replies; `verify-player-fairness.mjs` compares game clocks with a held decision; `verify-player-inputs.mjs` compares identical human/AI inputs across all ten games. `verify-ai-planning-browser.mjs` exercises real TAMEV planning and takeover in normal-frame flight. Browser scripts accept the same `PLAYWRIGHT_MODULE` override described above. Historical model comparisons predate this shared-player implementation and do not measure its current gameplay performance. The earlier Laya service remains in source for reference; the active interface uses TAMEV only.
 
 ## Tech Notes
-- Static frontend: PixiJS, its filters and Three.js are bundled locally and loaded on demand; no external CDN or remote game assets. Optional Laya inference is a separate service.
+- Static frontend: PixiJS, its filters, Three.js, the optional WASM runtime and tokenizer are bundled locally and loaded on demand; no external CDN or remote game assets. TAMEV inference runs in a resident local worker.
 - Offline: service worker + manifest; localStorage per-game saves. Cache versions include built page HTML and public asset contents, so policy and artwork changes refresh installed copies.
-- The page restricts scripts and workers to its own origin. Hosting-injected analytics cannot run or make external requests; the configured Laya decision connection remains available.
+- The page restricts scripts and workers to its own origin. Hosting-injected analytics cannot run or make external requests; AI inference uses only bundled local resources.
 - Mobile UX: touch controls, double-tap zoom disabled, overscroll reduced.
 
 ## Deploying to Cloudflare Pages
 - Recommended: use the included workflow `.github/workflows/deploy-cloudflare-pages.yml`.
 - In repo secrets add `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (Pages:Edit scope), and `CLOUDFLARE_PAGES_PROJECT` (your Pages project name).
-- Trigger on push to `main` (or manual dispatch); the workflow uses Node 22, runs `npm ci` and `npm run build`, and publishes `dist` to the main branch via `cloudflare/wrangler-action@v4` with a pinned Wrangler version. This follows the [Cloudflare CI guide](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/).
+- Trigger on push to `main` (or manual dispatch); the workflow uses Node 22, runs `npm ci` and `npm run build:decision` to bundle the pinned local model, and publishes `dist` to the main branch via `cloudflare/wrangler-action@v4` with a pinned Wrangler version. This follows the [Cloudflare CI guide](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/).
 - If configuring in the Cloudflare UI instead, set build command to `npm run build`, output directory to `dist`, and Node 22.
 
 ## Repo Structure (key parts)

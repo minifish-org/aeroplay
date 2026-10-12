@@ -22,7 +22,6 @@ import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
 import { GameAudio } from '../core/audio';
 import { GameLoop } from '../core/engine';
 import { exposeGame } from '../core/play';
-import { registerLayaGame } from '../core/laya-bridge';
 import { namespace } from '../core/storage';
 import { createStage } from '../core/three/stage';
 import {
@@ -40,7 +39,7 @@ const sky: GameModule = {
   icon: '✈️',
   description:
     'Bank through the clouds. Chase rings, build a streak, hit the boost.',
-  mount(root, goBack) {
+  mount(root, goBack, player) {
     const storage = namespace('sky');
     const { area } = createGameShell(root, 'Sky Rush', goBack);
     area.closest('.game-shell')!.classList.add('immersive-shell');
@@ -80,11 +79,11 @@ const sky: GameModule = {
     view.append(hud, message, distance, meta, overlay);
     const controls = document.createElement('div');
     controls.className = 'flight-controls';
-    const left = createTouchButton('←', () => turn(-1));
+    const left = createTouchButton('←', () => input.human('left'));
     left.setAttribute('aria-label', 'Steer left');
-    const right = createTouchButton('→', () => turn(1));
+    const right = createTouchButton('→', () => input.human('right'));
     right.setAttribute('aria-label', 'Steer right');
-    const boost = createTouchButton('BOOST', activateBoost, 'boost-button');
+    const boost = createTouchButton('BOOST', () => input.human('boost'), 'boost-button');
     controls.append(left, boost, right);
     area.append(controls);
     const utility = document.createElement('div');
@@ -417,9 +416,9 @@ const sky: GameModule = {
       render(dt);
     });
     const swipeOff = bindSwipe(stage.canvas, (direction) => {
-      if (direction === 'left') turn(-1);
-      if (direction === 'right') turn(1);
-      if (direction === 'up') activateBoost();
+      if (direction === 'left') input.human('left');
+      if (direction === 'right') input.human('right');
+      if (direction === 'up') input.human('boost');
     });
     const key = (event: KeyboardEvent) => {
       if (
@@ -427,11 +426,11 @@ const sky: GameModule = {
       )
         event.preventDefault();
       if (event.repeat) return;
-      if (event.key === 'ArrowLeft' || event.key === 'a') turn(-1);
-      if (event.key === 'ArrowRight' || event.key === 'd') turn(1);
+      if (event.key === 'ArrowLeft' || event.key === 'a') input.human('left');
+      if (event.key === 'ArrowRight' || event.key === 'd') input.human('right');
       if (event.code === 'Space' || event.key === 'ArrowUp') {
         if (state.mode === 'ready') begin();
-        else activateBoost();
+        else input.human('boost');
       }
       if (event.key === 'Enter' && state.mode !== 'playing')
         panel.querySelector('button')?.click();
@@ -477,48 +476,44 @@ const sky: GameModule = {
         );
     const rowKey = () => {
       const row = nearestRow();
-      return row ? `${flightVersion}:${state.sector}:${row.index}` : null;
+      return row ? `${flightVersion}:${state.sector}:${row.index}:${state.lane}:${state.boost > 0}:${state.charge >= 100}` : null;
     };
-    const layaOff = registerLayaGame({
+    const input = player.connect<'left' | 'right' | 'wait' | 'boost'>({
       game: 'sky',
+      planning: () => { const row = nearestRow(); return state.mode === 'playing' && row ? { game: 'sky', epoch: `${flightVersion}:${state.sector}`, row: row.index, lane: state.lane, target: row.safeLane, obstacles: row.obstacles } : null; },
       observe: () => {
-        const row = nearestRow();
-        const key = rowKey();
+        const row = nearestRow(), key = rowKey();
         if (state.mode !== 'playing' || !row || !key) return null;
         const lanes = ['left', 'middle', 'right'];
+        const actions: { action: 'left' | 'right' | 'wait' | 'boost'; description: string }[] = [
+          { action: 'wait', description: lanes[state.lane] },
+        ];
+        if (state.lane > 0) actions.push({ action: 'left', description: lanes[state.lane - 1] });
+        if (state.lane < 2) actions.push({ action: 'right', description: lanes[state.lane + 1] });
+        if (state.charge >= 100 && state.boost <= 0) actions.push({ action: 'boost', description: `Boost in ${lanes[state.lane]} lane` });
         return {
-          key,
-          context: `The golden ring is in the ${lanes[row.safeLane]} lane. ` +
-            row.obstacles.map((lane) => `The ${lanes[lane]} lane has a barrier.`).join(' '),
-          question: 'Which lane contains the golden ring?',
-          choices: { '0': 'left', '1': 'middle', '2': 'right' }
+          key, context: `The golden ring is in the ${lanes[row.safeLane]} lane. ` + row.obstacles.map(lane => `The ${lanes[lane]} lane has a barrier.`).join(' ') + ` Current lane ${lanes[state.lane]}.`,
+          question: 'Which control moves toward the golden ring lane while avoiding barriers?',
+          choices: Object.fromEntries(actions.map(a => [a.action, a.description])),
+          inputs: Object.fromEntries(actions.map(a => [a.action, a.action])),
         };
       },
-      act: (choice, key) => {
-        if (state.mode !== 'playing' || key !== rowKey()) return false;
-        if (!['0', '1', '2'].includes(choice)) return false;
-        steerFlight(state, Number(choice) - state.lane);
+      isCurrent: key => key === rowKey(),
+      apply: action => {
+        if (state.mode !== 'playing') return false;
+        if (action === 'left') turn(-1);
+        if (action === 'right') turn(1);
+        if (action === 'boost') activateBoost();
         return true;
       },
-      start: () => {
-        if (state.mode === 'over' || state.mode === 'won') restart();
-        else begin();
-      },
-      pause: () => {
-        if (state.mode === 'playing') state.mode = 'paused';
-        syncUI();
-      },
-      resume: () => {
-        if (state.mode === 'paused') begin();
-      },
-      isFinished: () => state.mode === 'over' || state.mode === 'won',
-      isPaused: () => state.mode === 'paused',
-      intervalMs: 50,
-      assistance: 'Laya reads the visible ring and barrier lanes and chooses a lane. Watch mode steers without boost.'
+      start: () => { if (state.mode === 'over' || state.mode === 'won') restart(state.mode === 'won'); else begin(); },
+      pause: () => { if (state.mode === 'playing') state.mode = 'paused'; syncUI(); },
+      resume: () => { if (state.mode === 'paused') begin(); },
+      isFinished: () => state.mode === 'over' || state.mode === 'won', isPaused: () => state.mode === 'paused',
     });
     return () => {
       loop.stop();
-      layaOff();
+      input.dispose();
       off();
       swipeOff();
       audio.dispose();

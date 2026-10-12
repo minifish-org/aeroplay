@@ -6,8 +6,9 @@ import {
   setPlayProfile,
   type PlayProfile
 } from './core/storage';
-import { createLayaSettingsButton } from './core/laya-settings';
-import { mountLayaControls } from './core/laya-controls';
+import { createAISettingsButton } from './core/ai-settings';
+import { mountPlayerControls } from './core/player-controls';
+import { Player, HumanPlayer, TamevPlayer } from './core/player';
 import '../styles/laya.css';
 import '../styles/pixi.css';
 
@@ -37,7 +38,7 @@ function renderHub() {
   top.className = 'hub-topline';
   top.innerHTML =
     '<div class="hub-brand">aero<span>play</span> ↗</div><div class="hub-tools"><div class="offline-badge">Your pocket arcade</div></div>';
-  const settings = createLayaSettingsButton();
+  const settings = createAISettingsButton();
   top.querySelector('.hub-tools')!.append(settings.button);
   teardown = settings.dispose;
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
@@ -155,18 +156,20 @@ async function startGame(id: string, profile: PlayProfile = 'human') {
     const module = await game.load();
     if (version !== navigationVersion) return;
     save('last-game', id);
-    setPlayProfile(profile);
+    const claimAIRecords = setPlayProfile(profile);
+    const player = new Player(profile === 'human' ? new HumanPlayer() : new TamevPlayer(), claimAIRecords);
     const gameTeardown = module.default.mount(app, () => {
       location.hash = 'hub';
-    });
-    const controls = mountLayaControls(app, profile, (next) => {
+    }, player);
+    const controls = mountPlayerControls(app, player, (next) => {
       void startGame(id, next);
     });
     teardown = () => {
       controls.dispose();
       gameTeardown();
+      player.dispose();
     };
-    if (profile === 'laya') controls.startWatching();
+    if (profile !== 'human') player.start();
   } catch (error) {
     if (version !== navigationVersion) return;
     app.innerHTML =

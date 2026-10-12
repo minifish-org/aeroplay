@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Build
-        run: npm run build
+        run: npm run build:decision
       - name: Publish to Cloudflare Pages
         uses: cloudflare/wrangler-action@v4
         with:

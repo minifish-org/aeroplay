@@ -3,8 +3,7 @@ import { SudokuView } from './views/puzzles';
 import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
-import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
-import { sudokuLayaMoves } from './laya-puzzles';
+import { sudokuCandidates } from './laya-puzzles';
 
 type Board = number[];
 
@@ -50,7 +49,7 @@ const sudoku: GameModule = {
   description:
     'A quiet challenge, with pencil notes and a nudge when you need it.',
   icon: '🔢',
-  mount(root, goBack) {
+  mount(root, goBack, player) {
     const storage = namespace('sudoku');
     const { area } = createGameShell(root, 'Sudoku', goBack);
 
@@ -98,11 +97,12 @@ const sudoku: GameModule = {
     );
     const actions = document.createElement('div');
     actions.className = 'control-row';
-    const noteButton = createTouchButton('Notes: Off', () => {
+    function toggleNotes() {
       noteMode = !noteMode;
       noteButton.textContent = `Notes: ${noteMode ? 'On' : 'Off'}`;
       noteButton.setAttribute('aria-pressed', String(noteMode));
-    });
+    }
+    const noteButton = createTouchButton('Notes: Off', () => input.human({ type: 'notes' }));
     const undoButton = createTouchButton('Undo', () => {
       if (isSolved()) return;
       const old = history.pop();
@@ -184,13 +184,13 @@ const sudoku: GameModule = {
         const btn = document.createElement('button');
         btn.className = 'sudoku-btn';
         btn.textContent = String(n);
-        btn.addEventListener('click', () => setValue(n));
+        btn.addEventListener('click', () => input.human({ type: 'value', value: n }));
         keypad.appendChild(btn);
       }
       const erase = document.createElement('button');
       erase.className = 'sudoku-btn muted';
       erase.textContent = 'Erase';
-      erase.addEventListener('click', () => setValue(0));
+      erase.addEventListener('click', () => input.human({ type: 'value', value: 0 }));
       keypad.appendChild(erase);
 
       newBtn.addEventListener('click', nextPuzzle);
@@ -249,17 +249,15 @@ const sudoku: GameModule = {
     }
 
     function onCellSelect(e: Event) {
-      if (paused || isLayaControlling()) return;
+      if (paused) return;
       const el = e.currentTarget as HTMLElement;
       const idx = Number(el.dataset.idx);
-      selected = idx;
-      render();
+      input.human({ type: 'select', index: idx });
     }
 
-    function setValue(val: number, fromLaya = false) {
+    function setValue(val: number) {
       if (
         paused ||
-        (isLayaControlling() && !fromLaya) ||
         selected === null ||
         isSolved()
       )
@@ -402,14 +400,14 @@ const sudoku: GameModule = {
     }
 
     const keyHandler = (e: KeyboardEvent) => {
-      if (paused || isLayaControlling()) return;
+      if (paused) return;
       if (/^[1-9]$/.test(e.key)) {
         e.preventDefault();
-        setValue(Number(e.key));
+        input.human({ type: 'value', value: Number(e.key) });
       }
       if (e.key === 'Backspace' || e.key === 'Delete') {
         e.preventDefault();
-        setValue(0);
+        input.human({ type: 'value', value: 0 });
       }
       if (e.key.toLowerCase() === 'n') noteButton.click();
       if (e.key.toLowerCase() === 'z') undoButton.click();
@@ -438,73 +436,55 @@ const sudoku: GameModule = {
     window.addEventListener('keydown', keyHandler);
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('pagehide', pageHide);
-    const stateKey = () => `${puzzleIndex}:${board.join('')}`;
-    let candidateKey = '';
-    let candidates: ReturnType<typeof sudokuLayaMoves> = [];
-    function options() {
-      const key = stateKey();
-      if (key !== candidateKey) {
-        candidateKey = key;
-        candidates = sudokuLayaMoves(board, givens).slice(0, 8);
-      }
-      return candidates;
-    }
-    const offLaya = registerLayaGame({
+    const stateKey = () => `${puzzleIndex}:${board.join('')}:${selected}:${noteMode}:${notes.map(n => n.join('')).join(',')}`;
+    type SudokuInput = { type: 'select'; index: number } | { type: 'value'; value: number } | { type: 'notes' };
+    const input = player.connect<SudokuInput>({
       game: 'sudoku',
+      planning: () => !paused && !isSolved() ? { game: 'sudoku', epoch: String(puzzleIndex), board, givens: [...givens], selected, notes: noteMode } : null,
       observe: () => {
         if (paused || isSolved()) return null;
-        const moves = options();
-        if (!moves.length) return null;
-        return {
-          key: stateKey(),
-          context: `Sudoku. Rows top to bottom; 0 is empty.\n${Array.from({ length: 9 }, (_, row) => board.slice(row * 9, (row + 1) * 9).join('')).join('\n')}\nConstraint assistance checks rows, columns and boxes of this visible board. When no forced digit exists, visible-board search checks possible completions. No answer sheet is used.\n${moves.map((c, i) => `Option ${i}: r${Math.floor(c.index / 9) + 1}c${(c.index % 9) + 1} ${c.value ? `= ${c.value}, ${c.candidates.length} legal digits` : 'erase to repair the board'}.`).join('\n')}`,
-          question: moves[0].value
-            ? 'Which assisted placement should be filled next?'
-            : 'Which editable number should be erased to repair this board?',
-          choices: Object.fromEntries(
-            moves.map((c, i) => [
-              String(i),
-              `${c.value ? `Fill ${c.value} in` : 'Erase'} r${Math.floor(c.index / 9) + 1}c${(c.index % 9) + 1}`
-            ])
-          )
-        };
+        if (noteMode) return { key: stateKey(), context: 'Sudoku notes mode is on. Toggle Notes to enter permanent digits.', question: 'Which control allows a digit to be filled?', choices: { notes: 'Turn Notes off' }, inputs: { notes: { type: 'notes' } } };
+        if (selected !== null && !givens.has(selected) && !board[selected]) {
+          const row = Math.floor(selected / 9), column = selected % 9;
+          const rowDigits = board.slice(row * 9, row * 9 + 9);
+          const columnDigits = Array.from({ length: 9 }, (_, r) => board[r * 9 + column]);
+          const boxDigits = Array.from({ length: 9 }, (_, i) => board[(Math.floor(row / 3) * 3 + Math.floor(i / 3)) * 9 + Math.floor(column / 3) * 3 + i % 3]);
+          const allowed = sudokuCandidates(board, selected);
+          const digits = Array.from({ length: 9 }, (_, i) => i + 1);
+          return {
+            key: stateKey(),
+            context: `Sudoku selected r${row + 1}c${column + 1}. Row ${rowDigits.join(',')}. Column ${columnDigits.join(',')}. Box ${boxDigits.join(',')}. Zero is empty. A digit must not repeat in its row, column or box.`,
+            question: 'Which digit can be entered without repeating a displayed digit?',
+            choices: Object.fromEntries(digits.map(value => [String(value), `Fill ${value}; ${allowed.includes(value) ? 'does not repeat a digit' : 'repeats a digit'}`])),
+            inputs: Object.fromEntries(digits.map(value => [String(value), { type: 'value' as const, value }])),
+          };
+        }
+        const empty = board.flatMap((value, index) => !value && !givens.has(index) ? [index] : []);
+        const cells = (empty.length ? empty : board.flatMap((_, index) => !givens.has(index) ? [index] : [])).slice(0, 9);
+        if (!cells.length) return null;
+        const choices = Object.fromEntries(cells.map(index => [String(index), `Select empty r${Math.floor(index / 9) + 1}c${index % 9 + 1}`]));
+        const inputs: Record<string, SudokuInput> = Object.fromEntries(cells.map(index => [String(index), { type: 'select' as const, index }]));
+        if (selected !== null && !givens.has(selected) && board[selected] && !sudokuCandidates(board, selected).includes(board[selected])) {
+          choices.erase = 'Erase the selected digit, which repeats a displayed digit';
+          inputs.erase = { type: 'value', value: 0 };
+        }
+        return { key: stateKey(), context: 'Sudoku. Choose an editable empty cell. Entering a digit is a separate input. No stored answer or completion search is supplied.', question: 'Which cell should be selected next, or should a duplicated digit be erased?', choices, inputs };
       },
-      act: (choice, key) => {
-        if (paused || isSolved() || key !== stateKey()) return false;
-        const candidate = options()[Number(choice)];
-        if (
-          !candidate ||
-          String(Number(choice)) !== choice ||
-          givens.has(candidate.index)
-        )
-          return false;
-        selected = candidate.index;
-        noteMode = false;
-        noteButton.textContent = 'Notes: Off';
-        noteButton.setAttribute('aria-pressed', 'false');
+      isCurrent: key => key === stateKey(),
+      apply: action => {
+        if (paused || isSolved()) return false;
         const before = stateKey();
-        setValue(candidate.value, true);
+        if (action.type === 'select') {
+          if (!Number.isInteger(action.index) || action.index < 0 || action.index >= board.length) return false;
+          selected = action.index; render();
+        } else if (action.type === 'notes') toggleNotes();
+        else setValue(action.value);
         return before !== stateKey();
       },
-      start: () => {
-        paused = false;
-        if (isSolved()) nextPuzzle();
-        else startTimer();
-      },
-      pause: () => {
-        paused = true;
-        stopTimer();
-        saveState();
-        updateInfo();
-      },
-      resume: () => {
-        paused = false;
-        if (!isSolved()) startTimer();
-      },
-      isFinished: isSolved,
-      isPaused: () => paused,
-      intervalMs: 500,
-      assistance: 'Constraint assistance'
+      start: () => { paused = false; if (isSolved()) nextPuzzle(); else startTimer(); },
+      pause: () => { paused = true; stopTimer(); saveState(); updateInfo(); },
+      resume: () => { paused = false; if (!isSolved()) startTimer(); },
+      isFinished: isSolved, isPaused: () => paused,
     });
     const off = exposeGame(
       () => ({
@@ -524,7 +504,7 @@ const sudoku: GameModule = {
       (ms) => view.scene.advance(ms)
     );
     return () => {
-      offLaya();
+      input.dispose();
       stopTimer();
       saveState();
       off();

@@ -1,13 +1,15 @@
 const KEY_PREFIX = 'aeroplay:';
-export type PlayProfile = 'human' | 'laya';
-let playProfile: PlayProfile = 'human';
+export type PlayProfile = 'human' | 'ai' | 'laya';
+let runProfile: { owner: PlayProfile } = { owner: 'human' };
 
 export function setPlayProfile(profile: PlayProfile) {
-  playProfile = profile;
+  const run = { owner: profile };
+  runProfile = run;
+  return () => { run.owner = 'ai'; };
 }
 
 export function getPlayProfile() {
-  return playProfile;
+  return runProfile.owner;
 }
 
 const withPrefix = (key: string, game?: string) =>
@@ -33,10 +35,12 @@ export function load<T>(key: string, fallback: T, game?: string): T {
 }
 
 export function namespace(game: string) {
-  // Capture ownership so delayed saves cannot write to a later personal run.
-  const owner = playProfile === 'laya' ? `laya:${game}` : game;
+  // Capture the run, including a later handoff to AI. A new mount cannot change
+  // this run's ownership, and takeover never turns AI records into personal ones.
+  const run = runProfile;
+  const owner = () => run.owner === 'human' ? game : `${run.owner}:${game}`;
   return {
-    save: <T>(key: string, value: T) => save(key, value, owner),
-    load: <T>(key: string, fallback: T) => load(key, fallback, owner)
+    save: <T>(key: string, value: T) => save(key, value, owner()),
+    load: <T>(key: string, fallback: T) => load(key, fallback, owner())
   };
 }

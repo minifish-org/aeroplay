@@ -4,7 +4,6 @@ import { SnakeView } from './views/snake';
 import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
-import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
 import { Mode, directionPad, exposeGame, message } from '../core/play';
 
 type Point = { x: number; y: number };
@@ -15,7 +14,7 @@ const snake: GameModule = {
   name: 'Snake',
   icon: '🐍',
   description: 'Chase golden crystals. Find your rhythm as the pace rises.',
-  mount(root, goBack) {
+  mount(root, goBack, player) {
     const storage = namespace('snake');
     const { area } = createGameShell(root, 'Snake', goBack);
     const info = document.createElement('div');
@@ -58,18 +57,19 @@ const snake: GameModule = {
     row.append(start, difficulty);
     area.append(row);
     function turn(x: number, y: number) {
-      if (mode === 'over' || mode === 'won' || mode === 'paused') return;
+      if (mode === 'over' || mode === 'won' || mode === 'paused') return false;
       if (mode === 'ready') mode = 'playing';
       const last = queue.at(-1) ?? dir;
+      if (last.x === x && last.y === y) return true;
       if (
-        (last.x === x && last.y === y) ||
         (last.x === -x && last.y === -y) ||
         queue.length >= 2
       )
-        return;
+        return false;
       queue.push({ x, y });
+      return true;
     }
-    directionPad(area, turn);
+    directionPad(area, (x, y) => input.human({ x, y }));
     function emptyCell(): Point | null {
       const cells: Point[] = [];
       for (let y = 0; y < SIZE; y++)
@@ -169,11 +169,7 @@ const snake: GameModule = {
         bonus,
         mode,
         score,
-        isLayaControlling()
-          ? 0.9
-          : relaxed
-            ? 0.22
-            : Math.max(0.09, 0.21 - Math.floor(eaten / 5) * 0.02)
+        relaxed ? 0.22 : Math.max(0.09, 0.21 - Math.floor(eaten / 5) * 0.02)
       );
     }
     const loop = new GameLoop(
@@ -182,7 +178,6 @@ const snake: GameModule = {
         const speed = relaxed
           ? 0.22
           : Math.max(0.09, 0.21 - Math.floor(eaten / 5) * 0.02);
-        if (isLayaControlling()) dt *= speed / 0.9;
         if (bonus) {
           bonusTime -= dt;
           if (bonusTime <= 0) bonus = null;
@@ -199,7 +194,7 @@ const snake: GameModule = {
     );
     const swipeOff = bindSwipe(canvas, (d) => {
       const p = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[d];
-      turn(p[0], p[1]);
+      input.human({ x: p[0], y: p[1] });
     });
     const key = (e: KeyboardEvent) => {
       if (e.key.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
@@ -211,7 +206,7 @@ const snake: GameModule = {
           ArrowRight: [1, 0]
         } as Record<string, number[]>
       )[e.key];
-      if (p) turn(p[0], p[1]);
+      if (p) input.human({ x: p[0], y: p[1] });
       if ((e.code === 'Space' || e.key === 'p') && !e.repeat) start.click();
     };
     const hidden = () => {
@@ -262,49 +257,36 @@ const snake: GameModule = {
           (next.x === food?.x && next.y === food?.y) ||
           (next.x === bonus?.x && next.y === bonus?.y);
         const body = grows ? segments : segments.slice(1);
-        if (
-          next.x < 0 ||
-          next.x >= SIZE ||
-          next.y < 0 ||
-          next.y >= SIZE ||
-          body.some((point) => point.x === next.x && point.y === next.y)
-        )
-          return [];
-        return [{ name, direction, next }];
+        const safe = next.x >= 0 && next.x < SIZE && next.y >= 0 && next.y < SIZE && !body.some(point => point.x === next.x && point.y === next.y);
+        return [{ name, direction, next, safe }];
       });
     }
-    const layaOff = registerLayaGame({
+    const input = player.connect<Point>({
       game: 'snake',
+      planning: () => mode === 'playing' && !queue.length ? { game: 'snake', epoch: String(relaxed), tick: stepVersion, segments, direction: dir, food, bonus, size: SIZE, wrap: relaxed } : null,
       observe: () => {
-        if (mode !== 'playing') return null;
+        if (mode !== 'playing' || queue.length) return null;
         const moves = availableMoves();
         if (!moves.length) return null;
         const head = segments.at(-1)!;
         return {
           key: String(stepVersion),
-          context: `Snake on a ${SIZE} by ${SIZE} grid. Coordinates: x right, y down. Head (${head.x},${head.y}); direction (${dir.x},${dir.y}). Fruit ${food ? `(${food.x},${food.y})` : 'none'}; golden fruit ${bonus ? `(${bonus.x},${bonus.y})` : 'none'}. Body length ${segments.length}. ${relaxed ? 'Edges wrap.' : 'Edges are walls.'} Only collision-free next moves are offered.`,
+          context: `Snake on a ${SIZE} by ${SIZE} grid. Coordinates: x right, y down. Head (${head.x},${head.y}); direction (${dir.x},${dir.y}). Fruit ${food ? `(${food.x},${food.y})` : 'none'}; golden fruit ${bonus ? `(${bonus.x},${bonus.y})` : 'none'}. Body length ${segments.length}. ${relaxed ? 'Edges wrap.' : 'Edges are walls.'} Each direction follows the same turn and collision rules.`,
           question:
             'Which next direction approaches fruit while avoiding collision?',
+          inputs: Object.fromEntries(moves.map(({ name, direction }) => [name, direction])),
           choices: Object.fromEntries(
-            moves.map(({ name, next }) => [
+            moves.map(({ name, next, safe }) => [
               name,
-              `Move ${name} to (${next.x},${next.y})${food ? `; fruit distance ${Math.abs(food.x - next.x) + Math.abs(food.y - next.y)}` : ''}${bonus ? `; golden fruit distance ${Math.abs(bonus.x - next.x) + Math.abs(bonus.y - next.y)}` : ''}`
+              `Move ${name} to (${next.x},${next.y}); ${safe ? 'safe' : 'collision'}${food ? `; fruit distance ${Math.abs(food.x - next.x) + Math.abs(food.y - next.y)}` : ''}${bonus ? `; golden fruit distance ${Math.abs(bonus.x - next.x) + Math.abs(bonus.y - next.y)}` : ''}`
             ])
           )
         };
       },
-      act: (choice, key) => {
-        if (mode !== 'playing' || key !== String(stepVersion)) return false;
-        const move = availableMoves().find(({ name }) => name === choice);
-        if (!move) return false;
-        queue = [];
-        if (move.direction.x !== dir.x || move.direction.y !== dir.y)
-          queue.push({ ...move.direction });
-        return true;
-      },
+      isCurrent: key => key === String(stepVersion) && !queue.length,
+      apply: direction => turn(direction.x, direction.y),
       start: () => {
         if (mode === 'over' || mode === 'won') reset();
-        queue = [];
         mode = 'playing';
         draw();
       },
@@ -318,14 +300,11 @@ const snake: GameModule = {
       },
       isFinished: () => mode === 'over' || mode === 'won',
       isPaused: () => mode === 'paused',
-      intervalMs: 50,
-      assistance:
-        'Watch mode moves one cell every 0.9 seconds. Collision-free directions are calculated; Laya chooses the direction.'
     });
     return () => {
       loop.stop();
       view.dispose();
-      layaOff();
+      input.dispose();
       off();
       swipeOff();
       window.removeEventListener('keydown', key);

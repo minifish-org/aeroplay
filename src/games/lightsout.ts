@@ -1,9 +1,10 @@
+import { applyToggle, isSolved, solveLights } from './lightsLogic';
+export { solveLights } from './lightsLogic';
 import { GameModule } from './gameTypes';
 import { LightsView } from './views/puzzles';
 import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
-import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
 
 const SIZE = 5;
 type SaveState = {
@@ -18,7 +19,7 @@ const lightsOut: GameModule = {
   name: 'Lights Out',
   icon: '💡',
   description: 'A ripple of light. Solve each puzzle in the fewest taps.',
-  mount(root, goBack) {
+  mount(root, goBack, player) {
     const storage = namespace('lightsout');
     const { area } = createGameShell(root, 'Lights Out', goBack);
     const info = document.createElement('div');
@@ -112,7 +113,7 @@ const lightsOut: GameModule = {
           `Row ${Math.floor(idx / SIZE) + 1}, column ${(idx % SIZE) + 1}, ${value ? 'on' : 'off'}`
         );
         button.setAttribute('aria-pressed', String(!!value));
-        button.addEventListener('click', () => press(idx));
+        button.addEventListener('click', () => input.human(idx));
         boardEl.append(button);
       });
       view.draw(board, hinted);
@@ -124,8 +125,8 @@ const lightsOut: GameModule = {
         hintsUsed
       });
     }
-    function press(index: number, fromLaya = false) {
-      if (paused || (isLayaControlling() && !fromLaya) || isSolved(board))
+    function press(index: number) {
+      if (paused || isSolved(board))
         return;
       if (!Number.isInteger(index) || index < 0 || index >= board.length)
         return;
@@ -148,38 +149,34 @@ const lightsOut: GameModule = {
     render();
     const stateKey = () => `${level}:${moves}:${board.join('')}`;
     const options = () =>
-      solveLights(board)
-        .slice(0, 16)
+      board.map((_, index) => index)
         .map((index) => {
           const next = [...board];
           applyToggle(next, index % SIZE, Math.floor(index / SIZE));
           return { index, lit: next.filter(Boolean).length };
-        });
-    const offLaya = registerLayaGame({
+        }).sort((a, b) => a.lit - b.lit).slice(0, 16);
+    const input = player.connect<number>({
       game: 'lightsout',
+      planning: () => !paused && !isSolved(board) ? { game: 'lightsout', epoch: `${level}:${initial.join('')}`, board } : null,
       observe: () => {
         if (paused || isSolved(board)) return null;
         const candidates = options();
         if (!candidates.length) return null;
         return {
           key: stateKey(),
-          context: `Lights Out 5 by 5; 1 is on.\n${Array.from({ length: SIZE }, (_, row) => board.slice(row * SIZE, (row + 1) * SIZE).join('')).join('\n')}\nConstraint assistance supplies taps from a solution of this visible board. Each tap flips itself and four neighbors.\n${candidates.map((c, i) => `Option ${i}: ${c.lit} lights remain on.`).join('\n')}`,
-          question: 'Which assisted tap leaves the fewest lights on?',
+          context: 'Lights Out 5 by 5. A tap flips its own cell and four neighbors. All offered taps use the same rule and consume one move.',
+          question: 'Which tap leaves the fewest lights on?',
+          inputs: Object.fromEntries(candidates.map((c, i) => [String(i), c.index])),
           choices: Object.fromEntries(
             candidates.map((c, i) => [
               String(i),
-              `Tap r${Math.floor(c.index / SIZE) + 1}c${(c.index % SIZE) + 1}`
+              `Tap r${Math.floor(c.index / SIZE) + 1}c${(c.index % SIZE) + 1}; ${c.lit} lights remain`
             ])
           )
         };
       },
-      act: (choice, key) => {
-        if (paused || isSolved(board) || key !== stateKey()) return false;
-        const candidate = options()[Number(choice)];
-        if (!candidate || String(Number(choice)) !== choice) return false;
-        press(candidate.index, true);
-        return true;
-      },
+      isCurrent: key => key === stateKey(),
+      apply: index => { const before = moves; press(index); return before !== moves; },
       start: () => {
         paused = false;
         if (isSolved(board)) {
@@ -196,8 +193,6 @@ const lightsOut: GameModule = {
       },
       isFinished: () => isSolved(board),
       isPaused: () => paused,
-      intervalMs: 500,
-      assistance: 'Constraint assistance'
     });
     const off = exposeGame(
       () => ({
@@ -215,67 +210,11 @@ const lightsOut: GameModule = {
       (ms) => view.scene.advance(ms)
     );
     return () => {
-      offLaya();
+      input.dispose();
       off();
       view.dispose();
     };
   }
 };
 
-function applyToggle(board: number[], x: number, y: number) {
-  for (const [dx, dy] of [
-    [0, 0],
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1]
-  ]) {
-    const nx = x + dx,
-      ny = y + dy;
-    if (nx >= 0 && ny >= 0 && nx < SIZE && ny < SIZE)
-      board[ny * SIZE + nx] ^= 1;
-  }
-}
-function isSolved(board: number[]) {
-  return board.every((v) => v === 0);
-}
-
-// Row-reduce over GF(2), then enumerate free variables for a minimum-tap hint.
-export function solveLights(board: number[]): number[] {
-  const matrix = Array.from({ length: 25 }, (_, row) => {
-    const cells = Array(25).fill(0);
-    applyToggle(cells, row % SIZE, Math.floor(row / SIZE));
-    return [...cells, board[row]];
-  });
-  const pivots: number[] = [];
-  for (let col = 0, row = 0; col < 25 && row < 25; col++) {
-    const pivot = matrix.findIndex((r, i) => i >= row && r[col] === 1);
-    if (pivot < 0) continue;
-    [matrix[row], matrix[pivot]] = [matrix[pivot], matrix[row]];
-    for (let i = 0; i < 25; i++)
-      if (i !== row && matrix[i][col])
-        for (let j = col; j <= 25; j++) matrix[i][j] ^= matrix[row][j];
-    pivots.push(col);
-    row++;
-  }
-  const free = Array.from({ length: 25 }, (_, i) => i).filter(
-    (i) => !pivots.includes(i)
-  );
-  let best: number[] | null = null;
-  for (let mask = 0; mask < 2 ** free.length; mask++) {
-    const solution = Array(25).fill(0);
-    free.forEach((col, i) => {
-      solution[col] = (mask >> i) & 1;
-    });
-    pivots.forEach((col, row) => {
-      solution[col] = matrix[row][25];
-      free.forEach((f) => {
-        solution[col] ^= matrix[row][f] & solution[f];
-      });
-    });
-    const pressed = solution.flatMap((v, i) => (v ? [i] : []));
-    if (!best || pressed.length < best.length) best = pressed;
-  }
-  return best ?? [];
-}
 export default lightsOut;

@@ -20,8 +20,6 @@ import { GameAudio } from '../core/audio';
 import { createStage, disposeObject } from '../core/three/stage';
 import { namespace } from '../core/storage';
 import { CARGO_LEVELS } from './cargo/levels';
-import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
-import { cargoPushPlans } from './laya-puzzles';
 import {
   CargoDirection,
   CargoState,
@@ -44,7 +42,7 @@ const cargo: GameModule = {
   name: 'Pocket Cargo',
   icon: '📦',
   description: 'A tiny island. A clever delivery. Twelve playful 3D puzzles.',
-  mount(root, goBack) {
+  mount(root, goBack, player) {
     const storage = namespace('cargo');
     const { area } = createGameShell(root, 'Pocket Cargo', goBack);
     area
@@ -94,8 +92,7 @@ const cargo: GameModule = {
     let hintDirection: CargoDirection | null = null;
     let history: { state: CargoState; pushes: number }[] = [];
     let time = 0;
-    let paused = false, planTimer = 0;
-    let planned: CargoDirection[] = [];
+    let paused = false;
     if (
       saved &&
       saved.level === levelIndex &&
@@ -122,7 +119,7 @@ const cargo: GameModule = {
     const pad = document.createElement('div');
     controls.append(pad);
     directionPad(pad, (x, y) =>
-      move(x < 0 ? 'left' : x > 0 ? 'right' : y < 0 ? 'up' : 'down')
+      input.human(x < 0 ? 'left' : x > 0 ? 'right' : y < 0 ? 'up' : 'down')
     );
     const actions = document.createElement('div');
     actions.className = 'cargo-actions';
@@ -295,7 +292,6 @@ const cargo: GameModule = {
       hintDirection = null;
     }
     function loadLevel(index: number) {
-      planned = [];
       levelIndex = index;
       board = parseCargo(CARGO_LEVELS[index].map);
       state = {
@@ -320,8 +316,8 @@ const cargo: GameModule = {
         usedHint
       });
     }
-    function move(direction: CargoDirection, fromLaya = false) {
-      if (paused || (isLayaControlling() && !fromLaya) || cargoSolved(board, state)) return;
+    function move(direction: CargoDirection) {
+      if (paused || cargoSolved(board, state)) return;
       audio.unlock();
       const result = moveCargo(board, state, direction);
       if (!result) return;
@@ -425,9 +421,9 @@ const cargo: GameModule = {
     selector.addEventListener('change', () =>
       loadLevel(Number(selector.value))
     );
-    const swipeOff = bindSwipe(stage.canvas, (direction) => move(direction));
+    const swipeOff = bindSwipe(stage.canvas, (direction) => input.human(direction));
     const key = (event: KeyboardEvent) => {
-      if (paused || isLayaControlling()) return;
+      if (paused) return;
       if (event.target === selector) return;
       const direction = (
         {
@@ -443,24 +439,13 @@ const cargo: GameModule = {
       )[event.key];
       if (direction) {
         event.preventDefault();
-        move(direction);
+        input.human(direction);
       }
       if (event.key.toLowerCase() === 'z') undo.click();
     };
     window.addEventListener('keydown', key);
     const loop = new GameLoop((dt) => {
       if (paused || document.hidden) return;
-      if (planned.length && !isLayaControlling()) planned = [];
-      if (planned.length && !cargoSolved(board, state)) {
-        planTimer -= dt;
-        if (planTimer <= 0) {
-          const direction = planned.shift()!;
-          const before = moves;
-          move(direction, true);
-          if (before === moves) planned = [];
-          planTimer = 0.17;
-        }
-      }
       time += dt;
       syncPositions(1 - Math.exp(-18 * dt));
       ripples.forEach((r, i) => {
@@ -473,49 +458,37 @@ const cargo: GameModule = {
     stage.resize();
     loop.start();
     const stateKey = () => `${levelIndex}:${moves}:${state.player}:${state.crates.join(',')}`;
-    const options = () => cargoPushPlans(board, state).slice(0, 8);
     const cellName = (cell: number) => `r${Math.floor(cell / board.width) + 1}c${cell % board.width + 1}`;
-    const visibleMap = () => Array.from({ length: board.height }, (_, row) =>
-      Array.from({ length: board.width }, (_, column) => {
-        const cell = row * board.width + column;
-        if (!board.floor.includes(cell)) return '#';
-        if (cell === state.player) return board.goals.includes(cell) ? '+' : '@';
-        if (state.crates.includes(cell)) return board.goals.includes(cell) ? '*' : '$';
-        return board.goals.includes(cell) ? '.' : '_';
-      }).join('')).join('\n');
-    const offLaya = registerLayaGame({
+    function options() {
+      return (['up', 'right', 'down', 'left'] as CargoDirection[]).flatMap(direction => {
+        const result = moveCargo(board, state, direction);
+        if (!result) return [];
+        const delivered = result.state.crates.filter(cell => board.goals.includes(cell)).length;
+        const robotDistance = Math.min(...result.state.crates.map(cell => Math.abs(cell % board.width - result.state.player % board.width) + Math.abs(Math.floor(cell / board.width) - Math.floor(result.state.player / board.width))));
+        const corner = result.state.crates.some(cell => cargoCorner(board, cell));
+        return [{ direction, description: `Move ${direction}: ${result.pushed ? 'push crate' : 'walk'}; ${delivered} delivered; robot distance to crate ${robotDistance}; ${corner ? 'crate in a corner' : 'no crate in a corner'}` }];
+      });
+    }
+    const input = player.connect<CargoDirection>({
       game: 'cargo',
+      planning: () => !paused && !cargoSolved(board, state) ? { game: 'cargo', epoch: String(levelIndex), board, state } : null,
       observe: () => {
-        if (paused || cargoSolved(board, state) || planned.length) return null;
-        const candidates = options();
-        if (!candidates.length) return null;
+        if (paused || cargoSolved(board, state)) return null;
+        const moves = options();
+        if (!moves.length) return null;
         return {
           key: stateKey(),
-          context: `Pocket Cargo. # wall, _ floor, . dock, $ crate, @ robot, * delivered crate, + robot on dock. Push all crates to docks.\n${visibleMap()}\nWalking routes and corner checks are assisted; future solvability is not guaranteed.\n${candidates.map((c, i) => `Option ${i}: ${cellName(c.crate)} ${c.direction}; ${c.delivered} delivered, dock distance ${c.distance}, ${c.route.length} steps.`).join('\n')}`,
-          question: 'Which push delivers the most crates and brings a crate closest to an empty dock?',
-          choices: Object.fromEntries(candidates.map((c, i) => [String(i), `Push ${cellName(c.crate)} ${c.direction}`]))
+          context: `Pocket Cargo. Robot ${cellName(state.player)}. Crates ${state.crates.map(cellName).join(',')}. Docks ${board.goals.map(cellName).join(',')}. Push crates onto docks. One input moves one cell; walls and crates obey the normal push rules.`,
+          question: 'Which step delivers crates or approaches a crate without trapping it in a corner?',
+          choices: Object.fromEntries(moves.map(move => [move.direction, move.description])),
+          inputs: Object.fromEntries(moves.map(move => [move.direction, move.direction])),
         };
       },
-      act: (choice, key) => {
-        if (paused || planned.length || cargoSolved(board, state) || key !== stateKey()) return false;
-        const candidate = options()[Number(choice)];
-        if (!candidate || String(Number(choice)) !== choice) return false;
-        planned = candidate.route;
-        planTimer = 0;
-        invalidateHint();
-        return true;
-      },
-      start: () => {
-        paused = false;
-        if (cargoSolved(board, state)) loadLevel((levelIndex + 1) % CARGO_LEVELS.length);
-        else if (!options().length) loadLevel(levelIndex);
-      },
-      pause: () => { paused = true; planned = []; invalidateHint(); syncUI(); },
-      resume: () => { paused = false; },
-      isFinished: () => cargoSolved(board, state) || !options().length,
-      isPaused: () => paused,
-      intervalMs: 350,
-      assistance: 'Move planning'
+      isCurrent: key => key === stateKey(),
+      apply: direction => { const before = moves; move(direction); return before !== moves; },
+      start: () => { paused = false; if (cargoSolved(board, state)) loadLevel((levelIndex + 1) % CARGO_LEVELS.length); },
+      pause: () => { paused = true; invalidateHint(); syncUI(); }, resume: () => { paused = false; },
+      isFinished: () => cargoSolved(board, state), isPaused: () => paused,
     });
     const off = exposeGame(
       () => ({
@@ -531,7 +504,6 @@ const cargo: GameModule = {
         usedHint,
         hintDirection,
         thinking,
-        planned,
         stars: best,
         coordinates:
           'Row-major grid cells. x right, y down. Arrows move in these grid directions.',
@@ -540,7 +512,7 @@ const cargo: GameModule = {
       (ms) => loop.advance(ms)
     );
     return () => {
-      offLaya();
+      input.dispose();
       loop.stop();
       off();
       swipeOff();

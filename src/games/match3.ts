@@ -3,7 +3,6 @@ import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { exposeGame, message } from '../core/play';
-import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
 import { GemView, GEM_TIMING } from './views/gems';
 
 type Cell = number;
@@ -16,7 +15,7 @@ const match3: GameModule = {
   name: 'Match-3',
   icon: '💎',
   description: '30 moves. One goal. Set off a spectacular chain reaction.',
-  mount(root, goBack) {
+  mount(root, goBack, player) {
     const storage = namespace('match3');
     const { area } = createGameShell(root, 'Match-3', goBack);
     const info = document.createElement('div');
@@ -147,14 +146,14 @@ const match3: GameModule = {
             button.classList.add('match3-fall');
           }
           button.disabled = phase !== 'playing';
-          button.addEventListener('click', () => select({ x, y }));
+          button.addEventListener('click', () => input.human({ x, y }));
           boardEl.append(button);
         })
       );
       view.draw(grid, selected, hinted, matching, phase, chain, falls);
     }
-    function select(p: Point, fromLaya = false) {
-      if (paused || (isLayaControlling() && !fromLaya) || phase !== 'playing')
+    function select(p: Point) {
+      if (paused || phase !== 'playing')
         return;
       hinted = [];
       if (!selected) selected = p;
@@ -231,48 +230,43 @@ const match3: GameModule = {
     finish();
     loop.start();
     const stateKey = () =>
-      `${level}:${moves}:${score}:${phase}:${grid.flat().join('')}`;
-    const options = () => match3Moves(grid).slice(0, 8);
-    const offLaya = registerLayaGame({
+      `${level}:${moves}:${score}:${phase}:${grid.flat().join('')}:${selected?.x},${selected?.y}`;
+    function options() {
+      if (selected) return [[0, -1], [1, 0], [0, 1], [-1, 0]].flatMap(([dx, dy]) => {
+        const point = { x: selected!.x + dx, y: selected!.y + dy };
+        if (point.x < 0 || point.y < 0 || point.x >= SIZE || point.y >= SIZE) return [];
+        const next = grid.map(row => [...row]); swap(next, selected!, point);
+        return [{ point, count: findMatches(next).length }];
+      });
+      const cells = new Map<string, { point: Point; count: number }>();
+      for (const move of match3Moves(grid)) {
+        for (const point of [move.a, move.b]) {
+          const key = `${point.x},${point.y}`;
+          if (!cells.has(key) || cells.get(key)!.count < move.count) cells.set(key, { point, count: move.count });
+        }
+      }
+      return [...cells.values()].slice(0, 8);
+    }
+    const input = player.connect<Point>({
       game: 'match3',
+      planning: () => !paused && phase === 'playing' ? { game: 'match3', epoch: `${level}:${moves}`, board: grid, selected } : null,
       observe: () => {
         if (paused || phase !== 'playing') return null;
-        const candidates = options();
-        if (!candidates.length) return null;
+        const cells = options();
+        if (!cells.length) return null;
         return {
           key: stateKey(),
-          context: `Match-3. Need ${Math.max(0, target() - score)} points in ${moves} moves. Gem types 1-5.\n${grid.map((row) => row.map((value) => value + 1).join('')).join('\n')}\n${candidates.map((c, i) => `Option ${i}: r${c.a.y + 1}c${c.a.x + 1} with r${c.b.y + 1}c${c.b.x + 1}; clears ${c.count} gems.`).join('\n')}`,
-          question: 'Which legal swap clears the most gems immediately?',
-          choices: Object.fromEntries(
-            candidates.map((c, i) => [
-              String(i),
-              `Swap r${c.a.y + 1}c${c.a.x + 1} with r${c.b.y + 1}c${c.b.x + 1}`
-            ])
-          )
+          context: `Match-3. Need ${Math.max(0, target() - score)} points in ${moves} moves. ${selected ? `Selected r${selected.y + 1}c${selected.x + 1}; choose an adjacent tile to swap.` : 'Select the first tile of a swap.'} Clearing and falling use the normal game animation.`,
+          question: 'Which tile leads to a swap clearing the most gems?',
+          choices: Object.fromEntries(cells.map((c, i) => [String(i), `Select r${c.point.y + 1}c${c.point.x + 1}; clears ${c.count} gems`])),
+          inputs: Object.fromEntries(cells.map((c, i) => [String(i), c.point])),
         };
       },
-      act: (choice, key) => {
-        if (paused || phase !== 'playing' || key !== stateKey()) return false;
-        const candidate = options()[Number(choice)];
-        if (!candidate || String(Number(choice)) !== choice) return false;
-        selected = candidate.a;
-        select(candidate.b, true);
-        return phase !== 'playing';
-      },
-      start: () => {
-        paused = false;
-        if (phase === 'won' || phase === 'over') restartLevel();
-      },
-      pause: () => {
-        paused = true;
-      },
-      resume: () => {
-        paused = false;
-      },
-      isFinished: () => phase === 'won' || phase === 'over',
-      isPaused: () => paused,
-      intervalMs: 400,
-      assistance: 'Move planning'
+      isCurrent: key => key === stateKey(),
+      apply: point => { const before = stateKey(); select(point); return before !== stateKey(); },
+      start: () => { paused = false; if (phase === 'won' || phase === 'over') restartLevel(); },
+      pause: () => { paused = true; }, resume: () => { paused = false; },
+      isFinished: () => phase === 'won' || phase === 'over', isPaused: () => paused,
     });
     const off = exposeGame(
       () => ({
@@ -291,7 +285,7 @@ const match3: GameModule = {
       (ms) => loop.advance(ms)
     );
     return () => {
-      offLaya();
+      input.dispose();
       loop.stop();
       view.dispose();
       off();

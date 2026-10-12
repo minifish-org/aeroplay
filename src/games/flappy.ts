@@ -4,15 +4,11 @@ import { FlappyView } from './views/flappy';
 import { createGameShell, createTouchButton, bindTap } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
-import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
 import { Mode, exposeGame, message } from '../core/play';
 import {
   FLIGHT,
   FLIGHT_STEP,
-  FLIGHT_TICK,
-  WATCH_SPEED,
   advanceFlight,
-  predictFlight,
   planFlight,
   type FlightPipe
 } from './flappyFlight';
@@ -23,7 +19,7 @@ const flappy: GameModule = {
   name: 'Flappy Bird',
   icon: '🐤',
   description: 'Find the perfect flight. Thread the gaps for bonus points.',
-  mount(root, goBack) {
+  mount(root, goBack, player) {
     const storage = namespace('flappy');
     const { area } = createGameShell(root, 'Flappy Bird', goBack);
     const info = document.createElement('div');
@@ -46,16 +42,11 @@ const flappy: GameModule = {
     let distance = 0,
       flash = 0,
       perfect = false;
-    let flightRemaining = 0;
-    let flightTurn = 0;
     let flightVersion = 0;
     let flightClock = 0;
-    let queuedFlight: { turn: number; choice: string } | null = null;
-    let appliedFlights = 0;
-    let missedFlights = 0;
     const controls = document.createElement('div');
     controls.className = 'control-row';
-    const flapButton = createTouchButton('Take flight', flap);
+    const flapButton = createTouchButton('Take flight', () => input.human('flap'));
     const pause = createTouchButton('Pause', () => {
       if (mode === 'playing') pauseFlight();
       else if (mode === 'paused') resumeFlight();
@@ -65,12 +56,7 @@ const flappy: GameModule = {
     area.append(controls);
     function reset() {
       flightVersion++;
-      flightRemaining = 0;
-      flightTurn = 0;
       flightClock = 0;
-      queuedFlight = null;
-      appliedFlights = 0;
-      missedFlights = 0;
       y = H / 2;
       velocity = 0;
       score = 0;
@@ -105,16 +91,11 @@ const flappy: GameModule = {
     }
     function pauseFlight() {
       if (mode === 'playing') mode = 'paused';
-      // Keep an already accepted plan, but invalidate any outstanding reply.
+      // Pausing invalidates the controller's old trajectory.
       flightVersion++;
       draw();
     }
     function resumeFlight() {
-      if (!isLayaControlling()) {
-        queuedFlight = null;
-        flightClock = 0;
-        flightVersion++;
-      }
       if (mode === 'paused') mode = 'playing';
       draw();
     }
@@ -131,22 +112,6 @@ const flappy: GameModule = {
         storage.save('best', best);
       }
       if (!pipes.length || pipes.at(-1)!.x < W - 190) spawn();
-    }
-    function nextFlight() {
-      flightTurn++;
-      const action = queuedFlight;
-      queuedFlight = null;
-      // Missing or late answers never hold the animation or invent an action.
-      if (
-        action?.turn === flightTurn &&
-        Object.hasOwn(planFlight(y, velocity, pipes, passed).choices, action.choice)
-      ) {
-        if (action.choice === '0') flap();
-        appliedFlights++;
-      } else {
-        missedFlights++;
-      }
-      flightRemaining = FLIGHT_STEP;
     }
     function draw() {
       info.textContent = `Score ${score}   ·   Best ${best}   ·   Gates ${passed}`;
@@ -170,29 +135,18 @@ const flappy: GameModule = {
     const loop = new GameLoop(
       (dt) => {
         if (mode !== 'playing') return;
-        if (isLayaControlling()) {
-          flightClock += dt * WATCH_SPEED;
-          while (mode === 'playing') {
-            const slice = Math.min(FLIGHT_TICK, flightRemaining);
-            if (flightClock + 1e-9 < slice) break;
-            flightClock = Math.max(0, flightClock - slice);
-            flightRemaining = Math.max(0, flightRemaining - slice);
-            stepFlight(slice);
-            if (flightRemaining < 1e-9 && mode === 'playing') nextFlight();
-          }
-        } else {
-          stepFlight(dt);
-        }
+        flightClock += dt;
+        stepFlight(dt);
         draw();
       },
       0.05,
       (dt) => view.tick(mode === 'paused' ? 0 : dt)
     );
-    const tapOff = bindTap(canvas, flap);
+    const tapOff = bindTap(canvas, () => input.human('flap'));
     const key = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         e.preventDefault();
-        if (!e.repeat) flap();
+        if (!e.repeat) input.human('flap');
       }
       if (e.key === 'p' && !e.repeat) pause.click();
     };
@@ -215,73 +169,42 @@ const flappy: GameModule = {
         distance,
         score,
         passed,
-        laya: isLayaControlling()
-          ? {
-              turn: flightTurn,
-              thinking: mode === 'playing' && queuedFlight === null,
-              queued: queuedFlight?.choice ?? null,
-              applied: appliedFlights,
-              missed: missedFlights
-            }
-          : undefined
+
       }),
       (ms) => loop.advance(ms)
     );
-    const decisionKey = () => `${flightVersion}:${flightTurn + 1}`;
-    const futurePlan = () => {
-      const future = predictFlight({ y, velocity, pipes, passed }, flightRemaining);
-      return (
-        future &&
-        planFlight(future.y, future.velocity, future.pipes, future.passed)
-      );
-    };
-    const layaOff = registerLayaGame({
+    const decisionKey = () => `${flightVersion}:${Math.floor(flightClock / FLIGHT_STEP)}`;
+    const input = player.connect<'flap' | 'wait'>({
       game: 'flappy',
+      planning: () => mode === 'playing' ? { game: 'flappy', epoch: String(flightVersion), time: flightClock, y, velocity, pipes, passed } : null,
       observe: () => {
-        if (mode !== 'playing' || queuedFlight) return null;
-        const plan = futurePlan();
-        if (!plan) return null;
+        if (mode !== 'playing') return null;
+        const plan = planFlight(y, velocity, pipes, passed);
         return {
-          key: decisionKey(),
-          context: plan.context,
-          question: 'Which flight action ends closest to the gap center?',
-          choices: plan.choices
+          key: decisionKey(), context: plan.context,
+          question: 'Which safe flight action ends closest to the gap center?',
+          choices: plan.choices, inputs: { '0': 'flap', '1': 'wait' },
         };
       },
-      act: (choice, key) => {
-        if (
-          mode !== 'playing' ||
-          !isLayaControlling() ||
-          key !== decisionKey() ||
-          queuedFlight
-        )
-          return false;
-        const plan = futurePlan();
-        if (!plan || !Object.hasOwn(plan.choices, choice)) return false;
-        queuedFlight = { turn: flightTurn + 1, choice };
-        return true;
+      isCurrent: key => key === decisionKey(),
+      apply: action => {
+        if (mode === 'paused') return false;
+        if (action === 'flap') { flap(); return true; }
+        return mode === 'playing';
       },
       start: () => {
         if (mode === 'over') reset();
-        if (flightRemaining <= 0) flightRemaining = FLIGHT_STEP;
-        if (mode === 'paused') mode = 'playing';
-        else if (mode === 'ready') {
-          flap();
-        }
+        if (mode === 'paused') resumeFlight();
+        else if (mode === 'ready') flap();
         draw();
       },
-      pause: pauseFlight,
-      resume: resumeFlight,
-      isFinished: () => mode === 'over',
-      isPaused: () => mode === 'paused',
-      intervalMs: 0,
-      assistance:
-        'Flight predictions help Laya plan ahead while the bird keeps flying.'
+      pause: pauseFlight, resume: resumeFlight,
+      isFinished: () => mode === 'over', isPaused: () => mode === 'paused',
     });
     return () => {
       loop.stop();
       view.dispose();
-      layaOff();
+      input.dispose();
       tapOff();
       off();
       window.removeEventListener('keydown', key);

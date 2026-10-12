@@ -1,4 +1,6 @@
-export type GameMount = (root: HTMLElement, goBack: () => void) => () => void;
+import type { Player } from '../core/player';
+
+export type GameMount = (root: HTMLElement, goBack: () => void, player: Player) => () => void;
 
 export interface GameModule {
   id: string;

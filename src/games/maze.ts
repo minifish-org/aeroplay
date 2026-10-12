@@ -5,7 +5,6 @@ import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
 import { GameLoop } from '../core/engine';
 import { namespace } from '../core/storage';
 import { directionPad, exposeGame, message } from '../core/play';
-import { isLayaControlling, registerLayaGame } from '../core/laya-bridge';
 
 type Cell = {
   visited: boolean;
@@ -17,7 +16,7 @@ const maze: GameModule = {
   name: 'Maze Escape',
   icon: '🧭',
   description: 'Explore, collect three stars, and find your way home.',
-  mount(root, goBack) {
+  mount(root, goBack, controller) {
     const storage = namespace('maze');
     const { area } = createGameShell(root, 'Maze Escape', goBack);
     const info = document.createElement('div');
@@ -41,9 +40,7 @@ const maze: GameModule = {
       finished = false,
       hints = 3;
     let paused = false,
-      revision = 0,
-      routeTimer = 0;
-    let planned: Point[] = [];
+      revision = 0;
     let trail = new Set<string>(),
       path: Point[] = [],
       showTrail = true;
@@ -70,7 +67,7 @@ const maze: GameModule = {
     });
     controls.append(hint, trailButton, next);
     area.append(controls);
-    directionPad(area, move);
+    directionPad(area, (x, y) => input.human({ x, y }));
     function neighbors(p: Point) {
       const w = grid[p.y][p.x].walls;
       return [
@@ -99,7 +96,6 @@ const maze: GameModule = {
     }
     function reset() {
       revision++;
-      planned = [];
       size = Math.min(16, 8 + Math.floor((level - 1) / 2) * 2);
       grid = generateMaze(size);
       player = { x: 0, y: 0 };
@@ -131,8 +127,8 @@ const maze: GameModule = {
       next.textContent = finished ? 'Next expedition →' : 'New maze';
       view.draw(grid, player, stars, trail, path, showTrail, finished);
     }
-    function move(dx: number, dy: number, fromLaya = false) {
-      if (paused || (isLayaControlling() && !fromLaya) || finished) return;
+    function move(dx: number, dy: number) {
+      if (paused || finished) return;
       const n = neighbors(player).find(
         (p) => p.x === player.x + dx && p.y === player.y + dy
       );
@@ -163,10 +159,10 @@ const maze: GameModule = {
         left: [-1, 0],
         right: [1, 0]
       }[d];
-      move(x, y);
+      input.human({ x, y });
     });
     const key = (e: KeyboardEvent) => {
-      if (paused || isLayaControlling()) return;
+      if (paused) return;
       const p = (
         {
           ArrowUp: [0, -1],
@@ -177,24 +173,13 @@ const maze: GameModule = {
       )[e.key];
       if (p) {
         e.preventDefault();
-        move(p[0], p[1]);
+        input.human({ x: p[0], y: p[1] });
       }
     };
     window.addEventListener('keydown', key);
     const loop = new GameLoop(
       (dt) => {
         if (paused || document.hidden) return;
-        if (planned.length && !isLayaControlling()) planned = [];
-        if (planned.length && !finished) {
-          routeTimer -= dt;
-          if (routeTimer <= 0) {
-            const next = planned.shift()!;
-            const before = steps;
-            move(next.x - player.x, next.y - player.y, true);
-            if (before === steps) planned = [];
-            routeTimer = 0.15;
-          }
-        }
         if (steps && !finished) {
           elapsed += dt;
           info.textContent = `Expedition ${level} · ${elapsed.toFixed(1)}s · ${steps} steps · Stars ${collected}/3`;
@@ -207,55 +192,36 @@ const maze: GameModule = {
     loop.start();
     const stateKey = () =>
       `${revision}:${steps}:${player.x},${player.y}:${stars.map((p) => `${p.x},${p.y}`).join(';')}`;
-    const targets = () =>
-      mazeLayaTargets(stars, { x: size - 1, y: size - 1 }, (target) =>
-        route(player, target).slice(1)
-      );
-    const offLaya = registerLayaGame({
+    const directions = { up: { x: 0, y: -1 }, right: { x: 1, y: 0 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 } };
+    function options() {
+      return Object.entries(directions).flatMap(([name, direction]) => {
+        const next = neighbors(player).find(cell => cell.x === player.x + direction.x && cell.y === player.y + direction.y);
+        if (!next) return [];
+        const targets = stars.length ? stars : [{ x: size - 1, y: size - 1 }];
+        const distance = Math.min(...targets.map(target => Math.abs(target.x - next.x) + Math.abs(target.y - next.y)));
+        return [{ name, direction, description: `${name}: row ${next.y + 1}, column ${next.x + 1}; straight distance to ${stars.length ? 'star' : 'exit'} ${distance}; ${trail.has(`${next.x},${next.y}`) ? 'visited' : 'unvisited'}` }];
+      });
+    }
+    const input = controller.connect<Point>({
       game: 'maze',
+      planning: () => !paused && !finished ? { game: 'maze', epoch: String(revision), size, walls: grid.map(row => row.map(cell => cell.walls)), position: player, stars } : null,
       observe: () => {
-        if (paused || finished || planned.length) return null;
-        const candidates = targets();
-        if (!candidates.length) return null;
+        if (paused || finished) return null;
+        const moves = options();
+        if (!moves.length) return null;
         return {
           key: stateKey(),
-          context: `Maze ${size} by ${size}. Player row ${player.y + 1}, column ${player.x + 1}. Stars collected ${collected}/3. Routes use the visible maze walls. The exit ends the round, so stars beyond it are unavailable.\n${candidates.map((c, i) => `Option ${i}: ${c.kind} at row ${c.target.y + 1}, column ${c.target.x + 1}, route length ${c.way.length}.`).join('\n')}`,
-          question:
-            candidates[0].kind === 'star'
-              ? 'Which remaining star has the shortest route?'
-              : 'Which route reaches the exit?',
-          choices: Object.fromEntries(
-            candidates.map((c, i) => [
-              String(i),
-              `${c.kind === 'star' ? 'Star' : 'Exit'} at row ${c.target.y + 1}, column ${c.target.x + 1}`
-            ])
-          )
+          context: `Maze ${size} by ${size}. Player row ${player.y + 1}, column ${player.x + 1}. Remaining stars ${stars.map(s => `r${s.y + 1}c${s.x + 1}`).join(',') || 'none'}. Exit r${size}c${size}. Walls block movement. Each input moves one cell.`,
+          question: 'Which step approaches an uncollected star or the exit and avoids revisiting cells?',
+          choices: Object.fromEntries(moves.map(move => [move.name, move.description])),
+          inputs: Object.fromEntries(moves.map(move => [move.name, move.direction])),
         };
       },
-      act: (choice, key) => {
-        if (paused || finished || planned.length || key !== stateKey())
-          return false;
-        const candidate = targets()[Number(choice)];
-        if (!candidate || String(Number(choice)) !== choice) return false;
-        planned = candidate.way;
-        routeTimer = 0;
-        return true;
-      },
-      start: () => {
-        paused = false;
-        if (finished) reset();
-      },
-      pause: () => {
-        paused = true;
-        planned = [];
-      },
-      resume: () => {
-        paused = false;
-      },
-      isFinished: () => finished,
-      isPaused: () => paused,
-      intervalMs: 300,
-      assistance: 'Move planning'
+      isCurrent: key => key === stateKey(),
+      apply: direction => { const before = steps; move(direction.x, direction.y); return before !== steps; },
+      start: () => { paused = false; if (finished) reset(); },
+      pause: () => { paused = true; }, resume: () => { paused = false; },
+      isFinished: () => finished, isPaused: () => paused,
     });
     const off = exposeGame(
       () => ({
@@ -269,7 +235,6 @@ const maze: GameModule = {
         grid: grid.map((row) => row.map((c) => c.walls)),
         hints,
         path,
-        planned,
         steps,
         elapsed,
         level
@@ -277,7 +242,7 @@ const maze: GameModule = {
       (ms) => loop.advance(ms)
     );
     return () => {
-      offLaya();
+      input.dispose();
       loop.stop();
       view.dispose();
       swipeOff();

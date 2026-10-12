@@ -16,7 +16,6 @@ export const FLIGHT = {
 };
 export const FLIGHT_STEP = 0.16;
 export const FLIGHT_TICK = 1 / 120;
-export const WATCH_SPEED = 0.35;
 export type FlightMotion = {
   y: number;
   velocity: number;
@@ -117,8 +116,7 @@ export function planFlight(
     return { choice, height, distance: Math.abs(height - target), safe };
   });
   const safe = outcomes.filter((outcome) => outcome.safe);
-  const offered = safe.length ? safe : outcomes;
-  const closest = Math.min(...offered.map((outcome) => outcome.distance));
+  const closest = Math.min(...(safe.length ? safe : outcomes).map((outcome) => outcome.distance));
   return {
     target,
     outcomes,
@@ -129,7 +127,7 @@ export function planFlight(
       )
       .join(' '),
     choices: Object.fromEntries(
-      offered.map((outcome) => [
+      outcomes.map((outcome) => [
         outcome.choice,
         outcome.choice === '0' ? 'Flap' : 'Wait'
       ])
