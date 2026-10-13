@@ -6,7 +6,6 @@ import {
   setPlayProfile,
   type PlayProfile
 } from './core/storage';
-import { createAISettingsButton } from './core/ai-settings';
 import { mountPlayerControls } from './core/player-controls';
 import { Player, HumanPlayer, TamevPlayer } from './core/player';
 import '../styles/player.css';
@@ -38,9 +37,6 @@ function renderHub() {
   top.className = 'hub-topline';
   top.innerHTML =
     '<div class="hub-brand">aero<span>play</span> ↗</div><div class="hub-tools"><div class="offline-badge">Your pocket arcade</div></div>';
-  const settings = createAISettingsButton();
-  top.querySelector('.hub-tools')!.append(settings.button);
-  teardown = settings.dispose;
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     void navigator.serviceWorker.ready.then(() => {
       const badge = top.querySelector('.offline-badge');
