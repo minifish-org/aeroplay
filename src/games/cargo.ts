@@ -62,9 +62,9 @@ const cargo: GameModule = {
     const info = document.createElement('div');
     info.className = 'cargo-stats';
     header.append(selector, info);
-    area.append(header);
     const view = document.createElement('div');
     view.className = 'three-view cargo-view';
+    view.append(header);
     area.append(view);
     const camera = new PerspectiveCamera(43, 1, 0.1, 100);
     camera.position.set(0, 10.5, 9.5);
@@ -114,7 +114,7 @@ const cargo: GameModule = {
     const status = document.createElement('div');
     status.className = 'cargo-status';
     status.setAttribute('role', 'status');
-    area.append(status);
+    view.append(status);
     const overlay = document.createElement('div');
     overlay.className = 'cargo-complete';
     view.append(overlay);
@@ -149,7 +149,7 @@ const cargo: GameModule = {
     });
     actions.append(undo, hint, retry, audio.button);
     controls.append(actions);
-    area.append(controls);
+    view.append(controls);
     const instructions = document.createElement('div');
     instructions.className = 'three-instruction';
     instructions.textContent =

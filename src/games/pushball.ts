@@ -30,7 +30,8 @@ const pushball: GameModule = {
     const hud = document.createElement('div'); hud.className = 'pushball-hud';
     hud.innerHTML = '<div class="pushball-team human-team"><span>YOU · BLUE</span><strong>0</strong></div><div class="pushball-match-label">FIRST TO 3<span>Push. Dash. Score.</span></div><div class="pushball-team ai-team"><span>TAMEV · CORAL</span><strong>0</strong></div>';
     const host = document.createElement('div'); host.className = 'pushball-view';
-    area.append(hud, host);
+    host.append(hud);
+    area.append(host);
     const view = createPushballView(host);
     if (!view) return () => {};
     const banner = document.createElement('div'); banner.className = 'pushball-banner';
@@ -59,7 +60,8 @@ const pushball: GameModule = {
     ai.innerHTML = '<strong>TAMEV + Planning · On device</strong><span></span>';
     const instructions = document.createElement('p'); instructions.className = 'pushball-instructions';
     instructions.textContent = 'Push into the TOP goal · Joystick / WASD / arrows · Space to dash · P to pause';
-    area.append(nativeControls, utility, ai, instructions);
+    host.append(nativeControls, utility);
+    area.append(ai, instructions);
     const loop = new GameLoop(update, 0.05, dt => render(dt));
     function clearControl(side: Side) { controls[side] = idleAction(); until[side] = 0; }
     function planning(side: Side): PlanningState | null {

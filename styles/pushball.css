@@ -42,27 +42,68 @@
   .pushball-panel { padding: 18px; }
 }
 
-/* Laptop and desktop. */
-@media (min-width: 1000px) {
-  .pushball-shell {
-    max-width: 1240px;
+/* In-view controls: the stick and dash sit over the pitch. */
+.pushball-shell .game-area {
+  padding: 0;
+}
+.pushball-shell .pushball-view {
+  width: min(100%, 620px);
+  height: min(680px, calc(100svh - 240px));
+  max-height: none;
+  margin: 0 auto;
+}
+.pushball-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  border: 0;
+  background: none;
+  pointer-events: none;
+  z-index: 3;
+}
+.pushball-controls > * {
+  pointer-events: auto;
+}
+.pushball-utility {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  padding: 0;
+  background: none;
+  z-index: 3;
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .pushball-shell .pushball-view {
+    width: 100%;
+    height: min(430px, calc(100svh - 132px));
+  }
+  .pushball-shell .pushball-controls {
+    padding: 0 12px;
+  }
+  .pushball-shell .pushball-stick {
+    width: 84px;
+    height: 84px;
+  }
+  .pushball-shell .pushball-dash {
+    width: 76px;
+    height: 76px;
   }
 }
 
-/* Landscape phone: the whole match has to live in ~258px of height. */
+/* Landscape phone: a single compact score line above the pitch. */
 @media (orientation: landscape) and (max-height: 560px) {
-  .pushball-shell .pushball-shell .game-side {
-    gap: 4px;
-  }
   .pushball-shell .pushball-hud {
-    padding: 4px 10px;
+    padding: 2px 10px;
   }
   .pushball-shell .pushball-team strong {
-    font-size: 20px;
+    font-size: 18px;
     line-height: 1.1;
-  }
-  .pushball-shell .pushball-team span {
-    font-size: 8px;
   }
   .pushball-shell .pushball-match-label {
     font-size: 9px;
@@ -70,69 +111,16 @@
   .pushball-shell .pushball-match-label span {
     display: none;
   }
-  .pushball-shell .pushball-controls {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-around;
-    gap: 10px;
-    border-left: 0;
-    padding: 4px 8px;
-  }
-  .pushball-shell .pushball-movement {
-    gap: 2px;
-  }
-  .pushball-shell .pushball-movement > span {
-    font-size: 7px;
-  }
-  .pushball-shell .pushball-stick {
-    width: 68px;
-    height: 68px;
-  }
-  .pushball-shell .pushball-stick-cross {
-    font-size: 60px;
-  }
-  .pushball-shell .pushball-stick-knob {
-    width: 26px;
-    height: 26px;
-    left: calc(50% - 13px);
-    top: calc(50% - 13px);
-  }
-  .pushball-shell .pushball-dash {
-    width: 62px;
-    height: 62px;
-    border-width: 2px;
-  }
-  .pushball-shell .pushball-dash strong {
-    font-size: 11px;
-  }
-  .pushball-shell .pushball-dash span {
-    font-size: 9px;
-    margin-top: 2px;
-  }
-  .pushball-shell .pushball-utility {
-    padding: 2px 8px;
-  }
-  .pushball-shell .pushball-utility .touch-btn {
-    min-height: 30px;
-    padding: 5px 10px;
-    font-size: 11px;
-  }
-  .pushball-shell .pushball-panel {
-    padding: 12px;
-  }
-  .pushball-shell .pushball-panel h2 {
-    font-size: 18px;
-    letter-spacing: -0.4px;
-    margin: 6px 0;
-  }
-  .pushball-shell .pushball-panel p {
-    font-size: 11px;
-    line-height: 1.45;
-    margin-bottom: 10px;
-  }
-  .pushball-shell .pushball-panel-actions .touch-btn {
-    min-height: 36px;
-    padding: 8px 12px;
-    font-size: 12px;
-  }
+}
+
+/* Score line rides on top of the pitch. */
+.pushball-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  border-bottom: 0;
+  padding: 8px 14px;
+  background: linear-gradient(#0b1827cc, #0b182700);
 }

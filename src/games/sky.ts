@@ -89,12 +89,11 @@ const sky: GameModule = {
     right.setAttribute('aria-label', 'Steer right');
     const boost = createTouchButton('BOOST', () => input.human('boost'), 'boost-button');
     controls.append(left, boost, right);
-    area.append(controls);
     const utility = document.createElement('div');
     utility.className = 'flight-utility';
     const pause = createTouchButton('Pause', togglePause);
     utility.append(pause, audio.button);
-    area.append(utility);
+    view.append(controls, utility);
     const instruction = document.createElement('div');
     instruction.className = 'three-instruction';
     instruction.textContent =

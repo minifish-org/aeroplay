@@ -1224,3 +1224,141 @@
   }
 }
 
+
+/* --- 3D scenes: controls live inside the view --- */
+.sky-shell .game-area,
+.cargo-shell .game-area,
+.pushball-shell .game-area {
+  display: block;
+  padding: 0;
+}
+.sky-shell .sky-view,
+.cargo-shell .cargo-view,
+.pushball-shell .pushball-view {
+  width: min(100%, 1120px);
+  height: min(680px, calc(100svh - 200px));
+  aspect-ratio: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0 auto;
+}
+.flight-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  pointer-events: none;
+  z-index: 3;
+}
+.flight-controls > * {
+  pointer-events: auto;
+}
+.flight-controls .boost-button {
+  flex: 1 1 auto;
+}
+.flight-controls .touch-btn {
+  min-height: 46px;
+}
+.flight-utility {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  justify-content: flex-end;
+  padding: 0;
+  z-index: 3;
+}
+.flight-utility .touch-btn,
+.pushball-utility .touch-btn {
+  background: #0d1f2dcc;
+  border-color: #ffffff2e;
+  backdrop-filter: blur(5px);
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 11px;
+  border-radius: 10px;
+}
+.flight-meta {
+  bottom: 74px;
+}
+.cargo-header {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 3;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #193a46d9;
+}
+.cargo-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  pointer-events: none;
+  z-index: 3;
+}
+.cargo-controls > * {
+  pointer-events: auto;
+}
+.cargo-controls .control-grid {
+  width: 132px;
+  grid-template-rows: repeat(3, 38px);
+}
+.cargo-status {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 160px;
+  z-index: 2;
+  min-height: 0;
+  padding: 0;
+  text-align: center;
+  color: #eaf4ee;
+  text-shadow: 0 1px 3px #0b1f2a;
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .sky-shell .sky-view,
+  .cargo-shell .cargo-view,
+  .pushball-shell .pushball-view {
+    width: 100%;
+    height: min(430px, calc(100svh - 132px));
+  }
+  .flight-controls {
+    bottom: 6px;
+    padding: 0 10px;
+  }
+  .flight-controls .touch-btn {
+    min-height: 40px;
+  }
+  .flight-meta {
+    bottom: 58px;
+  }
+  .cargo-status {
+    bottom: 132px;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 480px) {
+  .cargo-shell .cargo-view {
+    height: min(620px, calc(100svh - 214px));
+  }
+}
+
+/* Landscape phone: the 3D views keep only what the player needs. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .sky-shell .three-instruction,
+  .pushball-shell .pushball-ai,
+  .pushball-shell .pushball-instructions {
+    display: none;
+  }
+}
