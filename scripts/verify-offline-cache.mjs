@@ -117,7 +117,7 @@ assert.equal(
   false,
 );
 assert.equal(
-  (await fetchThroughWorker(new Request("https://laya.example/health")))
+  (await fetchThroughWorker(new Request("https://external.example/health")))
     .intercepted,
   false,
 );

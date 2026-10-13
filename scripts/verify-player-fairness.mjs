@@ -19,9 +19,8 @@ async function run(game, ai) {
     window.resetGameSeed = () => { seed = 1; };
     Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
     localStorage.clear();
-    localStorage.setItem('aeroplay:laya-settings', JSON.stringify({ provider: 'local', endpoint: '' }));
     document.addEventListener('click', event => {
-      if (event.target.closest('.laya-watch,.player-watch')) window.resetGameSeed();
+      if (event.target.closest('.player-watch')) window.resetGameSeed();
     }, true);
   });
   const engineSource = (await readFile('src/core/engine.ts', 'utf8'))
@@ -50,9 +49,9 @@ async function run(game, ai) {
   await page.goto(`${base}/#${game}`);
   await page.waitForFunction(() => !!window.render_game_to_text);
   if (ai) {
-    const watch = page.locator('.player-watch,.laya-watch');
+    const watch = page.locator('.player-watch');
     await watch.click();
-    await page.waitForFunction(() => ['ai', 'laya'].includes(document.querySelector('.game-shell')?.dataset.player));
+    await page.waitForFunction(() => document.querySelector('.game-shell')?.dataset.player === 'ai');
   } else {
     await page.locator('.control-row button').first().click();
   }

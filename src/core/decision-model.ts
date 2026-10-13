@@ -48,26 +48,3 @@ export interface LocalModelInfo {
   residentTensorBytes?: number;
 }
 
-export const TINY_MODEL = {
-  name: "TinyDecide Q4",
-  repository: "TheREZOR/TinyDecide",
-  revision: "aa745b73a2db9a43bce731f0e8e5c90a6899fe2c",
-  parameters: 10409613,
-  directory: "/models/tinydecide/",
-  modelBytes: 6181984,
-  modelHash: "23fe9d93f2eafadbe4dc686a7dc5f309fbcba9ea1a4873d457e75d17c5bf3441",
-  metaHash: "2fb895cfb0cdd6b11fcfb5573033e846bf4defadb3c78b9989cccfeefe06758f",
-  games: LOCAL_MODEL.games,
-} as const;
-
-// Choice-only conversion of the same pinned upstream weights, without retraining
-// or activation quantization. MatMulNBits retains the original Q4 projections.
-export const TINY_ONNX_MODEL = {
-  ...TINY_MODEL,
-  name: "TinyDecide Q4 ONNX",
-  sourceParameters: TINY_MODEL.parameters,
-  parameters: 10114177,
-  file: "choice-q4.onnx",
-  modelBytes: 6955425,
-  modelHash: "22a0d446964890745c1f6f5ced38369e1bfb3388922409feb6ed52aa55124aa7",
-} as const;

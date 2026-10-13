@@ -1,5 +1,5 @@
 const KEY_PREFIX = 'aeroplay:';
-export type PlayProfile = 'human' | 'ai' | 'laya';
+export type PlayProfile = 'human' | 'ai';
 let runProfile: { owner: PlayProfile } = { owner: 'human' };
 
 export function setPlayProfile(profile: PlayProfile) {
