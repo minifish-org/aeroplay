@@ -42,6 +42,35 @@ export function bindTap(el: HTMLElement, handler: () => void): () => void {
   };
 }
 
+/** Hosts a canvas or board so controls can live inside the play area. */
+export function wrapSurface(element: HTMLElement, className: string) {
+  const surface = document.createElement('div');
+  surface.className = `game-surface ${className}`.trim();
+  element.parentNode?.insertBefore(surface, element);
+  surface.append(element);
+  return surface;
+}
+
+/** Occasional actions: under the board on phones, beside it when width allows. */
+export function surfaceActions(surface: HTMLElement) {
+  const bar = document.createElement('div');
+  bar.className = 'surface-actions control-row';
+  if (surface.parentNode) surface.after(bar);
+  else surface.append(bar);
+  return bar;
+}
+
+/** A control group pinned to an edge of the play surface. */
+export function surfaceCorner(
+  surface: HTMLElement,
+  corner: 'tl' | 'tr' | 'left' | 'right'
+) {
+  const bar = document.createElement('div');
+  bar.className = `surface-corner surface-${corner}`;
+  surface.append(bar);
+  return bar;
+}
+
 export function createGameShell(
   root: HTMLElement,
   title: string,

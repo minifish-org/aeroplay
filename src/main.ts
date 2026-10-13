@@ -143,7 +143,7 @@ function renderHub() {
 function mountGameSide(root: HTMLElement) {
   const area = root.querySelector<HTMLElement>('.game-area');
   const visual = area?.querySelector<HTMLElement>(
-    ':scope > canvas, :scope > .pixi-board, :scope > .three-view, :scope > .pushball-view'
+    ':scope > canvas, :scope > .pixi-board, :scope > .three-view, :scope > .pushball-view, :scope > .game-surface'
   );
   if (!area || !visual) return;
   const side = document.createElement('div');

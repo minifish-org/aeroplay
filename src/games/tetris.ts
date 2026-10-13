@@ -2,7 +2,7 @@ import { createBoard, collides, merge, clearLines, rotatedPiece, boardHeights } 
 import { GameModule } from './gameTypes';
 import { createGameCanvas } from '../core/pixi/scene';
 import { TetrisView } from './views/tetris';
-import { createGameShell, createTouchButton } from '../core/ui';
+import { createGameShell, createTouchButton, wrapSurface, surfaceActions, surfaceCorner } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { Mode, exposeGame, message } from '../core/play';
@@ -83,28 +83,33 @@ const tetris: GameModule = {
     previews.className = 'tetris-previews';
     const canvas = createGameCanvas(WIDTH * CELL, HEIGHT * CELL);
     canvas.className = 'game-canvas tetris-canvas';
-    area.append(info, previews, canvas);
+    const surface = wrapSurface(canvas, 'surface-tetris');
+    area.append(info, surface);
+    const display = surfaceCorner(surface, 'tr');
+    display.append(previews);
     const view = new TetrisView(canvas);
     const status = message(
       area,
       'Arrows move and rotate · Space drops · C holds · P pauses'
     );
-    const controls = document.createElement('div');
-    controls.className = 'control-row tetris-controls';
+    const controls = surfaceActions(surface);
     const start = createTouchButton('Start', () => {
       if (mode === 'over') reset();
       mode = mode === 'playing' ? 'paused' : 'playing';
       draw();
     });
-    controls.append(
-      start,
+    controls.append(start);
+    const moveColumn = surfaceCorner(surface, 'left');
+    moveColumn.append(
       createTouchButton('◀', () => input.human('left')),
       createTouchButton('⟳', () => input.human('rotate')),
-      createTouchButton('▶', () => input.human('right')),
+      createTouchButton('▶', () => input.human('right'))
+    );
+    const dropColumn = surfaceCorner(surface, 'right');
+    dropColumn.append(
       createTouchButton('Drop', () => input.human('drop')),
       createTouchButton('Hold', () => input.human('hold'))
     );
-    area.append(controls);
     let board = createBoard();
     let bag: number[] = [],
       next: number[] = [];

@@ -1,10 +1,10 @@
 import { GameModule } from './gameTypes';
 import { createGameCanvas } from '../core/pixi/scene';
 import { SnakeView } from './views/snake';
-import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
+import { createGameShell, createTouchButton, bindSwipe, wrapSurface, surfaceActions } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
-import { Mode, directionPad, exposeGame, message } from '../core/play';
+import { Mode, exposeGame, message } from '../core/play';
 
 type Point = { x: number; y: number };
 const SIZE = 20;
@@ -21,7 +21,8 @@ const snake: GameModule = {
     info.className = 'info-row';
     const canvas = createGameCanvas(SIZE * CELL);
     canvas.className = 'game-canvas';
-    area.append(info, canvas);
+    const surface = wrapSurface(canvas, 'surface-board');
+    area.append(info, surface);
     const view = new SnakeView(canvas);
     const status = message(
       area,
@@ -40,8 +41,7 @@ const snake: GameModule = {
     let acc = 0;
     let relaxed = false;
     let stepVersion = 0;
-    const row = document.createElement('div');
-    row.className = 'control-row';
+    const row = surfaceActions(surface);
     const start = createTouchButton('Start', () => {
       if (mode === 'over' || mode === 'won') reset();
       mode = mode === 'playing' ? 'paused' : 'playing';
@@ -55,7 +55,6 @@ const snake: GameModule = {
       draw();
     });
     row.append(start, difficulty);
-    area.append(row);
     function turn(x: number, y: number) {
       if (mode === 'over' || mode === 'won' || mode === 'paused') return false;
       if (mode === 'ready') mode = 'playing';
@@ -69,7 +68,6 @@ const snake: GameModule = {
       queue.push({ x, y });
       return true;
     }
-    directionPad(area, (x, y) => input.human({ x, y }));
     function emptyCell(): Point | null {
       const cells: Point[] = [];
       for (let y = 0; y < SIZE; y++)

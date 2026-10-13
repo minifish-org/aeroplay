@@ -2,7 +2,7 @@ import { compressAndMerge, gridToString, preview2048Move } from './mergeLogic';
 export { preview2048Move } from './mergeLogic';
 import { GameModule } from './gameTypes';
 import { MergeView, type MergeAnimation } from './views/merge';
-import { createGameShell, bindSwipe, createTouchButton } from '../core/ui';
+import { createGameShell, bindSwipe, createTouchButton, wrapSurface, surfaceActions } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
 
@@ -34,31 +34,15 @@ const game2048: GameModule = {
     const restart = document.createElement('button');
     restart.className = 'touch-btn';
     restart.textContent = 'Restart';
-    info.append(scoreEl, bestEl, restart);
+    info.append(scoreEl, bestEl);
 
     const gridEl = document.createElement('div');
     gridEl.className = 'grid-2048';
-    area.append(info, gridEl);
+    const surface = wrapSurface(gridEl, 'surface-board');
+    area.append(info, surface);
+    const actions = surfaceActions(surface);
+    actions.append(restart);
     const view = new MergeView(gridEl);
-
-    const controls = document.createElement('div');
-    controls.className = 'control-grid';
-    const upBtn = createTouchButton('▲', () => input.human('up'));
-    const downBtn = createTouchButton('▼', () => input.human('down'));
-    const leftBtn = createTouchButton('◀', () => input.human('left'));
-    const rightBtn = createTouchButton('▶', () => input.human('right'));
-    controls.append(
-      document.createElement('span'),
-      upBtn,
-      document.createElement('span'),
-      leftBtn,
-      document.createElement('span'),
-      rightBtn,
-      document.createElement('span'),
-      downBtn,
-      document.createElement('span')
-    );
-    area.appendChild(controls);
 
     type Snapshot = { grid: Grid; score: number; moves: number };
     const saved = storage.load<Snapshot | null>('state', null);
@@ -89,7 +73,7 @@ const game2048: GameModule = {
       animations = {};
       render();
     });
-    info.append(undo);
+    actions.append(undo);
     function canMove() {
       return grid.some((row, y) =>
         row.some((v, x) => !v || v === grid[y][x + 1] || v === grid[y + 1]?.[x])

@@ -1,10 +1,10 @@
 import { GameModule } from './gameTypes';
 import { createGameCanvas } from '../core/pixi/scene';
 import { MazeView } from './views/maze';
-import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
+import { createGameShell, createTouchButton, bindSwipe, wrapSurface, surfaceActions } from '../core/ui';
 import { GameLoop } from '../core/engine';
 import { namespace } from '../core/storage';
-import { directionPad, exposeGame, message } from '../core/play';
+import { exposeGame, message } from '../core/play';
 
 type Cell = {
   visited: boolean;
@@ -23,7 +23,8 @@ const maze: GameModule = {
     info.className = 'info-row';
     const canvas = createGameCanvas(360);
     canvas.className = 'game-canvas';
-    area.append(info, canvas);
+    const surface = wrapSurface(canvas, 'surface-board');
+    area.append(info, surface);
     const status = message(
       area,
       'Find the green exit. Take a detour for the three stars.'
@@ -44,8 +45,7 @@ const maze: GameModule = {
     let trail = new Set<string>(),
       path: Point[] = [],
       showTrail = true;
-    const controls = document.createElement('div');
-    controls.className = 'control-row';
+    const controls = surfaceActions(surface);
     const hint = createTouchButton('Hint · 3', () => {
       if (!hints || finished) return;
       hints--;
@@ -66,8 +66,6 @@ const maze: GameModule = {
       reset();
     });
     controls.append(hint, trailButton, next);
-    area.append(controls);
-    directionPad(area, (x, y) => input.human({ x, y }));
     function neighbors(p: Point) {
       const w = grid[p.y][p.x].walls;
       return [

@@ -53,7 +53,7 @@ try {
             .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1)
             .map((el) => el.className || el.tagName)
             .slice(0, 3),
-          visual: box('.game-area > canvas, .game-area > .pixi-board, .game-area > .three-view, .game-area > .pushball-view')
+          visual: box('.game-area > canvas, .game-area > .pixi-board, .game-area > .three-view, .game-area > .pushball-view, .game-area > .game-surface')
         };
       });
       await page.screenshot({ path: `${out}/${vp.name}-${route}.png` });

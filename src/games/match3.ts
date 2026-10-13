@@ -1,5 +1,5 @@
 import { GameModule } from './gameTypes';
-import { createGameShell, createTouchButton } from '../core/ui';
+import { createGameShell, createTouchButton, wrapSurface, surfaceActions } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { exposeGame, message } from '../core/play';
@@ -25,7 +25,8 @@ const match3: GameModule = {
     progress.setAttribute('aria-label', 'Level score target');
     const boardEl = document.createElement('div');
     boardEl.className = 'match3-board';
-    area.append(info, progress, boardEl);
+    const surface = wrapSurface(boardEl, 'surface-board');
+    area.append(info, progress, surface);
     const view = new GemView(boardEl);
     const status = message(
       area,
@@ -64,8 +65,7 @@ const match3: GameModule = {
       moves = saved.moves;
       level = saved.level;
     }
-    const controls = document.createElement('div');
-    controls.className = 'control-row';
+    const controls = surfaceActions(surface);
     const hint = createTouchButton('Hint', () => {
       if (phase !== 'playing') return;
       hinted = findMove(grid) ?? [];
@@ -90,7 +90,6 @@ const match3: GameModule = {
     }
     const next = createTouchButton('Restart level', restartLevel);
     controls.append(hint, next);
-    area.append(controls);
     function target() {
       return 1000 + (level - 1) * 350;
     }

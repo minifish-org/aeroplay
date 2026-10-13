@@ -2,7 +2,7 @@ import { applyToggle, isSolved, solveLights } from './lightsLogic';
 export { solveLights } from './lightsLogic';
 import { GameModule } from './gameTypes';
 import { LightsView } from './views/puzzles';
-import { createGameShell, createTouchButton } from '../core/ui';
+import { createGameShell, createTouchButton, wrapSurface, surfaceActions } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
 
@@ -26,7 +26,8 @@ const lightsOut: GameModule = {
     info.className = 'info-row';
     const boardEl = document.createElement('div');
     boardEl.className = 'lights-grid';
-    area.append(info, boardEl);
+    const surface = wrapSurface(boardEl, 'surface-board');
+    area.append(info, surface);
     const view = new LightsView(boardEl);
     const status = message(
       area,
@@ -40,8 +41,7 @@ const lightsOut: GameModule = {
       hinted = -1;
     let paused = false;
     const history: number[][] = [];
-    const controls = document.createElement('div');
-    controls.className = 'control-row';
+    const controls = surfaceActions(surface);
     const undo = createTouchButton('Undo', () => {
       const old = history.pop();
       if (!old) return;
@@ -70,7 +70,6 @@ const lightsOut: GameModule = {
       render();
     });
     controls.append(undo, hint, reset, next);
-    area.append(controls);
     function newBoard() {
       board = Array(25).fill(0);
       const cells = Array.from({ length: 25 }, (_, i) => i);
