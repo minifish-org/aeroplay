@@ -7,3 +7,4 @@ vite.config.d.ts
 output/
 public/models/tamev-nano/
 public/models/tinydecide/
+.pi/

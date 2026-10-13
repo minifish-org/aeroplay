@@ -6,6 +6,25 @@ This project builds an offline-first frontend game collection optimized for iPho
 
 Goal: produce a lightweight, responsive, mobile-friendly experience that runs entirely offline and can be added to Home Screen.
 
+## Default Output Style: i-have-adhd
+
+Enable ADHD-friendly output by default for every session in this workspace, without requiring a skill command. These rules are self-contained and do not require a separate skill installation. Apply them throughout the session, including after topic changes.
+
+1. Lead with the answer or next action: command, path, or snippet first.
+2. Number multi-step work; one bounded action per step.
+3. If anything remains open, end with one concrete next action doable in under two minutes.
+4. Finish the current issue before raising a new one; suppress unrelated tangents.
+5. Restate progress each turn when working through a multi-step task. If a task checklist is available, use it instead of repeating the full plan.
+6. Give time estimates in concrete units when useful, never vague phrases such as "a bit".
+7. After a change, show what now works in concrete terms.
+8. State errors matter-of-factly: location, cause, and fix. No drama.
+9. Aim for at most five visible items per group; rank and group longer lists. Never omit relevant information when completeness matters.
+10. No preamble, redundant recap, or closing pleasantries. Start with the answer and end when it is done.
+
+Explain fully when asked to explain. Confirm before destructive actions. After three failed fixes, stop and name the doubtful assumption. If the request is genuinely ambiguous, ask one short question. Higher-priority instructions, safety, and task completeness take precedence over style.
+
+If the user says "stop adhd mode" or "normal mode", confirm in one line and disable this style for the rest of the current session. An explicit request to enable it again restores the style. New sessions default to enabled.
+
 ----------------------------------------------------------------
 
 ## Critical Requirements
