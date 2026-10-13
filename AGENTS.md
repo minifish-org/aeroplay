@@ -61,6 +61,7 @@ Difficulty B (must implement)
 - Sky Rush (3D flight arcade)
 - Sudoku
 - Lights Out
+- Robot Pushball (3D, human against the on-device TAMEV player)
 
 Additional Requirements
 - Unified Game Hub with responsive grid of icons
@@ -127,9 +128,16 @@ In-Game Layout
 - Minimal top bar with back button and title
 - Canvas or DOM game area centered
 - Touch controls where needed
-  - Swipe (Snake, Maze)
-  - Tap (Flappy Bird)
-  - On-screen arrows (Sokoban)
+  - Swipe (Snake, Maze, 2048)
+  - Tap (Flappy Bird, Match-3, Lights Out, Sudoku)
+  - On-screen controls inside the play area (Cargo D-pad, Pushball stick and dash, Sky steer and boost, Tetris move and drop columns)
+
+Responsive Layout
+- Each 2D game owns one square `.game-surface`; the board keeps its aspect and never stretches with the viewport
+- Controls that belong to play stay inside the play area: 3D scenes use overlays, Tetris uses the surface gutters beside the well
+- Do not add arrow pads where swipe and keyboard already drive the game; do not stack buttons in a separate row under the board
+- Occasional actions (hint, undo, restart) belong in one compact row under the board on phones and beside it when width allows
+- Every game must fit a laptop (1512x982), a portrait phone (390x844) and a landscape phone (844x390) without scrolling or horizontal overflow, and safe-area insets must survive the compact padding rules
 
 ----------------------------------------------------------------
 
@@ -137,7 +145,7 @@ In-Game Layout
 
 General
 - Use TypeScript
-- Use PixiJS for 2D presentation and Three.js for the two 3D games
+- Use PixiJS for 2D presentation and Three.js for the three 3D scenes (Sky Rush, Pocket Cargo, Robot Pushball)
 - Keep gameplay, native input, storage and AI adapters separate from renderer classes
 - Reuse one Pixi renderer across 2D scenes; destroy each scene's textures, filters and listeners on navigation
 - Keep particles bounded, stop idle rendering, and respect reduced-motion preferences
@@ -231,11 +239,12 @@ Output must run 100% offline.
 ## QA REQUIREMENTS
 
 Test on:
-- iPhone Safari
+- iPhone Safari and macOS Safari
 - Chrome mobile
 - Must work in Flight Mode
 - All resources load locally
 - Touch controls reliable
+- Run `node scripts/verify-layout.mjs` (laptop, portrait phone, landscape phone), `verify-games.mjs` for the 2D games, `verify-3d.mjs` for the 3D scenes and `verify-pixi.mjs` for rendering and teardown
 
 ----------------------------------------------------------------
 
@@ -245,20 +254,22 @@ Test on:
 2. Implement Game Hub UI
 3. Implement each game in /src/games
 4. Implement core helpers
-5. Ensure mobile touch UX
+5. Ensure mobile touch UX and the responsive layout rules above
 6. Add optional PWA
 7. Produce final offline build
+8. Keep the browser verifiers green before pushing: layout, 2D games, 3D scenes and Pixi rendering
 
 ----------------------------------------------------------------
 
 ## ACCEPTANCE CRITERIA
 
 Project is complete when:
-- All 10 games are playable offline
+- All 11 games are playable offline
 - Hub UI loads each game
 - No external requests at runtime; every asset, model and script is served from the same origin
 - Saves stored locally
 - Touch controls fully functional
+- Every game fits laptop and phone viewports, portrait and landscape, without scrolling
 - Build outputs static files runnable anywhere
 
 END OF AGENTS.md
