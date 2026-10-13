@@ -13,10 +13,17 @@ import {
   BufferGeometry
 } from 'three';
 
+/** Keeps the horizontal framing steady when the viewport aspect changes. */
+export function fovForAspect(baseFov: number, baseAspect: number, aspect: number) {
+  const half = Math.tan((baseFov * Math.PI) / 360);
+  return (2 * Math.atan(half * (baseAspect / Math.max(aspect, 0.2))) * 180) / Math.PI;
+}
+
 export function createStage(
   host: HTMLElement,
   camera: Camera,
-  background: number
+  background: number,
+  onResize?: (width: number, height: number, aspect: number) => void
 ) {
   const canvas = document.createElement('canvas');
   canvas.className = 'three-canvas';
@@ -69,6 +76,7 @@ export function createStage(
       camera.right = worldHeight * aspect / 2;
       camera.updateProjectionMatrix();
     }
+    onResize?.(width, height, Math.max(1, width) / Math.max(height, 1));
     renderer.render(scene, camera);
   };
   const observer = new ResizeObserver(resize);

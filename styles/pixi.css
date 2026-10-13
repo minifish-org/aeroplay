@@ -155,7 +155,7 @@
 @media (orientation: landscape) and (max-height: 560px) {
   .pixi-board {
     width: auto;
-    height: min(430px, calc(100svh - 176px));
+    height: min(430px, calc(100svh - 132px));
     max-width: 100%;
     aspect-ratio: 1;
     margin: 0;
@@ -166,7 +166,7 @@
   }
   .game-canvas[data-renderer='pixi'] {
     width: auto !important;
-    height: min(430px, calc(100svh - 176px)) !important;
+    height: min(430px, calc(100svh - 132px)) !important;
     max-width: 100%;
     aspect-ratio: 1;
     margin: 0;

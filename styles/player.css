@@ -51,8 +51,8 @@
     gap: 8px;
   }
   .player-mode-picker button {
-    min-height: 34px;
-    padding: 5px 10px;
+    min-height: 28px;
+    padding: 4px 9px;
     font-size: 11px;
   }
   .player-availability {

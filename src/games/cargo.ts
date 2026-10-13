@@ -17,7 +17,7 @@ import { createGameShell, createTouchButton, bindSwipe } from '../core/ui';
 import { directionPad, exposeGame } from '../core/play';
 import { GameLoop } from '../core/engine';
 import { GameAudio } from '../core/audio';
-import { createStage, disposeObject } from '../core/three/stage';
+import { createStage, disposeObject, fovForAspect } from '../core/three/stage';
 import { namespace } from '../core/storage';
 import { CARGO_LEVELS } from './cargo/levels';
 import {
@@ -69,7 +69,11 @@ const cargo: GameModule = {
     const camera = new PerspectiveCamera(43, 1, 0.1, 100);
     camera.position.set(0, 10.5, 9.5);
     camera.lookAt(0, 0, 0);
-    const stage = createStage(view, camera, 0xd6e6df);
+    // Keep the island readable on wide, short viewports without cropping it.
+    const stage = createStage(view, camera, 0xd6e6df, (_width, _height, aspect) => {
+      camera.fov = Math.min(43, Math.max(31, fovForAspect(43, 1.25, aspect)));
+      camera.updateProjectionMatrix();
+    });
     if (!stage) return () => {};
     const audio = new GameAudio();
     const worker = new Worker(

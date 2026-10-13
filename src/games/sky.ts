@@ -23,7 +23,7 @@ import { GameAudio } from '../core/audio';
 import { GameLoop } from '../core/engine';
 import { exposeGame } from '../core/play';
 import { namespace } from '../core/storage';
-import { createStage } from '../core/three/stage';
+import { createStage, fovForAspect } from '../core/three/stage';
 import {
   boostFlight,
   createFlight,
@@ -49,7 +49,11 @@ const sky: GameModule = {
     const camera = new PerspectiveCamera(57, 1, 0.1, 260);
     camera.position.set(0, 5.2, 9.4);
     camera.lookAt(0, 1.1, -18);
-    const stage = createStage(view, camera, 0xbde3e8);
+    // Wide, short viewports get a narrower field of view so the aircraft keeps its size.
+    let baseFov = 57;
+    const stage = createStage(view, camera, 0xbde3e8, (_width, _height, aspect) => {
+      baseFov = Math.min(58, Math.max(38, fovForAspect(57, 1.4, aspect)));
+    });
     if (!stage) return () => {};
     stage.scene.fog = new Fog(0xbde3e8, 65, 175);
     const audio = new GameAudio();
@@ -398,7 +402,8 @@ const sky: GameModule = {
       camera.position.x =
         state.x * 0.15 + Math.sin(visualTime * 75) * shake * 0.14;
       camera.fov +=
-        ((state.boost > 0 ? 66 : 57) - camera.fov) * Math.min(1, dt * 5);
+        (baseFov * (state.boost > 0 ? 1.16 : 1) - camera.fov) *
+        Math.min(1, dt * 5);
       camera.updateProjectionMatrix();
       stage!.render();
     }

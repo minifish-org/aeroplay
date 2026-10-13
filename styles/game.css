@@ -920,7 +920,7 @@
     grid-column: 2;
     grid-row: 1;
     gap: 8px;
-    max-height: min(430px, calc(100svh - 156px));
+    max-height: min(430px, calc(100svh - 132px));
     overflow-y: auto;
     margin-bottom: 0;
   }
@@ -930,7 +930,7 @@
   }
   .game-canvas {
     width: auto !important;
-    height: min(430px, calc(100svh - 176px)) !important;
+    height: min(430px, calc(100svh - 132px)) !important;
     max-width: 100%;
     aspect-ratio: 1;
     margin: 0;
@@ -953,7 +953,7 @@
     padding: 6px;
   }
   .sky-shell .sky-view {
-    height: min(430px, calc(100svh - 140px));
+    height: min(430px, calc(100svh - 124px));
     min-height: 0;
   }
   .flight-controls {
@@ -979,7 +979,7 @@
   .cargo-shell .cargo-view {
     grid-column: 1;
     grid-row: 1;
-    height: min(430px, calc(100svh - 136px));
+    height: min(430px, calc(100svh - 124px));
     aspect-ratio: 1;
     min-height: 0;
     max-height: none;
@@ -988,7 +988,7 @@
   .pushball-shell .game-side {
     grid-column: 2;
     grid-row: 1;
-    max-height: min(430px, calc(100svh - 136px));
+    max-height: min(430px, calc(100svh - 124px));
   }
   .cargo-shell .cargo-controls {
     flex-direction: row;
@@ -1016,7 +1016,7 @@
   .pushball-shell .pushball-view {
     grid-column: 1;
     grid-row: 1;
-    height: min(430px, calc(100svh - 136px));
+    height: min(430px, calc(100svh - 132px));
   }
   .pushball-shell .game-side {
     gap: 6px;
@@ -1050,11 +1050,28 @@
   .pushball-utility {
     padding: 4px 10px;
   }
+  .three-overlay {
+    padding: 10px;
+  }
   .three-panel {
-    padding: 18px;
+    padding: 14px;
+  }
+  .panel-eyebrow {
+    font-size: 9px;
   }
   .three-panel h2 {
-    font-size: clamp(22px, 3.2vw, 30px);
+    font-size: 20px;
+    letter-spacing: -0.6px;
+    margin: 8px 0;
+  }
+  .three-panel p {
+    font-size: 11px;
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+  .primary-action {
+    padding: 10px 16px;
+    min-height: 40px;
   }
 }
 
@@ -1072,5 +1089,26 @@
   }
   .pushball-instructions {
     display: none;
+  }
+}
+
+/* Landscape phone: a slimmer chrome row so the play surface stays large. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .game-bar {
+    gap: 8px;
+  }
+  .back-btn {
+    min-height: 30px;
+    padding: 4px 10px;
+    border-radius: 9px;
+    font-size: 13px;
+  }
+  .game-title {
+    font-size: 15px;
+  }
+  .game-bar .player-settings-button {
+    min-height: 30px;
+    padding: 4px 9px;
+    font-size: 11px;
   }
 }
