@@ -52,11 +52,11 @@ function renderHub() {
   hero.innerHTML = `
     <div class="hub-eyebrow">YOUR OFFLINE ARCADE</div>
     <h1 class="hub-heading">One more round.<br>Anywhere.</h1>
-    <div class="hub-subtitle">Chase a record. Solve a challenge. Eight recharged classics and two 3D adventures, ready when you are.</div>
+    <div class="hub-subtitle">Chase a record. Solve a challenge. Arcade classics, 3D adventures, and a local AI duel, ready when you are.</div>
   `;
   const last = games.find((g) => g.id === load('last-game', 'sky')) ?? games[0];
   const artwork = document.createElement('img');
-  artwork.src = `/assets/previews/${last.id}.jpg`;
+  artwork.src = last.preview ?? `/assets/previews/${last.id}.jpg`;
   artwork.alt = '';
   artwork.className = 'hero-art';
   hero.append(artwork);
@@ -82,6 +82,7 @@ function renderHub() {
     if (id === 'lightsout')
       return `Puzzle ${store.load<{ level: number }>('state-v2', { level: 1 }).level}`;
     if (id === 'sudoku') return 'Take your time';
+    if (id === 'pushball') return `${store.load('wins', 0)} wins · Human vs TAMEV`;
     if (id === 'cargo') {
       const stars = store.load<Record<string, number>>('stars', {});
       return `${Object.keys(stars).length}/12 islands delivered`;
@@ -115,7 +116,7 @@ function renderHub() {
       if (game.dimension) card.classList.add('featured-card');
       else card.classList.add('preview-card');
       card.innerHTML = `
-        <img class="card-art ${game.dimension ? '' : 'card-preview'}" src="/assets/previews/${game.id}.jpg" alt="" loading="lazy" />
+        <img class="card-art ${game.dimension ? '' : 'card-preview'}" src="${game.preview ?? `/assets/previews/${game.id}.jpg`}" alt="" loading="lazy" />
         <div class="hub-card-top"><div class="hub-card-icon">${game.icon}</div><span class="hub-card-index">${game.dimension ? '3D' : String(index + 1).padStart(2, '0')}</span></div>
         <div class="hub-card-title">${game.name}</div>
         <div class="hub-card-desc">${game.description}</div>
@@ -145,6 +146,7 @@ function renderHub() {
 async function startGame(id: string, profile: PlayProfile = 'human') {
   const game = games.find((game) => game.id === id);
   if (!game) return;
+  if (game.playMode === 'versus-ai') profile = 'human';
   const version = ++navigationVersion;
   teardown?.();
   teardown = null;
@@ -161,9 +163,8 @@ async function startGame(id: string, profile: PlayProfile = 'human') {
     const gameTeardown = module.default.mount(app, () => {
       location.hash = 'hub';
     }, player);
-    const controls = mountPlayerControls(app, player, (next) => {
-      void startGame(id, next);
-    });
+    const controls = game.playMode === 'versus-ai' ? { dispose() {} }
+      : mountPlayerControls(app, player, (next) => { void startGame(id, next); });
     teardown = () => {
       controls.dispose();
       gameTeardown();

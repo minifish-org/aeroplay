@@ -1,4 +1,5 @@
 import { FLIGHT, predictFlight } from '../games/flappyFlight';
+import { createPushballPlans } from '../games/pushball/policy';
 import { collides, merge, clearLines, rotatedPiece, boardHeights } from '../games/tetrisLogic';
 import { applyToggle, solveLights } from '../games/lightsLogic';
 import { preview2048Move } from '../games/mergeLogic';
@@ -260,5 +261,6 @@ export function createInputPlans(state: PlanningState, ahead: PlannedInput[] = [
     case '2048': return mergePlans(state);
     case 'match3': return matchPlans(state);
     case 'sky': return skyPlans(state);
+    case 'pushball': return createPushballPlans(state);
   }
 }

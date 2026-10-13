@@ -20,6 +20,9 @@ export interface PlayerGame<Input> {
   apply: (input: Input) => boolean;
   /** Read-only visible state for controller-owned planning. */
   planning?: () => PlanningState | null;
+  /** Release held native controls when a plan is cancelled. */
+  clearInput?: () => void;
+  onPlanSelected?: (plan: InputPlan) => void;
   start: () => void;
   pause: () => void;
   resume: () => void;
@@ -50,8 +53,11 @@ export class TamevPlayer implements PlayerController {
       if (!plans.length) throw new Error('No safe plan was found. The game keeps running; take over or retry.');
       const result = await requestLocalDecision({
         key: observation.key,
-        context: `${observation.planning.game}. Plans were calculated from visible state. Every control obeys the normal rules and speed.`,
-        question: 'Which plan achieves the goal safely with fewer controls and better outcomes?',
+        context: observation.planning.game === 'pushball' ? observation.context
+          : `${observation.planning.game}. Plans were calculated from visible state. Every control obeys the normal rules and speed.`,
+        question: observation.planning.game === 'pushball'
+          ? 'Which plan best scores in the opponent goal or prevents conceding? Prefer low own-goal risk and reaching the ball.'
+          : 'Which plan achieves the goal safely with fewer controls and better outcomes?',
         choices: Object.fromEntries(plans.map((plan, i) => [String(i), plan.label])),
       }, signal);
       return plans[Number(result.choice)];
@@ -114,6 +120,7 @@ export class Player {
   private cancel() {
     ++this.generation; this.pending?.abort(); this.pending = null;
     this.controller.cancel?.(); this.plan = []; this.nextPlan = []; this.nextInputAt = 0;
+    this.game?.clearInput?.();
   }
   private startPolling() {
     if (this.type === 'ai' && !this.timer) this.timer = window.setInterval(() => { void this.tick(); }, 16);
@@ -192,6 +199,7 @@ export class Player {
         }
         if (this.plan.length) this.nextPlan = choice.steps;
         else this.plan = choice.steps;
+        game.onPlanSelected?.(choice);
         this.error = '';
         return;
       }

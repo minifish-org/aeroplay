@@ -9,7 +9,9 @@ export class AIPlanner {
   request(state: PlanningState, ahead: PlannedInput[], signal: AbortSignal): Promise<InputPlan[]> {
     if (signal.aborted) return Promise.reject(new DOMException('Cancelled', 'AbortError'));
     if (this.pending) return Promise.reject(new Error('The planner is busy.'));
-    const worker = this.worker ??= new Worker(new URL('./ai-planning.worker.ts', import.meta.url), { type: 'module' });
+    const worker = this.worker ??= state.game === 'pushball'
+      ? new Worker(new URL('../games/pushball/opponent.worker.ts', import.meta.url), { type: 'module' })
+      : new Worker(new URL('./ai-planning.worker.ts', import.meta.url), { type: 'module' });
     const id = ++this.sequence;
     return new Promise((resolve, reject) => {
       const abort = () => this.dispose();

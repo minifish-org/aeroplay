@@ -133,9 +133,9 @@ async function open(id) {
 try {
   await page.goto(base);
   await page.waitForSelector('.hub-card');
-  assert.equal(await page.locator('.hub-card').count(), 10);
+  assert.equal(await page.locator('.hub-card').count(), 11);
   await button('3D').click();
-  assert.equal(await page.locator('.hub-card').count(), 2);
+  assert.equal(await page.locator('.hub-card').count(), 3);
   await screenshot('hub-3d');
   await open('sky');
   assert.equal((await state()).mode, 'ready');

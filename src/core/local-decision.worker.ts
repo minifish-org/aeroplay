@@ -38,6 +38,9 @@ async function localFile(file: string) {
   const response = await fetch(`${LOCAL_MODEL.directory}${file}`, {
     credentials: "omit",
     redirect: "error",
+    // Cache Storage still serves offline files. Avoid competing HTTP-cache
+    // writes when first inference and service-worker installation fetch together.
+    cache: "no-store",
   });
   if (
     !response.ok ||

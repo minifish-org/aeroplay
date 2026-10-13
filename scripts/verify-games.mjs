@@ -88,9 +88,9 @@ const keyFor = (dx, dy) =>
 
 try {
   await page.goto(base);
-  assert.equal(await page.locator('.hub-card').count(), 10);
+  assert.equal(await page.locator('.hub-card').count(), 11);
   await button('Arcade').click();
-  assert.equal(await page.locator('.hub-card').count(), 4);
+  assert.equal(await page.locator('.hub-card').count(), 5);
   await button('Puzzles').click();
   assert.equal(await page.locator('.hub-card').count(), 6);
   await button('All games').click();
@@ -527,7 +527,7 @@ try {
   }
   await button('Back').tap();
   await page.waitForSelector('.hub-card');
-  assert.equal(await page.locator('.hub-card').count(), 10);
+  assert.equal(await page.locator('.hub-card').count(), 11);
   assert.equal(
     await page.evaluate(() => typeof window.render_game_to_text),
     'undefined'

@@ -7,5 +7,6 @@ export interface GameModule {
   name: string;
   description: string;
   icon: string;
+  playMode?: 'versus-ai';
   mount: GameMount;
 }

@@ -62,7 +62,7 @@ try {
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
   await page.reload();
   await page.waitForSelector(".hub-card");
-  assert.equal(await page.locator(".hub-card").count(), 10);
+  assert.equal(await page.locator(".hub-card").count(), 11);
   const cached = await page.evaluate(async () => {
     const names = await caches.keys();
     return (
@@ -93,8 +93,9 @@ try {
   } else await context.setOffline(true);
   await page.reload();
   await page.waitForSelector(".hub-card");
-  assert.equal(await page.locator(".hub-card").count(), 10);
+  assert.equal(await page.locator(".hub-card").count(), 11);
   for (const id of [
+    "pushball",
     "sky",
     "cargo",
     "snake",
@@ -279,7 +280,7 @@ try {
     [],
   );
   console.log(
-    `PASS Offline: ${cached.length} cached resources, online/offline reload${pagesRedirects ? " with Pages HTML redirects" : ""}, all ten games, saved scores, ${isWebKit ? "WebKit native controls and keyboard" : "real 2D/3D touch swipes"} and offline worker hints, no external network requests or page errors${external.length ? `; ${external.length} script attempts blocked by CSP before network dispatch` : ""}`,
+    `PASS Offline: ${cached.length} cached resources, online/offline reload${pagesRedirects ? " with Pages HTML redirects" : ""}, all eleven games, saved scores, ${isWebKit ? "WebKit native controls and keyboard" : "real 2D/3D touch swipes"} and offline worker hints, no external network requests or page errors${external.length ? `; ${external.length} script attempts blocked by CSP before network dispatch` : ""}`,
   );
 } finally {
   await browser.close();

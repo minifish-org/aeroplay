@@ -3,9 +3,17 @@ export type GameEntry = Omit<GameModule, 'mount'> & {
   category: 'Arcade' | 'Puzzles';
   accent: string;
   dimension?: '3D';
+  preview?: string;
   load: () => Promise<{ default: GameModule }>;
 };
 export const games: GameEntry[] = [
+  {
+    id: 'pushball', name: 'Robot Pushball', icon: '🤖',
+    description: 'Outsmart a local AI. Get behind the ball, dash, and push it home.',
+    category: 'Arcade', accent: '#72e0fb', dimension: '3D', playMode: 'versus-ai',
+    preview: '/assets/previews/pushball.svg',
+    load: () => import('./pushball')
+  },
   {
     id: 'sky',
     name: 'Sky Rush',

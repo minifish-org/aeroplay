@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480">
+  <defs><linearGradient id="bg" x2="0" y2="1"><stop stop-color="#1f4155"/><stop offset="1" stop-color="#0d1e31"/></linearGradient></defs>
+  <rect width="640" height="480" fill="url(#bg)"/>
+  <g transform="translate(320 245) rotate(-12)">
+    <rect x="-155" y="-185" width="310" height="370" rx="12" fill="#0c2334" stroke="#557d8a" stroke-width="8"/>
+    <path d="M-147-147H147M-147-75H147M-147 0H147M-147 75H147M-147 147H147" stroke="#31575e" stroke-width="35"/>
+    <path d="M-147 0H147" stroke="#81b1ae" stroke-width="2"/>
+    <circle r="43" fill="none" stroke="#81b1ae" stroke-width="2"/>
+    <path d="M-54-180v-24H54v24" fill="none" stroke="#ffab8d" stroke-width="8"/>
+    <path d="M-54 180v24H54v-24" fill="none" stroke="#72e0fb" stroke-width="8"/>
+    <g transform="translate(20 -88)"><circle cy="9" r="27" fill="#071725"/><circle r="25" fill="#ff967b"/><rect x="-21" y="-20" width="42" height="24" rx="7" fill="#1a3444"/><path d="M-12-9h8M5-9h8" stroke="#eef8ed" stroke-width="4"/></g>
+    <g transform="translate(-30 95)"><circle cy="9" r="27" fill="#071725"/><circle r="25" fill="#53dafa"/><rect x="-21" y="-20" width="42" height="24" rx="7" fill="#1a3444"/><path d="M-12-9h8M5-9h8" stroke="#eef8ed" stroke-width="4"/></g>
+    <circle cx="8" cy="21" r="17" fill="#ffedbe" stroke="#415b64" stroke-width="3"/>
+    <path d="M-18 60L0 43" stroke="#72e0fb" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <text x="30" y="42" fill="#b7ede4" font-family="system-ui,sans-serif" font-size="12" font-weight="700" letter-spacing="3">LOCAL AI DUEL</text>
+</svg>

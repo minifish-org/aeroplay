@@ -1,6 +1,7 @@
 import {
   Camera,
   PerspectiveCamera,
+  OrthographicCamera,
   Color,
   DirectionalLight,
   HemisphereLight,
@@ -50,12 +51,22 @@ export function createStage(
   scene.add(sun);
   host.append(canvas);
   let disposed = false;
+  const orthoWidth = camera instanceof OrthographicCamera ? camera.right - camera.left : 0;
+  const orthoHeight = camera instanceof OrthographicCamera ? camera.top - camera.bottom : 0;
   const resize = () => {
     if (disposed) return;
     const { width, height } = host.getBoundingClientRect();
     renderer.setSize(Math.max(1, width), Math.max(1, height), false);
     if (camera instanceof PerspectiveCamera) {
       camera.aspect = width / Math.max(height, 1);
+      camera.updateProjectionMatrix();
+    } else if (camera instanceof OrthographicCamera) {
+      const aspect = Math.max(1, width) / Math.max(height, 1);
+      const worldHeight = Math.max(orthoHeight, orthoWidth / aspect);
+      camera.top = worldHeight / 2;
+      camera.bottom = -worldHeight / 2;
+      camera.left = -worldHeight * aspect / 2;
+      camera.right = worldHeight * aspect / 2;
       camera.updateProjectionMatrix();
     }
     renderer.render(scene, camera);

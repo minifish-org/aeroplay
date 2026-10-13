@@ -19,7 +19,7 @@ for (const name of ["chromium", "webkit"]) {
   try {
     await page.goto(base);
     await page.waitForSelector(".hub-card");
-    assert.equal(await page.locator(".hub-card").count(), 10);
+    assert.equal(await page.locator(".hub-card").count(), 11);
     const violation = await page.evaluate(
       (url) =>
         new Promise((resolve) => {
