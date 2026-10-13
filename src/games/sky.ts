@@ -42,7 +42,7 @@ const sky: GameModule = {
   mount(root, goBack, player) {
     const storage = namespace('sky');
     const { area } = createGameShell(root, 'Sky Rush', goBack);
-    area.closest('.game-shell')!.classList.add('immersive-shell');
+    area.closest('.game-shell')!.classList.add('immersive-shell', 'sky-shell');
     const view = document.createElement('div');
     view.className = 'three-view sky-view';
     area.append(view);

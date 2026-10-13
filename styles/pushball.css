@@ -41,3 +41,10 @@
   .pushball-controls { padding-left: 22px; padding-right: 22px; }
   .pushball-panel { padding: 18px; }
 }
+
+/* Laptop and desktop. */
+@media (min-width: 1000px) {
+  .pushball-shell {
+    max-width: 1240px;
+  }
+}

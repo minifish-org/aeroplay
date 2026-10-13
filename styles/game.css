@@ -749,3 +749,328 @@
     min-height: 290px;
   }
 }
+
+/* Shared side column: readouts, messages and controls live here. */
+.game-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* --- Laptop and desktop: board left, everything else beside it --- */
+@media (min-width: 1000px) {
+  .game-shell {
+    max-width: 1240px;
+  }
+  .game-area {
+    display: grid;
+    grid-template-columns: auto minmax(220px, 300px);
+    justify-content: center;
+    column-gap: 20px;
+    align-items: start;
+    padding: 18px;
+  }
+  .game-area > canvas,
+  .game-area > .pixi-board,
+  .game-area > .three-view {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .game-area > *:not(canvas):not(.pixi-board):not(.three-view) {
+    grid-column: 2;
+    margin-bottom: 12px;
+  }
+  .game-side {
+    grid-column: 2;
+    grid-row: 1;
+    max-height: min(760px, calc(100svh - 200px));
+    overflow-y: auto;
+    margin-bottom: 0;
+  }
+  .game-canvas {
+    width: auto !important;
+    height: min(760px, calc(100svh - 200px)) !important;
+    max-width: 100%;
+    aspect-ratio: 1;
+    margin: 0;
+  }
+  .flappy-canvas {
+    aspect-ratio: 3 / 4;
+  }
+  .tetris-canvas {
+    aspect-ratio: 1 / 2;
+  }
+  .info-row {
+    font-size: 13px;
+  }
+  .game-message {
+    font-size: 13px;
+  }
+  .touch-btn,
+  .sudoku-btn,
+  .sudoku-action {
+    font-size: 14px;
+  }
+  .control-grid {
+    width: 170px;
+    grid-template-rows: repeat(3, 46px);
+    align-self: start;
+  }
+  .control-row {
+    justify-content: start;
+  }
+  .tetris-previews {
+    padding: 8px;
+  }
+}
+
+/* Immersive scenes on a laptop. */
+@media (min-width: 1000px) {
+  .sky-shell .game-area {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+  }
+  .sky-shell .sky-view {
+    height: min(60svh, 600px);
+  }
+  .sky-shell .game-side {
+    max-height: none;
+    overflow: visible;
+  }
+  .cargo-shell .game-area,
+  .pushball-shell .game-area {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 26%);
+    column-gap: 20px;
+    align-items: start;
+    padding: 0;
+  }
+  .cargo-shell .cargo-view {
+    grid-column: 1;
+    grid-row: 1;
+    height: min(680px, calc(100svh - 180px));
+    aspect-ratio: 1.2;
+    min-height: 0;
+    max-height: none;
+  }
+  .cargo-shell .game-side,
+  .pushball-shell .game-side {
+    grid-column: 2;
+    grid-row: 1;
+    max-height: min(680px, calc(100svh - 180px));
+  }
+  .cargo-shell .cargo-controls {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .pushball-shell .pushball-view {
+    grid-column: 1;
+    grid-row: 1;
+    height: min(680px, calc(100svh - 180px));
+  }
+  .pushball-shell .game-side {
+    gap: 8px;
+  }
+  .pushball-shell .pushball-controls {
+    flex-direction: column;
+    justify-content: center;
+    gap: 16px;
+    border-top: 0;
+    border-left: 1px solid #294453;
+  }
+}
+
+/* --- Landscape phone: the same split for a short viewport --- */
+@media (orientation: landscape) and (max-height: 560px) {
+  .game-shell {
+    max-width: none;
+    gap: 10px;
+  }
+  .game-bar {
+    gap: 10px;
+  }
+  .back-btn {
+    min-height: 36px;
+    padding: 6px 12px;
+  }
+  .game-title {
+    font-size: 17px;
+  }
+  .game-area {
+    display: grid;
+    grid-template-columns: auto minmax(170px, 330px);
+    justify-content: center;
+    column-gap: 14px;
+    align-items: start;
+    padding: 10px;
+  }
+  .game-area > canvas,
+  .game-area > .pixi-board,
+  .game-area > .three-view {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .game-area > *:not(canvas):not(.pixi-board):not(.three-view) {
+    grid-column: 2;
+    margin-bottom: 8px;
+  }
+  .game-side {
+    grid-column: 2;
+    grid-row: 1;
+    gap: 8px;
+    max-height: min(430px, calc(100svh - 156px));
+    overflow-y: auto;
+    margin-bottom: 0;
+  }
+  .game-message {
+    min-height: 0;
+    padding: 8px 10px;
+  }
+  .game-canvas {
+    width: auto !important;
+    height: min(430px, calc(100svh - 176px)) !important;
+    max-width: 100%;
+    aspect-ratio: 1;
+    margin: 0;
+  }
+  .flappy-canvas {
+    aspect-ratio: 3 / 4;
+  }
+  .tetris-canvas {
+    aspect-ratio: 1 / 2;
+  }
+  .control-grid {
+    width: 148px;
+    grid-template-rows: repeat(3, 40px);
+    align-self: start;
+  }
+  .control-row {
+    justify-content: start;
+  }
+  .tetris-previews {
+    padding: 6px;
+  }
+  .sky-shell .sky-view {
+    height: min(430px, calc(100svh - 140px));
+    min-height: 0;
+  }
+  .flight-controls {
+    padding: 8px 12px 4px;
+  }
+  .flight-controls .touch-btn {
+    min-height: 44px;
+  }
+  .flight-utility .touch-btn {
+    min-height: 30px;
+  }
+  .three-instruction {
+    padding: 2px 12px 8px;
+  }
+  .cargo-shell .game-area,
+  .pushball-shell .game-area {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(190px, 38%);
+    column-gap: 10px;
+    align-items: start;
+    padding: 0;
+  }
+  .cargo-shell .cargo-view {
+    grid-column: 1;
+    grid-row: 1;
+    height: min(430px, calc(100svh - 136px));
+    aspect-ratio: 1;
+    min-height: 0;
+    max-height: none;
+  }
+  .cargo-shell .game-side,
+  .pushball-shell .game-side {
+    grid-column: 2;
+    grid-row: 1;
+    max-height: min(430px, calc(100svh - 136px));
+  }
+  .cargo-shell .cargo-controls {
+    flex-direction: row;
+    gap: 8px;
+    padding: 0;
+  }
+  .cargo-shell .control-grid {
+    width: 132px;
+    grid-template-rows: repeat(3, 38px);
+  }
+  .cargo-shell .three-instruction {
+    display: none;
+  }
+  .cargo-header {
+    padding: 8px 4px;
+  }
+  .level-select {
+    font-size: 14px;
+  }
+  .cargo-status {
+    min-height: 0;
+    padding: 0 4px 6px;
+    font-size: 11px;
+  }
+  .pushball-shell .pushball-view {
+    grid-column: 1;
+    grid-row: 1;
+    height: min(430px, calc(100svh - 136px));
+  }
+  .pushball-shell .game-side {
+    gap: 6px;
+  }
+  .pushball-shell .pushball-controls {
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    border-top: 0;
+    border-left: 1px solid #294453;
+    padding: 8px 10px;
+  }
+  .pushball-shell .pushball-stick {
+    width: 84px;
+    height: 84px;
+  }
+  .pushball-shell .pushball-stick-knob {
+    width: 32px;
+    height: 32px;
+    left: calc(50% - 16px);
+    top: calc(50% - 16px);
+  }
+  .pushball-shell .pushball-dash {
+    width: 70px;
+    height: 70px;
+  }
+  .pushball-shell .pushball-ai,
+  .pushball-shell .pushball-instructions {
+    display: none;
+  }
+  .pushball-utility {
+    padding: 4px 10px;
+  }
+  .three-panel {
+    padding: 18px;
+  }
+  .three-panel h2 {
+    font-size: clamp(22px, 3.2vw, 30px);
+  }
+}
+
+/* Portrait phones: trim the tallest boards so nothing scrolls. */
+@media (orientation: portrait) and (max-width: 480px) {
+  .sky-view {
+    height: min(58svh, 520px);
+  }
+  .cargo-view {
+    aspect-ratio: 1.15;
+    min-height: 250px;
+  }
+  .pushball-view {
+    height: clamp(270px, calc(100svh - 500px), 500px);
+  }
+  .pushball-instructions {
+    display: none;
+  }
+}

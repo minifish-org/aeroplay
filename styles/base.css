@@ -25,7 +25,7 @@ body {
   padding: max(24px, env(safe-area-inset-top))
     max(20px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom))
     max(20px, env(safe-area-inset-left));
-  max-width: 1080px;
+  max-width: 1280px;
   margin: auto;
   min-height: 100svh;
 }
@@ -49,8 +49,9 @@ button:active:not(:disabled) {
 }
 @media (max-width: 480px) {
   #app {
-    padding: max(14px, env(safe-area-inset-top)) 12px
-      max(20px, env(safe-area-inset-bottom));
+    padding: max(14px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -59,5 +60,14 @@ button:active:not(:disabled) {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Landscape phones: keep the notch clear and trim vertical chrome. */
+@media (orientation: landscape) and (max-height: 560px) {
+  #app {
+    padding: max(8px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
   }
 }

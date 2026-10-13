@@ -139,6 +139,21 @@ function renderHub() {
   show('All games');
 }
 
+/** Board stays on the left; readouts and controls stack beside it. */
+function mountGameSide(root: HTMLElement) {
+  const area = root.querySelector<HTMLElement>('.game-area');
+  const visual = area?.querySelector<HTMLElement>(
+    ':scope > canvas, :scope > .pixi-board, :scope > .three-view, :scope > .pushball-view'
+  );
+  if (!area || !visual) return;
+  const side = document.createElement('div');
+  side.className = 'game-side';
+  Array.from(area.children).forEach((child) => {
+    if (child !== visual) side.append(child);
+  });
+  area.append(side);
+}
+
 async function startGame(id: string, profile: PlayProfile = 'human') {
   const game = games.find((game) => game.id === id);
   if (!game) return;
@@ -159,6 +174,7 @@ async function startGame(id: string, profile: PlayProfile = 'human') {
     const gameTeardown = module.default.mount(app, () => {
       location.hash = 'hub';
     }, player);
+    mountGameSide(app);
     const controls = game.playMode === 'versus-ai' ? { dispose() {} }
       : mountPlayerControls(app, player, (next) => { void startGame(id, next); });
     teardown = () => {

@@ -124,3 +124,64 @@
     transition: none;
   }
 }
+
+/* Shared board sizing for wide and landscape viewports. */
+@media (min-width: 1000px) {
+  .pixi-board {
+    width: auto;
+    height: min(760px, calc(100svh - 200px));
+    max-width: 100%;
+    aspect-ratio: 1;
+    margin: 0;
+  }
+  .pixi-sudoku,
+  .pixi-lights {
+    max-width: 100%;
+  }
+  .game-canvas[data-renderer='pixi'] {
+    width: auto !important;
+    height: min(760px, calc(100svh - 200px)) !important;
+    max-width: 100%;
+    aspect-ratio: 1;
+    margin: 0;
+  }
+  .flappy-canvas[data-renderer='pixi'] {
+    aspect-ratio: 3 / 4;
+  }
+  .tetris-canvas[data-renderer='pixi'] {
+    aspect-ratio: 1 / 2;
+  }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .pixi-board {
+    width: auto;
+    height: min(430px, calc(100svh - 176px));
+    max-width: 100%;
+    aspect-ratio: 1;
+    margin: 0;
+  }
+  .pixi-sudoku,
+  .pixi-lights {
+    max-width: 100%;
+  }
+  .game-canvas[data-renderer='pixi'] {
+    width: auto !important;
+    height: min(430px, calc(100svh - 176px)) !important;
+    max-width: 100%;
+    aspect-ratio: 1;
+    margin: 0;
+  }
+  .flappy-canvas[data-renderer='pixi'] {
+    aspect-ratio: 3 / 4;
+  }
+  .tetris-canvas[data-renderer='pixi'] {
+    aspect-ratio: 1 / 2;
+  }
+}
+
+/* Portrait phone: the Tetris well is the tallest board, so cap it by height. */
+@media (orientation: portrait) and (max-width: 480px) {
+  .tetris-canvas[data-renderer='pixi'] {
+    max-width: min(232px, calc((100svh - 470px) * 0.5));
+  }
+}

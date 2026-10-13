@@ -54,6 +54,8 @@ Run `node scripts/verify-pixi.mjs` to verify visible rendering after native inpu
 
 Run `node scripts/verify-motion.mjs` with the same browser and server overrides to inspect intermediate animation frames for all eight 2D games. It verifies action ordering, visible positions and fades, rapid input, undo, paused gravity, real animation-frame completion and reduced motion, and saves screenshots with their visual state to `output/motion-*`.
 
+Run `node scripts/verify-layout.mjs` to check the laptop, phone-portrait and phone-landscape grids: every game has to fit its viewport without scrolling or horizontal overflow, and screenshots land in `output/layout-*`.
+
 Run `node scripts/verify-offline.mjs` against `npm run preview` to verify production precaching, offline reload, all eleven game mounts, and touch swipes. It uses the same Playwright environment overrides, including `TEST_BROWSER=webkit`. The WebKit check installs an isolated preview and then stops the server to verify cached reload and play without Playwright's service-worker offline override.
 
 Run `TEST_PAGES_REDIRECTS=1 node scripts/verify-offline.mjs` after building to start an isolated preview with Cloudflare Pages-style `/index.html` redirects and verify both online and offline reloads. The service worker uses the canonical `/` response for navigation; caching a redirected HTML response breaks browser reloads on Pages.

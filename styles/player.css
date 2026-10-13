@@ -44,3 +44,26 @@
 @media (pointer: coarse) {
   .player-mode-picker button, .player-settings-button, .player-close { min-height: 44px; }
 }
+
+/* Landscape phone: the player bar shares the short viewport with the game. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .player-mode-bar {
+    gap: 8px;
+  }
+  .player-mode-picker button {
+    min-height: 34px;
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+  .player-availability {
+    font-size: 10px;
+  }
+  .player-session {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .player-session-actions .touch-btn {
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+}
