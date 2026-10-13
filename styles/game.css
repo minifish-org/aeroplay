@@ -773,11 +773,12 @@
   }
   .game-area > canvas,
   .game-area > .pixi-board,
-  .game-area > .three-view {
+  .game-area > .three-view,
+  .game-area > .pushball-view {
     grid-column: 1;
     grid-row: 1;
   }
-  .game-area > *:not(canvas):not(.pixi-board):not(.three-view) {
+  .game-area > *:not(canvas):not(.pixi-board):not(.three-view):not(.pushball-view) {
     grid-column: 2;
     margin-bottom: 12px;
   }
@@ -868,7 +869,9 @@
   .pushball-shell .pushball-view {
     grid-column: 1;
     grid-row: 1;
+    width: min(100%, 560px);
     height: min(680px, calc(100svh - 180px));
+    margin: 0 auto;
   }
   .pushball-shell .game-side {
     gap: 8px;
@@ -908,11 +911,12 @@
   }
   .game-area > canvas,
   .game-area > .pixi-board,
-  .game-area > .three-view {
+  .game-area > .three-view,
+  .game-area > .pushball-view {
     grid-column: 1;
     grid-row: 1;
   }
-  .game-area > *:not(canvas):not(.pixi-board):not(.three-view) {
+  .game-area > *:not(canvas):not(.pixi-board):not(.three-view):not(.pushball-view) {
     grid-column: 2;
     margin-bottom: 8px;
   }

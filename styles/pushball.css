@@ -48,3 +48,91 @@
     max-width: 1240px;
   }
 }
+
+/* Landscape phone: the whole match has to live in ~258px of height. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .pushball-shell .pushball-shell .game-side {
+    gap: 4px;
+  }
+  .pushball-shell .pushball-hud {
+    padding: 4px 10px;
+  }
+  .pushball-shell .pushball-team strong {
+    font-size: 20px;
+    line-height: 1.1;
+  }
+  .pushball-shell .pushball-team span {
+    font-size: 8px;
+  }
+  .pushball-shell .pushball-match-label {
+    font-size: 9px;
+  }
+  .pushball-shell .pushball-match-label span {
+    display: none;
+  }
+  .pushball-shell .pushball-controls {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    gap: 10px;
+    border-left: 0;
+    padding: 4px 8px;
+  }
+  .pushball-shell .pushball-movement {
+    gap: 2px;
+  }
+  .pushball-shell .pushball-movement > span {
+    font-size: 7px;
+  }
+  .pushball-shell .pushball-stick {
+    width: 68px;
+    height: 68px;
+  }
+  .pushball-shell .pushball-stick-cross {
+    font-size: 60px;
+  }
+  .pushball-shell .pushball-stick-knob {
+    width: 26px;
+    height: 26px;
+    left: calc(50% - 13px);
+    top: calc(50% - 13px);
+  }
+  .pushball-shell .pushball-dash {
+    width: 62px;
+    height: 62px;
+    border-width: 2px;
+  }
+  .pushball-shell .pushball-dash strong {
+    font-size: 11px;
+  }
+  .pushball-shell .pushball-dash span {
+    font-size: 9px;
+    margin-top: 2px;
+  }
+  .pushball-shell .pushball-utility {
+    padding: 2px 8px;
+  }
+  .pushball-shell .pushball-utility .touch-btn {
+    min-height: 30px;
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+  .pushball-shell .pushball-panel {
+    padding: 12px;
+  }
+  .pushball-shell .pushball-panel h2 {
+    font-size: 18px;
+    letter-spacing: -0.4px;
+    margin: 6px 0;
+  }
+  .pushball-shell .pushball-panel p {
+    font-size: 11px;
+    line-height: 1.45;
+    margin-bottom: 10px;
+  }
+  .pushball-shell .pushball-panel-actions .touch-btn {
+    min-height: 36px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
