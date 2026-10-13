@@ -1,5 +1,3 @@
-export type SudokuMove = { index: number; value: number; candidates: number[] };
-
 /** Candidate digits use only the displayed board's row, column and box. */
 export function sudokuCandidates(board: number[], index: number) {
   const row = Math.floor(index / 9), col = index % 9;
@@ -45,28 +43,6 @@ export function solveVisibleSudoku(visible: number[], budget = 50000): number[] 
     return false;
   }
   return search() ? board : null;
-}
-
-export function sudokuLayaMoves(board: number[], givens: Set<number>): SudokuMove[] {
-  const empty = board.flatMap((value, index) => value ? [] : [{ index, digits: sudokuCandidates(board, index) }]);
-  const conflicts = board.flatMap((value, index) =>
-    value && !givens.has(index) && !sudokuCandidates(board, index).includes(value) ? [index] : []);
-  const repair = () => (conflicts.length ? conflicts : board.flatMap((value, index) => value && !givens.has(index) ? [index] : []))
-    .slice(-16).map((index) => ({ index, value: 0, candidates: [] }));
-  if (conflicts.length || empty.some((cell) => !cell.digits.length)) return repair();
-  const forced = empty.filter((cell) => cell.digits.length === 1);
-  if (forced.length) return forced.slice(0, 16).map((cell) => ({ index: cell.index, value: cell.digits[0], candidates: cell.digits }));
-  const cell = empty.sort((a, b) => a.digits.length - b.digits.length)[0];
-  if (!cell) return [];
-  // On a branch, advertise only digits that admit a visible-board completion.
-  const checked = cell.digits.filter((value) => {
-    const next = [...board];
-    next[cell.index] = value;
-    return solveVisibleSudoku(next) !== null;
-  });
-  return checked.length
-    ? checked.map((value) => ({ index: cell.index, value, candidates: cell.digits }))
-    : repair();
 }
 
 export type CargoPushPlan = {

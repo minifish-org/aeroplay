@@ -10,11 +10,11 @@ export function mountPlayerControls(root: HTMLElement, player: Player, replaceRu
   const settings = createAISettingsButton();
   shell.querySelector('.game-bar')!.append(settings.button);
   const bar = document.createElement('div');
-  bar.className = 'laya-mode-bar';
-  bar.innerHTML = '<div class="laya-mode-picker" role="group" aria-label="Player"><button type="button" class="player-human">Play yourself</button><button type="button" class="player-watch">Watch TAMEV</button></div><span class="player-availability"></span>';
+  bar.className = 'player-mode-bar';
+  bar.innerHTML = '<div class="player-mode-picker" role="group" aria-label="Player"><button type="button" class="player-human">Play yourself</button><button type="button" class="player-watch">Watch TAMEV</button></div><span class="player-availability"></span>';
   const panel = document.createElement('div');
-  panel.className = 'laya-session';
-  panel.innerHTML = '<div class="laya-session-copy" role="status" aria-live="polite"><strong></strong><span></span></div><div class="laya-session-actions"><button type="button" class="touch-btn player-pause">Pause</button><button type="button" class="touch-btn player-retry">Retry AI</button><button type="button" class="touch-btn player-takeover">Take over →</button><button type="button" class="touch-btn player-again">Watch again</button></div>';
+  panel.className = 'player-session';
+  panel.innerHTML = '<div class="player-session-copy" role="status" aria-live="polite"><strong></strong><span></span></div><div class="player-session-actions"><button type="button" class="touch-btn player-pause">Pause</button><button type="button" class="touch-btn player-retry">Retry AI</button><button type="button" class="touch-btn player-takeover">Take over →</button><button type="button" class="touch-btn player-again">Watch again</button></div>';
   shell.insertBefore(bar, area); shell.append(panel);
   const human = bar.querySelector<HTMLButtonElement>('.player-human')!;
   const watch = bar.querySelector<HTMLButtonElement>('.player-watch')!;
@@ -38,7 +38,7 @@ export function mountPlayerControls(root: HTMLElement, player: Player, replaceRu
     retry.hidden = !ai || !player.error || player.status === 'finished';
     takeover.hidden = !ai; again.hidden = !ai || player.status !== 'finished';
     panel.querySelector('strong')!.textContent = !ai ? 'You have the controls.' : player.status === 'finished' ? 'This round has finished.' : player.status === 'paused' ? 'Game paused.' : 'TAMEV has the controls.';
-    panel.querySelector('.laya-session-copy span')!.textContent = !ai ? 'This AI run stays separate from your personal records.' : player.error ? `${player.error} The game keeps running. You can take over.` : 'AI plans ahead from visible state and uses one normal control at a time. You can take over.';
+    panel.querySelector('.player-session-copy span')!.textContent = !ai ? 'This AI run stays separate from your personal records.' : player.error ? `${player.error} The game keeps running. You can take over.` : 'AI plans ahead from visible state and uses one normal control at a time. You can take over.';
   }
   human.addEventListener('click', () => { if (player.type !== 'human' || player.hasUsedAI) replaceRun('human'); });
   watch.addEventListener('click', () => { if (player.type !== 'ai') player.watchAI(); });
@@ -49,7 +49,7 @@ export function mountPlayerControls(root: HTMLElement, player: Player, replaceRu
   const off = player.subscribe(update);
   const key = (event: KeyboardEvent) => {
     if (player.type !== 'ai' || (event.target instanceof HTMLElement && event.target.closest('dialog,input,textarea,select'))) return;
-    if (event.target instanceof HTMLElement && event.target.closest('.game-bar button,.laya-mode-bar button,.laya-session button') && [' ', 'Enter'].includes(event.key)) { event.stopImmediatePropagation(); return; }
+    if (event.target instanceof HTMLElement && event.target.closest('.game-bar button,.player-mode-bar button,.player-session button') && [' ', 'Enter'].includes(event.key)) { event.stopImmediatePropagation(); return; }
     if (event.key.startsWith('Arrow') || [' ', 'Enter', 'p', 'P', 'c', 'C', 'z', 'Z', 'n', 'N', 'a', 'd', 'w', 's'].includes(event.key) || /^[1-9]$/.test(event.key)) { event.preventDefault(); event.stopImmediatePropagation(); }
   };
   window.addEventListener('keydown', key, true);

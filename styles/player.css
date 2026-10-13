@@ -1,0 +1,46 @@
+.player-settings-button {
+  margin-left: auto;
+  background: #1b3045;
+  color: #c7d8e6;
+  border: 1px solid #334c60;
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.player-settings-button[data-connection='ready'] { color: #adebd3; border-color: #527b72; }
+.hub-tools { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: end; }
+.player-mode-bar { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+.player-mode-picker { display: flex; padding: 4px; border-radius: 12px; background: #132438; border: 1px solid #2a4056; }
+.player-mode-picker button { min-height: 40px; border: 0; background: transparent; color: #a9bdcb; padding: 8px 12px; border-radius: 8px; font: inherit; font-size: 12px; }
+.player-mode-picker button[aria-pressed='true'] { background: #244b42; color: #adebd3; }
+.player-mode-picker button:disabled { opacity: .5; }
+.player-availability { color: #a9bdcb; font-size: 11px; line-height: 1.5; }
+.player-session { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px; background: #152d3b; border: 1px solid #35584d; border-radius: 13px; }
+.player-session[hidden], .player-session-actions button[hidden] { display: none; }
+.player-session-copy { flex: 1 1 180px; }
+.player-session-copy strong { display: block; font-size: 13px; color: #d6f1e4; }
+.player-session-copy span { display: block; margin-top: 5px; color: #a9bdcb; font-size: 11px; line-height: 1.6; }
+.player-session-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+.player-session-actions .touch-btn { font-size: 11px; padding: 8px 10px; }
+.player-takeover { background: #adebd3; border-color: #adebd3; color: #17342e; }
+.player-settings-dialog { width: min(520px, calc(100% - 28px)); max-width: 520px; background: #152537; color: #e9f1f8; border: 1px solid #527b72; border-radius: 18px; padding: 22px; }
+.player-settings-dialog::backdrop { background: #06111fbb; }
+.player-settings-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; margin-bottom: 21px; }
+.player-settings-head h2 { font-size: 20px; margin: 0; }
+.player-close { background: #284359; color: #d5e3ec; border: 0; border-radius: 8px; width: 36px; min-height: 36px; font-size: 22px; }
+.player-settings-actions { display: flex; gap: 9px; justify-content: end; margin-top: 13px; }
+@media (max-width: 480px) {
+  .hub-tools { gap: 7px; }
+  .hub-tools .offline-badge { font-size: 10px; }
+  .game-bar { flex-wrap: wrap; gap: 10px; }
+  .game-title { font-size: 18px; }
+  .game-bar .player-settings-button { font-size: 11px; padding: 7px 9px; }
+  .player-session-actions { width: 100%; justify-content: end; }
+  .player-settings-dialog { padding: 18px; }
+  .player-settings-actions .touch-btn { padding: 9px 10px; font-size: 12px; }
+}
+@media (pointer: coarse) {
+  .player-mode-picker button, .player-settings-button, .player-close { min-height: 44px; }
+}

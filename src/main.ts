@@ -9,7 +9,7 @@ import {
 import { createAISettingsButton } from './core/ai-settings';
 import { mountPlayerControls } from './core/player-controls';
 import { Player, HumanPlayer, TamevPlayer } from './core/player';
-import '../styles/laya.css';
+import '../styles/player.css';
 import '../styles/pixi.css';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;

@@ -3,7 +3,7 @@ import { SudokuView } from './views/puzzles';
 import { createGameShell, createTouchButton } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
-import { sudokuCandidates } from './laya-puzzles';
+import { sudokuCandidates } from './puzzleSolvers';
 
 type Board = number[];
 

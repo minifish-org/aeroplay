@@ -2,7 +2,7 @@
 
 AGENT: FlightMode Games Project
 
-This project builds an offline-first frontend game collection optimized for iPhone flight-mode usage, using HTML, TypeScript, CSS, and locally bundled game libraries such as Three.js. All games share a unified Game Hub UI. Optional Laya watch mode uses a separately configured decision service; personal gameplay and game assets remain fully offline.
+This project builds an offline-first frontend game collection optimized for iPhone flight-mode usage, using HTML, TypeScript, CSS, and locally bundled game libraries such as Three.js. All games share a unified Game Hub UI. The optional AI watch mode runs TAMEV entirely on the device; personal gameplay and game assets remain fully offline.
 
 Goal: produce a lightweight, responsive, mobile-friendly experience that runs entirely offline and can be added to Home Screen.
 
@@ -66,7 +66,7 @@ Additional Requirements
 - Unified Game Hub with responsive grid of icons
 - Each game runs in its own page or dynamically loaded view
 - Mobile touch controls required
-- All game assets local, no network dependency for personal gameplay; optional Laya mode connects only after a service is configured.
+- All game assets local, no network dependency for personal gameplay; the optional AI player runs on-device only.
 - Use localStorage for save data
 - Optional: PWA support (service worker + manifest)
 
@@ -138,7 +138,7 @@ In-Game Layout
 General
 - Use TypeScript
 - Use PixiJS for 2D presentation and Three.js for the two 3D games
-- Keep gameplay, native input, storage and Laya adapters separate from renderer classes
+- Keep gameplay, native input, storage and AI adapters separate from renderer classes
 - Reuse one Pixi renderer across 2D scenes; destroy each scene's textures, filters and listeners on navigation
 - Keep particles bounded, stop idle rendering, and respect reduced-motion preferences
 - Load game modules on demand and bundle all dependencies locally
@@ -224,7 +224,7 @@ Output must run 100% offline.
 - Minimize DOM reflow
 - Prefer Canvas for animations
 - Cap FPS if needed
-- No runtime network usage for an unconfigured installation. Configured Laya mode may check service health and request decisions; never add an external dependency to personal gameplay.
+- No runtime network usage. The on-device AI player uses bundled local resources only; never add an external dependency to personal gameplay.
 
 ----------------------------------------------------------------
 
@@ -256,7 +256,7 @@ Test on:
 Project is complete when:
 - All 10 games are playable offline
 - Hub UI loads each game
-- No external requests without an explicitly configured Laya service
+- No external requests at runtime; every asset, model and script is served from the same origin
 - Saves stored locally
 - Touch controls fully functional
 - Build outputs static files runnable anywhere

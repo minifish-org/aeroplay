@@ -5,7 +5,7 @@ import { applyToggle, solveLights } from '../games/lightsLogic';
 import { preview2048Move } from '../games/mergeLogic';
 import { moveCargo } from '../games/cargo/model';
 import { solveCargo } from '../games/cargo/solver';
-import { cargoPushPlans, sudokuCandidates, solveVisibleSudoku } from '../games/laya-puzzles';
+import { cargoPushPlans, sudokuCandidates, solveVisibleSudoku } from '../games/puzzleSolvers';
 import { planningSignature, type InputPlan, type PlannedInput, type PlanningState, type Point } from './ai-planning-state';
 
 type State<G extends PlanningState['game']> = Extract<PlanningState, { game: G }>;

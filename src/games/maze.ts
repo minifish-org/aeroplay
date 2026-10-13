@@ -252,24 +252,6 @@ const maze: GameModule = {
   }
 };
 
-/** Route steps exclude the player cell; entering the exit ends the round. */
-export function mazeLayaTargets(
-  stars: Point[],
-  exit: Point,
-  routeTo: (target: Point) => Point[]
-) {
-  const candidates = stars
-    .map((target) => ({ target, way: routeTo(target), kind: 'star' as const }))
-    .filter(
-      (candidate) =>
-        candidate.way.length > 0 &&
-        !candidate.way.some((point) => point.x === exit.x && point.y === exit.y)
-    );
-  if (candidates.length) return candidates;
-  const way = routeTo(exit);
-  return way.length ? [{ target: exit, way, kind: 'exit' as const }] : [];
-}
-
 function generateMaze(size: number): Cell[][] {
   const COLS = size,
     ROWS = size;

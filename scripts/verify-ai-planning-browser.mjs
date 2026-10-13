@@ -15,7 +15,7 @@ try {
   await page.evaluate(async () => { const { prepareTamev } = await import('/src/core/ai-model.ts'); await prepareTamev(); });
   await page.click('.player-watch');
   await page.waitForTimeout(4500);
-  const result = await page.evaluate(() => ({ state: JSON.parse(window.render_game_to_text()), decisions: Number(document.querySelector('.game-shell').dataset.playerDecisions), discarded: Number(document.querySelector('.game-shell').dataset.playerDiscarded), panel: document.querySelector('.laya-session').textContent }));
+  const result = await page.evaluate(() => ({ state: JSON.parse(window.render_game_to_text()), decisions: Number(document.querySelector('.game-shell').dataset.playerDecisions), discarded: Number(document.querySelector('.game-shell').dataset.playerDiscarded), panel: document.querySelector('.player-session').textContent }));
   await page.screenshot({ path: 'output/ai-planning/flappy.png' });
   await writeFile('output/ai-planning/flappy.json', JSON.stringify({ ...result, errors }, null, 2));
   assert.deepEqual(errors, []);

@@ -107,7 +107,7 @@
 .hub-card[data-game='tetris'] .card-preview {
   object-position: center bottom;
 }
-.hub-tools .laya-settings-button {
+.hub-tools .player-settings-button {
   color: #edf5ff;
   border-color: #527291;
   background: #20384f;
