@@ -21,13 +21,14 @@ export class Stage {
   private tweens: Tween[] = []; private particles: { mesh: Mesh; velocity: Vector3; life: number }[] = [];
   private world = {width:8,height:8}; private preset: Preset = 'board'; private frames = 0; private mounts = 0; private lost = false;
   private grid: { cols:number; rows:number; width:number; height:number } | null = null;
+  private size={width:0,height:0};
   readonly lights = new Group();
   constructor() {
     this.renderer = new WebGLRenderer({ antialias:true, alpha:false, preserveDrawingBuffer:true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,2)); this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.toneMapping = ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.12;
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = PCFSoftShadowMap;
-    this.renderer.domElement.dataset.renderer = 'three'; this.renderer.domElement.setAttribute('aria-label','Game scene');
+    this.renderer.domElement.dataset.renderer = 'three'; this.renderer.domElement.setAttribute('aria-label','Game scene'); this.renderer.domElement.tabIndex=0;
     for(const [color,intensity,x,y,z] of [[0xfff0db,3.1,5,9,12],[0xd0e9ff,1.6,-7,4,8],[0xcdf6eb,2.1,0,-5,6]]) {
       const light = new DirectionalLight(color,intensity); light.position.set(x,y,z);
       if(!this.lights.children.length) { light.castShadow = true; light.shadow.mapSize.set(1024,1024); light.shadow.camera.left=-20; light.shadow.camera.right=20; light.shadow.camera.top=20; light.shadow.camera.bottom=-20; light.shadow.bias=-.0004; light.shadow.normalBias=.04; }
@@ -35,7 +36,7 @@ export class Stage {
     }
     this.scene.add(this.content,this.lights);
     this.observer = new ResizeObserver(() => { this.resize(); this.render(); });
-    this.renderer.domElement.addEventListener('webglcontextlost',event => { event.preventDefault(); this.lost=true; this.host?.dispatchEvent(new Event('stage-lost')); });
+    this.renderer.domElement.addEventListener('webglcontextlost',event => { event.preventDefault(); this.lost=true; this.releaseGPU(); this.host?.dispatchEvent(new Event('stage-lost')); });
     this.renderer.domElement.addEventListener('webglcontextrestored',() => { this.lost=false; this.resize(); this.render(); this.host?.dispatchEvent(new Event('stage-restored')); });
   }
   mount(host:HTMLElement, play:HTMLElement, preset:Preset='board', width=8, height=8, background=0x20374b) {
@@ -54,7 +55,9 @@ export class Stage {
   resize() {
     if(!this.host || !this.play) return;
     const h=this.host.getBoundingClientRect(),p=this.viewport(),aspect=p.width/Math.max(1,p.height);
-    this.renderer.setSize(Math.max(1,h.width),Math.max(1,h.height),false);
+    if(this.size.width!==h.width||this.size.height!==h.height) {
+      this.size={width:h.width,height:h.height};this.renderer.setSize(Math.max(1,h.width),Math.max(1,h.height),false);
+    }
     if(this.camera===this.ortho) {
       const height=Math.max(this.world.height,this.world.width/aspect); this.ortho.left=-height*aspect/2; this.ortho.right=height*aspect/2; this.ortho.top=height/2; this.ortho.bottom=-height/2;
     } else this.perspective.aspect=aspect;
@@ -142,10 +145,15 @@ export class Stage {
     if(grid&&this.preset==='board') {const a=this.project(-grid.width/2,grid.height/2),b=this.project(grid.width/2,-grid.height/2);boardBounds={x:a.x,y:a.y,width:b.x-a.x,height:b.y-a.y,cols:grid.cols,rows:grid.rows};}
     return {playBounds:bounds,boardBounds,picks,renderer:{mounts:this.mounts,frames:this.frames,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,drawCalls:this.renderer.info.render.calls,contexts:1,pixelRatio:this.renderer.getPixelRatio()},motion:{reduced:this.reducedMotion,tweens:this.tweens.length,particles:this.particles.length,maxParticles:48}};
   }
-  clear() {
-    this.observer?.disconnect(); const geometries=new Set<BufferGeometry>(this.geometry.values()),materials=new Set<Material>(this.materials.values());
+  private releaseGPU() {
+    // Release old context listeners before restoration; retain CPU shapes for upload.
+    const geometries=new Set<BufferGeometry>(this.geometry.values()),materials=new Set<Material>(this.materials.values());
     this.content.traverse(object=>{if(object instanceof Mesh){geometries.add(object.geometry);const list=Array.isArray(object.material)?object.material:[object.material];list.forEach(material=>materials.add(material));}});
     geometries.forEach(geometry=>geometry.dispose()); materials.forEach(material=>{const textured=material as MeshBasicMaterial; textured.map?.dispose(); material.dispose();});
+    this.lights.children.forEach(light=>{if(light instanceof DirectionalLight)light.shadow.map?.dispose();});
+  }
+  clear() {
+    this.observer?.disconnect(); this.releaseGPU();
     this.content.clear(); this.geometry.clear(); this.materials.clear(); this.tweens=[];this.particles=[];this.grid=null;this.host=null;this.play=null;
   }
 }

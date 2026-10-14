@@ -3,7 +3,8 @@ export function bindInput(host: HTMLElement, keyInput: (key: string) => unknown,
   pick: (x: number, y: number) => unknown, swipe = false) {
   let start: { x: number; y: number; id: number } | null = null;
   const down = (event: PointerEvent) => {
-    if(event.target instanceof HTMLElement && event.target.closest('button,select,input,.hud-panel')) return;
+    if(event.target instanceof Element && event.target.closest('button,select,input,.hud-panel,.hud-inputs')) return;
+    host.querySelector('canvas')?.focus({preventScroll:true});
     start = { x: event.clientX, y: event.clientY, id: event.pointerId }; host.setPointerCapture(event.pointerId);
   };
   const up = (event: PointerEvent) => {
@@ -14,7 +15,8 @@ export function bindInput(host: HTMLElement, keyInput: (key: string) => unknown,
   };
   const cancel = () => { start = null; };
   const key = (event: KeyboardEvent) => {
-    if(event.target instanceof HTMLElement && event.target.closest('button,select,input,textarea')) return;
+    if(event.target instanceof Element && event.target.closest('select,input,textarea')) return;
+    if(event.target instanceof Element && event.target.closest('button') && [' ', 'Enter'].includes(event.key)) return;
     const value = keyInput(event.key); if(value === undefined) return; event.preventDefault(); submit(value);
   };
   host.addEventListener('pointerdown',down); host.addEventListener('pointerup',up); host.addEventListener('pointercancel',cancel);
