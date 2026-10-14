@@ -1,6 +1,9 @@
-import type { GameContext } from "../../core/loop";
-export default function mount({stage,hud}:GameContext) {
-  stage.board(6,6);const tile=stage.tile(0,0,2,2,0x96d5b5);tile.rotation.z=.08;
-  const label=stage.label("Lights Out",3);label.position.set(0,-2,.3);stage.render();
-  hud.notice("Getting ready for your next round.");return ()=>{};
+import { mountRun, type GameContext } from '../../core/loop';
+import { createLightsOutModel } from './model';
+import { createView } from './view';
+import { createHUD } from './hud';
+export default function mount(context:GameContext) {
+  const {stage,hud,store}=context;stage.mount(hud.element,hud.playArea,'board',7,7,0x20374b);
+  const model=createLightsOutModel(store.load('state-v2',null)),render=createView(stage,model),refresh=createHUD(context,model);
+  return mountRun(context,{model,render,refresh,persist:()=>store.save('state-v2',model.saved())});
 }
