@@ -54,6 +54,8 @@ export class Stage {
   }
   resize() {
     if(!this.host || !this.play) return;
+    const wide=String(innerWidth>innerHeight&&Math.min(innerWidth,innerHeight)<=700);
+    if(this.host.dataset.wide!==wide)this.host.dataset.wide=wide;
     const h=this.host.getBoundingClientRect(),p=this.viewport(),aspect=p.width/Math.max(1,p.height);
     if(this.size.width!==h.width||this.size.height!==h.height) {
       this.size={width:h.width,height:h.height};this.renderer.setSize(Math.max(1,h.width),Math.max(1,h.height),false);
