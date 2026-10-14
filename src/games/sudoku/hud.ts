@@ -13,13 +13,18 @@ export function createSudokuHUD(hud: HUD, model: SudokuModel, human: (input: unk
   return () => {
     const stats = model.summary();
     hud.stats({ Puzzle: `${stats.puzzle}/${stats.total}`, Time: time(stats.elapsedSeconds), Best: stats.bestSeconds === null ? '—' : time(stats.bestSeconds), Mistakes: stats.mistakes, Filled: `${stats.filled}/81` });
-    notes.setAttribute('aria-pressed', String(model.noteMode)); notes.disabled = !personal() || model.mode !== 'playing';
+    notes.setAttribute('aria-pressed', String(model.noteMode));
+    notes.disabled = !personal() || model.mode !== 'playing';
     undo.disabled = !personal() || !stats.undoCount || model.mode === 'won';
-    hint.disabled = !personal() || !model.hints || model.mode !== 'playing'; next.disabled = !personal();
+    hint.disabled = !personal() || !model.hints || model.mode !== 'playing';
+    next.disabled = !personal();
     hud.label(hint, 'Hint · ' + model.hints);
     digits.forEach(button => { button.disabled = !personal() || model.mode !== 'playing' || model.selected === null || model.givens.includes(model.selected); });
-    if (model.mode === 'won') hud.panel('Puzzle solved', `${time(stats.elapsedSeconds)} · ${model.mistakes} mistakes${model.bestSeconds !== null ? ' · Best ' + time(model.bestSeconds) : ''}`);
-    else if (model.mode === 'paused') hud.panel('Paused', '', [{ label: 'Resume', press: () => utility('resume') }]);
-    else hud.panel('');
+    if (model.mode === 'won')
+      hud.panel('Puzzle solved', `${time(stats.elapsedSeconds)} · ${model.mistakes} mistakes${model.bestSeconds !== null ? ' · Best ' + time(model.bestSeconds) : ''}`);
+    else if (model.mode === 'paused')
+      hud.panel('Paused', '', [{ label: 'Resume', press: () => utility('resume') }]);
+    else
+      hud.panel('');
   };
 }

@@ -5,7 +5,7 @@ export const games = [
   { id: 'sudoku', name: 'Sudoku', accent: '#a6bde8', load: () => import('./sudoku/index') },
   { id: 'match3', name: 'Match-3', accent: '#cbb0ee', load: () => import('./match3/index') },
   { id: 'cargo', name: 'Pocket Cargo', accent: '#96d5b5', load: () => import('./cargo/index') },
-  { id: 'sky', name: 'Sky Rush', accent: '#eac488', load: () => import('./sky/index') },
-  { id: 'pushball', name: 'Robot Pushball', accent: '#80d1d9', load: () => import('./pushball/index') },
+  { id: 'sky', name: 'Sky Rush', accent: '#f2cd83', load: () => import('./sky/index') },
+  { id: 'pushball', name: 'Robot Pushball', accent: '#8ed3ea', load: () => import('./pushball/index') },
 ];
 export type GameEntry = (typeof games)[number];

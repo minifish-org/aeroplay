@@ -1,0 +1,115 @@
+# AeroPlay rewrite acceptance
+
+Measured on 2026-10-15, before the single P4 release push. The complete eight-game Three.js rewrite is implemented on `main`. **Build:decision and all four complete verifiers pass.** The inherited Pushball fixed points are repaired through existing candidate validity; steering, physics, the pinned TAMEV model and ordinary inputs are retained. Actions, deployed asset hashes and the cache fingerprint are checked after publication and reported in the release message.
+
+## Pages and screenshots
+
+[PAGES.md](PAGES.md) contains the baseline element inventory, final Keep/Merge/Delete decisions, current source links, and all tracked comparisons. [Screenshot gallery](screenshots/index.html) shows the hub and all eight games with before/after captures.
+
+| Page | iPhone portrait 390×844 | iPhone landscape 844×390 | MacBook 1512×982 |
+| --- | --- | --- | --- |
+| Hub | [Picture](screenshots/hub/after-iphone-portrait.png) | [Picture](screenshots/hub/after-iphone-landscape.png) | [Picture](screenshots/hub/after-macbook.png) |
+| 2048 | [Picture](screenshots/2048/after-iphone-portrait.png) | [Picture](screenshots/2048/after-iphone-landscape.png) | [Picture](screenshots/2048/after-macbook.png) |
+| Lights Out | [Picture](screenshots/lightsout/after-iphone-portrait.png) | [Picture](screenshots/lightsout/after-iphone-landscape.png) | [Picture](screenshots/lightsout/after-macbook.png) |
+| Flappy Bird | [Picture](screenshots/flappy/after-iphone-portrait.png) | [Picture](screenshots/flappy/after-iphone-landscape.png) | [Picture](screenshots/flappy/after-macbook.png) |
+| Sudoku | [Picture](screenshots/sudoku/after-iphone-portrait.png) | [Picture](screenshots/sudoku/after-iphone-landscape.png) | [Picture](screenshots/sudoku/after-macbook.png) |
+| Match-3 | [Picture](screenshots/match3/after-iphone-portrait.png) | [Picture](screenshots/match3/after-iphone-landscape.png) | [Picture](screenshots/match3/after-macbook.png) |
+| Pocket Cargo | [Picture](screenshots/cargo/after-iphone-portrait.png) | [Picture](screenshots/cargo/after-iphone-landscape.png) | [Picture](screenshots/cargo/after-macbook.png) |
+| Sky Rush | [Picture](screenshots/sky/after-iphone-portrait.png) | [Picture](screenshots/sky/after-iphone-landscape.png) | [Picture](screenshots/sky/after-macbook.png) |
+| Robot Pushball | [Picture](screenshots/pushball/after-iphone-portrait.png) | [Picture](screenshots/pushball/after-iphone-landscape.png) | [Picture](screenshots/pushball/after-macbook.png) |
+
+All nine pages were opened and the 27 requested captures were inspected. Additional layout checks cover 1440×900, rotation, active AI, pause, results, GPU interruptions, resource teardown, and reduced motion.
+
+## Structure
+
+```text
+src/
+  main.ts
+  core/
+    stage.ts hud.ts input.ts storage.ts loop.ts audio.ts
+  ai/
+    player.ts tamev.ts planner.worker.ts
+  hub/
+    hub.ts
+  games/
+    registry.ts
+    2048/ lightsout/ flappy/ sudoku/ match3/ cargo/ sky/ pushball/
+      index.ts model.ts view.ts hud.ts
+styles/
+  tokens.css hub.css game.css
+scripts/
+  prepare-decision-model.mjs capture-previews.mjs
+  verify-lib.mjs verify-layout.mjs verify-games.mjs verify-ai.mjs verify-offline.mjs
+```
+
+One shared renderer owns the camera/light authority. Game models have no Three imports. There are no Pixi packages, retired game modules/planners/save readers, DOM boards, AI settings dialogs, or runtime external services. Native controls, existing saves, three Sudoku puzzles, and twelve Cargo islands are retained.
+
+## Measurements
+
+Line counts include readable source formatting and every `.mjs` file in `scripts`, including model preparation and preview capture.
+
+| Metric | Baseline | Current | Target |
+| --- | ---: | ---: | ---: |
+| TypeScript | 10,016 lines / 59 files | 5,202 lines / 44 files | ≤6,000 |
+| CSS | 2,017 lines / 6 files | 481 lines / 3 files | ≤900 |
+| Scripts | 3,476 lines / 21 files | 1,855 lines / 7 files | ≤2,000 |
+| Games | 11 | 8 | 8 |
+| Rendering libraries | Pixi + Three | Three | Three |
+| Rendering chunks, raw decimal kB | 392.95 + 559.10 | 550.44 | One Three chain |
+| Largest model + view + HUD | 500–900 lines | 430 lines | ≤450 |
+
+| Game | Model + view + HUD lines |
+| --- | ---: |
+| 2048 | 275 |
+| Lights Out | 255 |
+| Flappy Bird | 336 |
+| Sudoku | 328 |
+| Match-3 | 364 |
+| Pocket Cargo | 314 |
+| Sky Rush | 332 |
+| Robot Pushball | 430 |
+
+The production build is 31,134,791 bytes including the pinned 14,872,474-byte model and 14,239,897-byte WASM. Its service worker precaches 33 resources. Release cache fingerprint: `aeroplay-e9f93392bdeb`; the previous production site was observed using `aeroplay-569addfa0659` before release.
+
+## Phase commits
+
+| Phase | Commit | Added / deleted text lines | Validation |
+| --- | --- | ---: | --- |
+| P0 skeleton and removal | `90451be` | +552 / −15,931 | Build; source 110 / CSS 26 |
+| P1 shared core | `85f01dc` | +516 / −63 | Build; source 533 / CSS 54 |
+| P2 2048 | `0113744` | +241 / −16 | Build and native checks |
+| P2 Lights Out | `f206874` | +190 / −8 | Build and native checks |
+| P2 Flappy Bird | `516c160` | +309 / −8 | Build and native checks |
+| P2 Sudoku | `0d65e46` | +269 / −8 | Build and native checks |
+| P2 Match-3 | `92fd513` | +260 / −8 | Build and native checks |
+| P2 Pocket Cargo | `a7eb5b9` | +211 / −8 | Build and native checks |
+| P2 Sky Rush | `3a9257b` | +246 / −8 | Build and native checks |
+| P2 Robot Pushball | `6b0e0e2` | +324 / −8 | Build and native checks |
+| P3 local AI and preservation | `5afcda9` | +1,172 / −79 | Build:decision, genuine Watch/takeover/match evidence |
+| P4 documentation, cleanup and final checks | Commit containing this report | +5,686 / −1,628 | Build:decision and all four complete gates pass |
+
+The pre-existing `2ee86c8`, unpublished at the start of the rewrite, is preserved. Each of the ten P0/P1/P2 snapshots independently built from `git archive` with only dependencies shared; no pending source was borrowed. No phase used a failed-build bypass, branch, worktree or force push.
+
+## Acceptance evidence
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Build:decision | PASS | Five pinned model files verified; TypeScript and Vite build pass |
+| Layout, WebKit | PASS · 131.5 s | 36 layouts, rotations, all settlement HUDs, active/paused AI, one GPU context, teardown, loss recovery, reduced motion |
+| Games, WebKit | PASS · 44.5 s | All eight settlements, twelve Cargo islands, three Sudoku puzzles, native controls/undo/hints/restarts/legacy saves, and a genuine 0–3 TAMEV match in 12.543 simulated seconds / 56 decisions |
+| AI, WebKit | PASS · 24.8 s | Eight immutable planners, input/clock/cancellation/ownership/budget guards, real frozen-context and four mirrored captured-state regressions, Watch/pause/retry/takeover/residency, and a genuine 0–3 match in 16.532 simulated seconds / 83 decisions |
+| Offline, Chromium | PASS · 51.3 s | Hub-only preparation, closed/restarted browser with stopped server, all eight cold loads and native paths, a genuine 0–3 match in 37.726 simulated seconds / 228 decisions, full watched Lights with the same resident model, cache activation/removal and new-asset offline reload |
+| Offline, automated WebKit | Environment limitation | Independent 350-byte service-worker probe also creates an empty cache; identical Chromium probe stores both resources |
+
+Every full match keeps the original 90-second wall deadline, winner 1 and three actual AI goals. Each uses one real resident model initialization with no AI error. The complete offline script also passed its cache-update tail; no partial run is counted as a complete gate.
+
+The Pushball correction changes eligibility of existing Defend to visible own-half threats and rejects stationary forecasts. All six strategy implementations, physics, geometry, model revision, context/question and input guards remain. Permanent regressions first reproduced both fixed points on both sides, then proved guarded progress with actual resident ONNX argmax. A sole viable candidate still dispatches genuine model inference. The original Left flank now has filtered key 0; its label, context and actual ball-movement assertions remain exact. Native Dash testing starts a fresh match to avoid a goal/kickoff resetting cooldown during the tap; its original cooldown assertion is retained.
+
+Final logs, source/test fingerprints and snapshots are retained under `output/final-verifiers.json` and `output/final-*.log`. Earlier failing runs are preserved under `output/pre-planner-fix-final-*`, `output/pushball-failure-*`, `output/offline-pushball-failure-*`, and the captured red/green regression artifacts. These are local QA evidence rather than shipped game assets.
+
+## Remaining risks and device checks
+
+1. Physical iPhone Safari/Home Screen validation is outstanding. Native Mac Safari inspection was attempted while the Mac was locked and could not run. Automated WebKit gameplay/layout and Chromium offline proof are identified separately.
+2. The pinned small model can choose slow routes on unusual positions. An isolated first-corner replay made progress and scored but was still moving after 150 choices; it is not claimed as a completed match. The mandatory native and cold-offline full-match paths all passed without changing their assertions.
+3. The Three chunk is 550.44 raw kB; Vite reports its existing size warning. The locally cached model/WASM dominate the 31.13 MB offline download. No rendering or physics dependency was added.
+4. The existing Actions/Pages deployment is unchanged. Post-push checks must identify the release SHA, compare deployed/local asset bytes and confirm `aeroplay-e9f93392bdeb`; their results are recorded in the release message rather than inferred from local tests.

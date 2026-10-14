@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AeroPlay rewrite screenshots</title>
+<style>
+  body { margin:24px; background:#101b2b; color:#eef5f8; font:16px system-ui; }
+  h1 { font-size:24px; } h2 { margin-top:36px; } a { color:#96d5b5; }
+  .views { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+  figure { margin:0; } img { width:100%; max-height:680px; object-fit:contain; object-position:top; }
+  figcaption { margin:8px 0; } details { margin-top:12px; }
+  @media(max-width:800px) { .views { grid-template-columns:1fr; } }
+</style>
+<h1>AeroPlay: final Three.js pages</h1>
+<p>Actual WebKit captures: iPhone portrait 390×844, iPhone landscape 844×390, MacBook 1512×982. Open a picture for its full resolution; expand the baseline for comparison.</p>
+<main></main>
+<script>
+  const pages = [['hub','Game hub'],['2048','2048'],['lightsout','Lights Out'],['flappy','Flappy Bird'],['sudoku','Sudoku'],['match3','Match-3'],['cargo','Pocket Cargo'],['sky','Sky Rush'],['pushball','Robot Pushball']];
+  const devices = [['iphone-portrait','iPhone portrait'],['iphone-landscape','iPhone landscape'],['macbook','MacBook']];
+  const views = (id, phase) => {
+    const row = document.createElement('div'); row.className = 'views';
+    for (const [device, name] of devices) {
+      const figure = document.createElement('figure'), link = document.createElement('a'), image = document.createElement('img'), caption = document.createElement('figcaption');
+      link.href = id + '/' + phase + '-' + device + '.png'; image.src = link.href; image.alt = id + ': ' + name + ' ' + phase;
+      image.loading = 'lazy'; caption.textContent = name; link.append(image); figure.append(link, caption); row.append(figure);
+    }
+    return row;
+  };
+  for (const [id, name] of pages) {
+    const section = document.createElement('section'), heading = document.createElement('h2'), baseline = document.createElement('details'), summary = document.createElement('summary');
+    heading.textContent = name; summary.textContent = 'Before the rewrite'; baseline.append(summary, views(id, 'before'));
+    section.append(heading, views(id, 'after'), baseline); document.querySelector('main').append(section);
+  }
+</script>
+</html>

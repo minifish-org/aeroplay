@@ -8,11 +8,17 @@ export function createFlappyHUD(hud: HUD, model: FlappyModel, human: (input: unk
   return () => {
     hud.stats({ Score: model.score, Best: model.best, Gates: model.passed });
     hud.label(flap, model.mode === 'ready' ? 'Take flight' : model.mode === 'over' ? 'Try again' : 'Flap');
-    flap.disabled = !personal() || model.mode === 'paused'; restart.disabled = !personal();
-    restart.hidden = model.mode === 'over'; pause.hidden = !personal(); pause.disabled = !['playing', 'paused'].includes(model.mode);
+    flap.disabled = !personal() || model.mode === 'paused';
+    restart.disabled = !personal();
+    restart.hidden = model.mode === 'over';
+    pause.hidden = !personal();
+    pause.disabled = !['playing', 'paused'].includes(model.mode);
     hud.label(pause, model.mode === 'paused' ? 'Resume' : 'Pause');
-    if (model.mode === 'over') hud.panel('Flight complete', `${model.score} points · ${model.passed} gates · Best ${model.best}`);
-    else if (model.mode === 'paused') hud.panel('Paused', 'Your flight is waiting.');
-    else hud.panel('');
+    if (model.mode === 'over')
+      hud.panel('Flight complete', `${model.score} points · ${model.passed} gates · Best ${model.best}`);
+    else if (model.mode === 'paused')
+      hud.panel('Paused', 'Your flight is waiting.');
+    else
+      hud.panel('');
   };
 }

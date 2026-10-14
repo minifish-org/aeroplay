@@ -207,22 +207,54 @@ export function observeMatch(state: MatchState): Observation {
 }
 
 export class PushballRun {
-  state=createMatch();version=0;wins:number;matches:number;private counted=false;
-  controls:[Action,Action]=[idleAction(),idleAction()];until:[number,number]=[0,0];
-  constructor(wins=0,matches=0){this.wins=wins;this.matches=matches;}
-  get mode(){return this.state.mode;}
-  reset(){this.state=createMatch();this.version++;this.counted=false;this.clear();}
-  clear(side?:Side){if(side===undefined){this.clear(0);this.clear(1);}else{this.controls[side]=idleAction();this.until[side]=0;}}
-  start(){if(this.mode==='ready'||this.mode==='paused')this.state.mode='playing';}
-  pause(){if(this.mode==='playing')this.state.mode='paused';this.clear();}
-  resume(){if(this.mode==='paused')this.state.mode='playing';}
-  act(side:Side,action:Action){if(this.mode!=='playing'||this.state.kickoff>0)return false;this.controls[side]=normalizeAction(action);this.until[side]=this.state.elapsed+CONTROL_LIFETIME;return true;}
-  step(dt:number){
-    const oldGoal=this.state.goalSerial,current=this.controls.map((control,side)=>this.state.elapsed<=this.until[side]?control:idleAction()) as [Action,Action];
-    stepMatch(this.state,current,dt);this.controls[0].dash=this.controls[1].dash=false;
-    if(oldGoal!==this.state.goalSerial)this.clear();
-    if(this.state.mode==='over'&&!this.counted){this.counted=true;this.matches++;if(this.state.winner===0)this.wins++;}
+  state = createMatch();
+  version = 0;
+  wins: number;
+  matches: number;
+  private counted = false;
+  controls: [
+    Action,
+    Action
+  ] = [idleAction(), idleAction()];
+  until: [
+    number,
+    number
+  ] = [0, 0];
+  constructor(wins = 0, matches = 0) { this.wins = wins; this.matches = matches; }
+  get mode() { return this.state.mode; }
+  reset() { this.state = createMatch(); this.version++; this.counted = false; this.clear(); }
+  clear(side?: Side) { if (side === undefined) {
+    this.clear(0);
+    this.clear(1);
   }
-  planning(side:Side){return this.mode==='playing'&&this.state.kickoff===0?{game:'pushball' as const,epoch:this.version+':'+this.state.goalSerial,side,snapshot:observeMatch(this.state),control:{...this.controls[side]},controlUntil:this.until[side]}:null;}
-  snapshot(){return {game:'pushball',...structuredClone(this.state),record:{wins:this.wins,matches:this.matches},controls:structuredClone(this.controls),controlUntil:[...this.until]};}
+  else {
+    this.controls[side] = idleAction();
+    this.until[side] = 0;
+  } }
+  start() { if (this.mode === 'ready' || this.mode === 'paused')
+    this.state.mode = 'playing'; }
+  pause() { if (this.mode === 'playing')
+    this.state.mode = 'paused'; this.clear(); }
+  resume() { if (this.mode === 'paused')
+    this.state.mode = 'playing'; }
+  act(side: Side, action: Action) { if (this.mode !== 'playing' || this.state.kickoff > 0)
+    return false; this.controls[side] = normalizeAction(action); this.until[side] = this.state.elapsed + CONTROL_LIFETIME; return true; }
+  step(dt: number) {
+    const oldGoal = this.state.goalSerial, current = this.controls.map((control, side) => this.state.elapsed <= this.until[side] ? control : idleAction()) as [
+      Action,
+      Action
+    ];
+    stepMatch(this.state, current, dt);
+    this.controls[0].dash = this.controls[1].dash = false;
+    if (oldGoal !== this.state.goalSerial)
+      this.clear();
+    if (this.state.mode === 'over' && !this.counted) {
+      this.counted = true;
+      this.matches++;
+      if (this.state.winner === 0)
+        this.wins++;
+    }
+  }
+  planning(side: Side) { return this.mode === 'playing' && this.state.kickoff === 0 ? { game: 'pushball' as const, epoch: this.version + ':' + this.state.goalSerial, side, snapshot: observeMatch(this.state), control: { ...this.controls[side] }, controlUntil: this.until[side] } : null; }
+  snapshot() { return { game: 'pushball', ...structuredClone(this.state), record: { wins: this.wins, matches: this.matches }, controls: structuredClone(this.controls), controlUntil: [...this.until] }; }
 }

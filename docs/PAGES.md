@@ -1,24 +1,24 @@
 # AeroPlay Page Review
 
-Review date: 2026-10-15 (Asia/Singapore). Status: **confirmed by the user's full-rewrite and final-push instruction**.
+Review updated: 2026-10-15 (Asia/Singapore). **Approved decisions implemented in the Three.js rewrite.**
 
-This review was delivered with current screenshots before implementation, as required by task section 4. Its baseline describes the pre-rewrite checkout. Implementation and validation progress is recorded in `progress.md`; no partial rewrite is pushed.
+The baseline inventory and screenshots were delivered before implementation. All historical source paths and line numbers in the inventory below refer to preserved commit **`2ee86c887447a3f495e8175adb9c4e9e91ae9688`**; they do not describe current file locations. The implemented-page table links the current code and tracked before/after captures. Phase and release evidence are recorded in [progress.md](../progress.md) and [DELIVERY.md](DELIVERY.md).
 
 ## Scope and decision meanings
 
-The target is the hub plus exactly eight games: 2048, Lights Out, Flappy Bird, Sudoku, Match-3, Pocket Cargo, Sky Rush, and Robot Pushball. Snake, Tetris, and Maze are removed after confirmation. Every surviving view is rewritten using Three.js; only the explicitly permitted pure gameplay logic is reusable. Existing level and puzzle data must remain available.
+The implementation contains the hub and exactly eight games: 2048, Lights Out, Flappy Bird, Sudoku, Match-3, Pocket Cargo, Sky Rush, and Robot Pushball. Snake, Tetris, Maze, Pixi, old views, DOM boards, and AI settings dialogs are removed. All surviving views use Three.js. Permitted pure logic and the existing level/puzzle data are retained.
 
 - **Keep** preserves a function, value, or meaningful feedback. Existing renderer/view code is still replaced.
 - **Merge** preserves the function or information in the shared in-stage HUD, compact controls, a transient result/state panel, or a one-time hint.
 - **Delete** removes redundant presentation or an explicitly retired implementation. Deleting a DOM board or old view never deletes the corresponding game rules, inputs, values, or feedback.
 
-The shared review below applies to every game, with the documented Pushball exception. Each page table adds all of that page's specific elements, including source-defined hidden and result states. Screenshots show actual initial human/ready states; source inspection covers later states. No target mockups are presented as existing screens.
+The approved shared decisions below apply to every game, with the documented Pushball exception. Each page table adds all of that page's specific elements, including source-defined hidden and result states. Baseline screenshots show actual initial human/ready states; source inspection covers hidden and result states. Tracked after captures show the new Three presentation.
 
 ## Verified baseline
 
-The reviewed checkout is local `main` at `2ee86c887447a3f495e8175adb9c4e9e91ae9688`, initially clean and one commit ahead of the local `origin/main` reference. The existing unpushed commit, `Rebuild the 2D play panels and drop Tetris hold`, is preserved. These screenshots describe that local checkout, not a verified production deployment.
+The reviewed checkout was local `main` at `2ee86c887447a3f495e8175adb9c4e9e91ae9688`, initially clean and one commit ahead of the local `origin/main` reference. The pre-existing commit, `Rebuild the 2D play panels and drop Tetris hold`, was unpublished when reviewed and is preserved. These screenshots describe that baseline checkout rather than a verified production deployment.
 
-| Metric | Current measurement | Rewrite target |
+| Metric | Baseline measurement at `2ee86c8` | Rewrite target |
 | --- | ---: | ---: |
 | `src/**/*.ts` | 59 files; 10,016 lines | At most 6,000 lines |
 | `styles/**/*.css` | 6 files; 2,017 lines | At most 900 lines |
@@ -29,50 +29,50 @@ The reviewed checkout is local `main` at `2ee86c887447a3f495e8175adb9c4e9e91ae96
 | Render dependencies | `pixi.js`, `pixi-filters`, `three` | `three` only |
 | Main renderer chunks, raw build output | Pixi scene 392.95 kB; Three 559.10 kB | One Three rendering dependency chain |
 
-`npm run build` passed on the unchanged baseline. The new four-verifier suite has not been implemented or run; this review is not release acceptance.
+`npm run build` passed on the unchanged baseline. These historical measurements do not establish final release acceptance; the implemented source and the four-verifier evidence are assessed separately.
 
-## Current screenshots and measured layout
+## Baseline screenshots and measured layout
 
 Captures use the existing local development server, Playwright WebKit, fresh temporary localStorage, service workers blocked, and DPR 1 at the exact CSS viewport sizes. No gameplay state, board, stylesheet, or control was injected. The capture-session directory is dated 2026-10-14, when this review began.
 
-Evidence: [screenshot gallery](../output/playwright/aeroplay-before-2026-10-14/index.html), [raw page observations](../output/playwright/aeroplay-before-2026-10-14/observations.json), and [Cargo/Sky clipping and hit-target observations](../output/playwright/aeroplay-before-2026-10-14/control-observations.json). These are local review artifacts under the existing ignored `output/playwright/` directory.
+Evidence: [screenshot gallery](../output/playwright/aeroplay-before-2026-10-14/index.html), [raw page observations](../output/playwright/aeroplay-before-2026-10-14/observations.json), and [Cargo/Sky clipping and hit-target observations](../output/playwright/aeroplay-before-2026-10-14/control-observations.json). The original gallery and observation JSON remain local review artifacts under ignored `output/playwright/`. The nine-page baseline images and matching Three after images are tracked under [screenshots/](screenshots/).
 
 | Page | iPhone portrait 390×844 | iPhone landscape 844×390 | MacBook 1512×982 |
 | --- | --- | --- | --- |
-| Hub | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-hub.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-landscape-hub.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/macbook-hub.png) |
-| 2048 | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-2048.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-landscape-2048.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/macbook-2048.png) |
-| Lights Out | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-lightsout.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-landscape-lightsout.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/macbook-lightsout.png) |
-| Flappy Bird | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-flappy.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-landscape-flappy.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/macbook-flappy.png) |
-| Sudoku | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-sudoku.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-landscape-sudoku.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/macbook-sudoku.png) |
-| Match-3 | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-match3.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-landscape-match3.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/macbook-match3.png) |
-| Pocket Cargo | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-cargo.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-landscape-cargo.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/macbook-cargo.png) |
-| Sky Rush | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-sky.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-landscape-sky.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/macbook-sky.png) |
-| Robot Pushball | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-pushball.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/iphone-landscape-pushball.png) | [Current screen](../output/playwright/aeroplay-before-2026-10-14/macbook-pushball.png) |
+| Hub | [Baseline screen](screenshots/hub/before-iphone-portrait.png) | [Baseline screen](screenshots/hub/before-iphone-landscape.png) | [Baseline screen](screenshots/hub/before-macbook.png) |
+| 2048 | [Baseline screen](screenshots/2048/before-iphone-portrait.png) | [Baseline screen](screenshots/2048/before-iphone-landscape.png) | [Baseline screen](screenshots/2048/before-macbook.png) |
+| Lights Out | [Baseline screen](screenshots/lightsout/before-iphone-portrait.png) | [Baseline screen](screenshots/lightsout/before-iphone-landscape.png) | [Baseline screen](screenshots/lightsout/before-macbook.png) |
+| Flappy Bird | [Baseline screen](screenshots/flappy/before-iphone-portrait.png) | [Baseline screen](screenshots/flappy/before-iphone-landscape.png) | [Baseline screen](screenshots/flappy/before-macbook.png) |
+| Sudoku | [Baseline screen](screenshots/sudoku/before-iphone-portrait.png) | [Baseline screen](screenshots/sudoku/before-iphone-landscape.png) | [Baseline screen](screenshots/sudoku/before-macbook.png) |
+| Match-3 | [Baseline screen](screenshots/match3/before-iphone-portrait.png) | [Baseline screen](screenshots/match3/before-iphone-landscape.png) | [Baseline screen](screenshots/match3/before-macbook.png) |
+| Pocket Cargo | [Baseline screen](screenshots/cargo/before-iphone-portrait.png) | [Baseline screen](screenshots/cargo/before-iphone-landscape.png) | [Baseline screen](screenshots/cargo/before-macbook.png) |
+| Sky Rush | [Baseline screen](screenshots/sky/before-iphone-portrait.png) | [Baseline screen](screenshots/sky/before-iphone-landscape.png) | [Baseline screen](screenshots/sky/before-macbook.png) |
+| Robot Pushball | [Baseline screen](screenshots/pushball/before-iphone-portrait.png) | [Baseline screen](screenshots/pushball/before-iphone-landscape.png) | [Baseline screen](screenshots/pushball/before-macbook.png) |
 
 Additional evidence: hub full pages ([portrait](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-hub-full.png), [landscape](../output/playwright/aeroplay-before-2026-10-14/iphone-landscape-hub-full.png), [MacBook](../output/playwright/aeroplay-before-2026-10-14/macbook-hub-full.png)); the [shared AI settings dialog](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-2048-ai-settings.png); contact sheets ([portrait](../output/playwright/aeroplay-before-2026-10-14/iphone-portrait-overview.png), [landscape](../output/playwright/aeroplay-before-2026-10-14/iphone-landscape-overview.png), [MacBook](../output/playwright/aeroplay-before-2026-10-14/macbook-overview.png)). There are 27 viewport captures, three full-page hub captures, one dialog capture, and three derived contact sheets.
 
 All nine pages opened in all three viewport sizes. The capture recorded no page exceptions or failed requests, and no document-width overflow. This is narrower than full gameplay or offline verification.
 
-| Current issue | Live evidence | Review consequence |
+| Baseline issue | Recorded evidence | Implemented decision |
 | --- | --- | --- |
 | Hub requires scrolling in all three layouts | Document heights: 2,357px portrait, 1,390px landscape, 2,329px MacBook | Remove the hero, filters, descriptions, featured spans, and footer; fit eight consistent cards in the viewport. |
 | Sudoku landscape requires scrolling | Document height 510px in a 390px viewport; keypad falls below the captured viewport | Put board and all ten numeric/erase controls inside one stage with reserved input space. |
 | Cargo D-pad, Undo, Hint, Restart, and Sound are clipped | All eight button centers are outside a clipping ancestor and cannot hit their buttons in all three sizes | Retain every action and place controls inside reserved stage regions. A positive DOM rectangle is insufficient proof of visibility. |
 | Sky steer, Boost, Pause, and Sound are clipped | All five control centers fail the same clipping/hit check in all three sizes | Retain every action; position the control group inside the stage. Ready-state steer/pause disablement is separate from the clipping defect. |
-| Existing verifier can miss these failures | `verify-layout.mjs:20-23` omits the hub; `:66-68` exempts Sudoku landscape scrolling; it never checks control hit targets | The replacement must test hub plus eight games without exemptions and check actual visible, reachable controls and playfield separation. |
+| Baseline verifier missed these failures | `verify-layout.mjs:20-23` omits the hub; `:66-68` exempts Sudoku landscape scrolling; it never checks control hit targets | The replacement tests the hub plus eight games without exemptions and checks visible, reachable controls and reserved playable bounds. |
 
 Cargo/Sky clipping is also explained by source: `.three-view` clips overflow and `.three-canvas` fills its height (`styles/game.css:446-461`), while Cargo's status/controls and Sky's controls/utility remain in normal flow after the canvas (`src/games/cargo.ts:65-74,114-152`; `src/games/sky.ts:54,84-96`; `styles/game.css:582-616,668-690`). `mountGameSide` moves only direct area children, so it does not repair these descendants (`src/main.ts:142-154`). Pushball explicitly positions its control overlays (`styles/pushball.css:55-80`).
 
-WebKit viewport captures are not physical iPhone/MacBook Safari certification. Real safe-area values, Safari chrome, touch ergonomics, DPR behavior, complete result paths, AI play, reduced motion, navigation teardown, and offline cache activation remain implementation-stage validation work.
+The browser evidence uses Playwright WebKit. It is not physical iPhone/MacBook Safari certification; no physical-device session is claimed by these screenshots. Complete gameplay, AI, teardown, reduced motion, and offline acceptance are covered by the final verification suite.
 
 ## Shared game elements
 
-Sources: `src/core/ui.ts:83-114`; `src/core/player-controls.ts:7-59`; `src/core/ai-settings.ts:3-23`; `src/core/audio.ts:4-25`; `src/main.ts:142-193,214-223`.
+Baseline sources (`2ee86c8`): `src/core/ui.ts:83-114`; `src/core/player-controls.ts:7-59`; `src/core/ai-settings.ts:3-23`; `src/core/audio.ts:4-25`; `src/main.ts:142-193,214-223`.
 
-| Current element / state | Decision | Result and reason |
+| Baseline element / state | Decision | Implemented result and reason |
 | --- | --- | --- |
 | Separate top bar, Back button, game title | Merge | Keep Back and compact title inside the stage's navigation/HUD area; remove the separate page row. |
-| Top-right `⚙ AI player` button | Delete | Explicitly retired. It currently exists on the ten optional-Watch games, not the hub or Pushball. |
+| Top-right `⚙ AI player` button | Delete | Explicitly retired. It existed on the ten baseline optional-Watch games, not the hub or Pushball. |
 | AI dialog title, close ×, explanatory paragraph, model-status paragraph | Delete / Merge | Delete the entire dialog. Move useful first-use explanation into the one-time hint and actionable loading/error state into the HUD. |
 | `Load TAMEV`, `Loading…`, `Ready on this device` preload control | Delete | Remove manual preload UI; first Watch loads inference. Preserve loading/ready/error feedback at the requesting control. |
 | `Play yourself` / `Watch TAMEV` two-button picker | Merge | One icon + short-label mode control, initially Human. Human→TAMEV invokes existing Watch; TAMEV→Human invokes existing takeover of the same run. |
@@ -81,9 +81,9 @@ Sources: `src/core/ui.ts:83-114`; `src/core/player-controls.ts:7-59`; `src/core/
 | Long AI session explanation and record-ownership paragraph | Merge | First-use help explains ownership; real errors stay concise and actionable. No permanent explanatory panel. |
 | AI Pause / Resume | Merge | Conditional shared HUD action. Where native game pause already exists, use one action controlling game and AI together. |
 | Retry AI | Keep | Conditional HUD recovery only on actual AI error; remain distinct from game retry/restart. |
-| Take over | Merge | AI→Human activation of the mode control continues the current run. It must cancel queued plans and release native inputs. |
+| Take over | Merge | AI→Human activation of the mode control continues the current run. It cancels queued plans and releases native inputs. |
 | Watch again | Merge | Preserve a completed-watch replay action in the compact result controls, using an AI-owned run. |
-| Personal-profile return currently provided by Play yourself | Merge | Preserve a conditional short-label `Your run` action within the compact controls after AI has been used. It remounts Human and restores the existing personal save; it does not inherently reset the game. Keep Restart, Retry, Next, and New puzzle separate. The single mode toggle still performs Watch/takeover; a continuing AI-owned run must never silently become a personal record. |
+| Personal-profile return formerly provided by Play yourself | Merge | Preserve a conditional short-label `Your run` action within the compact controls after AI has been used. It remounts Human and restores the existing personal save; it does not inherently reset the game. Keep Restart, Retry, Next, and New puzzle separate. The single mode toggle still performs Watch/takeover; a continuing AI-owned run must never silently become a personal record. |
 | `area.inert = ai` and gameplay-key guard | Keep behavior; replace mechanism | Lock human gameplay inputs while AI drives. Never make the entire new stage inert: Back, mode, Pause, Retry, and focused HUD controls must remain usable. |
 | External `.game-side` and under-board `surfaceActions` row | Delete | All UI belongs inside the visible stage; remove the old relocation helper and independent action row. |
 | Top/bottom score, hint, and control strips | Merge | One shared stage HUD layout with reserved regions. Preserve values while removing stacked independent panels. |
@@ -94,15 +94,15 @@ Sources: `src/core/ui.ts:83-114`; `src/core/player-controls.ts:7-59`; `src/core/
 | WebGL-unavailable / graphics-restored feedback | Merge | Shared stage error/recovery state. Delete the obsolete suggestion to return to classic renderers, since all retained games use Three. |
 | MacBook `F` fullscreen keyboard action | Keep | Existing optional keyboard utility; no new persistent button required. |
 
-DOM is retained for clear HUD text, native buttons/selects, progress semantics, labels, focus, and live status. DOM tile/cell/gem boards and transparent full-board input overlays are deleted. Board hit testing moves to the Three scene; keyboard navigation and meaningful accessible cell/value state must survive without recreating a hidden board.
+DOM is retained for clear HUD text, native buttons/selects, progress semantics, labels, focus, and live status. DOM tile/cell/gem boards and transparent full-board input overlays are deleted. Board hit testing uses the Three scene. Sudoku retains keyboard selection and accessible cell/value announcements without recreating a hidden board.
 
-HUD/control bounds must remain at least 12px inside the stage, additionally respecting `env(safe-area-inset-*)`. Playable board/arena bounds exclude reserved HUD and touch-control regions, so controls cannot cover cells, goals, or required navigation paths. One shared variable-driven layout sizes every game; no per-game media queries.
+HUD/control regions reserve at least 12px inside the stage, additionally respecting `env(safe-area-inset-*)`. Playable board/arena bounds exclude reserved HUD and touch-control regions, so controls cannot cover cells, goals, or required navigation paths. One shared variable-driven layout sizes every game; no per-game media queries.
 
 ## Hub
 
-Sources: `src/main.ts:27-140`; `src/games/registry.ts:9-113`.
+Baseline sources (`2ee86c8`): `src/main.ts:27-140`; `src/games/registry.ts:9-113`.
 
-| Current element | Decision | Result and reason |
+| Baseline element | Decision | Implemented result and reason |
 | --- | --- | --- |
 | `aeroplay ↗` brand | Keep | Compact wordmark; remove decorative arrow or use the shared SVG language. |
 | `Your pocket arcade` / `Offline ready` badge | Merge | Show only truthful offline readiness when the cache is ready; remove the marketing fallback. |
@@ -111,12 +111,12 @@ Sources: `src/main.ts:27-140`; `src/games/registry.ts:9-113`.
 | `Find your next favorite` heading | Delete | The card grid already communicates selection. |
 | All games, 3D, Arcade, Puzzles filter buttons | Delete | Eight fixed cards remain directly available; renderer/dimension promotion adds no useful selection step. |
 | Eleven clickable cards | Keep / Delete | Keep the eight specified game navigation buttons; delete Snake/Tetris/Maze cards and their metadata/assets/load paths. |
-| Card preview image | Keep | Real Three-rendered preview for every game; replace illustration-only previews such as the current Pushball SVG. |
+| Card preview image | Keep | Real Three-rendered preview for every game; replace illustration-only previews such as the baseline Pushball SVG. |
 | Emoji card icon | Delete | Use preview artwork and consistent SVG control icons. |
 | Numeric index / 3D badge / trailing arrow | Delete | Redundant metadata on an already clickable card. |
 | Game name | Keep | Required identity. |
-| Description paragraph | Delete | The target card contains preview, name, and one record line. |
-| Best/progress line and empty-state slogans | Keep / Merge | One useful local record/progress line; neutral empty-record state. Sudoku should read existing best time instead of `Take your time`. |
+| Description paragraph | Delete | Each card contains preview, name, and one record line. |
+| Best/progress line and empty-state slogans | Keep / Merge | One useful local record/progress line; neutral empty-record state. Sudoku reads the existing best time instead of `Take your time`. |
 | Featured cards spanning two columns versus preview cards | Merge | One card component and equal sizing for all eight games. |
 | `No ads. No accounts... Progress stays on this device.` footer | Delete | Remove persistent marketing text; offline operation and local saves remain functional requirements. |
 
@@ -124,9 +124,9 @@ Sources: `src/main.ts:27-140`; `src/games/registry.ts:9-113`.
 
 ## 2048
 
-Sources: `src/games/game2048.ts:28-155,201-226,257-282`; `src/games/views/merge.ts:27-30,86-199`.
+Baseline sources (`2ee86c8`): `src/games/game2048.ts:28-155,201-226,257-282`; `src/games/views/merge.ts:27-30,86-199`.
 
-| Current element / state | Decision | Result and reason |
+| Baseline element / state | Decision | Implemented result and reason |
 | --- | --- | --- |
 | Score and Best blocks | Merge | Retain both in the stage HUD. |
 | Restart | Merge | Compact control; reset board/score/moves/history and preserve best. |
@@ -139,15 +139,15 @@ Sources: `src/games/game2048.ts:28-155,201-226,257-282`; `src/games/views/merge.
 | Merge-value popup, bursts, tile transitions | Keep | Recreate bounded score feedback with the shared ≤400ms/reduced-motion rules. |
 | AI paused state | Merge | Shared pause indication; board input remains blocked while paused. |
 
-**Preserve:** spawn distribution, merge score, best, current board/score/moves restore, swipe/arrows, and Undo. The actual legacy namespace is **`aeroplay:game2048:*`**, despite route ID `2048`; do not rename it. Undo history is not currently persisted.
+**Preserve:** spawn distribution, merge score, best, current board/score/moves restore, swipe/arrows, and Undo. The actual legacy namespace is **`aeroplay:game2048:*`**, despite route ID `2048`; do not rename it. Undo history remains in memory.
 
 **Final page:** Three board with Score/Best/Milestone/Moves, Back/title/mode, Restart/Undo, and conditional AI controls inside the stage. No permanent instruction strip or DOM tiles.
 
 ## Lights Out
 
-Sources: `src/games/lightsout.ts:25-150,190-203`; `src/games/views/puzzles.ts:12-30,65-112`.
+Baseline sources (`2ee86c8`): `src/games/lightsout.ts:25-150,190-203`; `src/games/views/puzzles.ts:12-30,65-112`.
 
-| Current element / state | Decision | Result and reason |
+| Baseline element / state | Decision | Implemented result and reason |
 | --- | --- | --- |
 | Puzzle, Moves, Perfect target, Lit count | Merge | Keep all four values in the compact HUD. |
 | Undo | Merge | Retain move rollback and disabled state in the controls. |
@@ -165,9 +165,9 @@ Sources: `src/games/lightsout.ts:25-150,190-203`; `src/games/views/puzzles.ts:12
 
 ## Flappy Bird
 
-Sources: `src/games/flappy.ts:23-158,203`; `src/games/views/flappy.ts:25-199,220-284`.
+Baseline sources (`2ee86c8`): `src/games/flappy.ts:23-158,203`; `src/games/views/flappy.ts:25-199,220-284`.
 
-| Current element / state | Decision | Result and reason |
+| Baseline element / state | Decision | Implemented result and reason |
 | --- | --- | --- |
 | Score, Best, Gates | Merge | Keep all values; Gates differs from score because a centered pass earns +2. |
 | Take flight / Flap / Try again | Merge | One state-aware primary scene control; retain tap-sky and Space inputs. |
@@ -179,15 +179,15 @@ Sources: `src/games/flappy.ts:23-158,203`; `src/games/views/flappy.ts:25-199,220
 | Paused scene overlay and repeated Resume instruction | Merge | One compact pause state with Resume. |
 | Failure points, retry instruction, failure burst | Merge | Result score/best plus retry and bounded failure feedback. |
 
-**Preserve:** ready/playing/paused/over, pipe variation/narrowing, collisions, centered bonus, personal best, tap/Space, and pause. The existing death→ready→playing interaction requires two taps; any intentional simplification must keep ready/result states understandable. Only `aeroplay:flappy:best` is persisted; there is no saved mid-flight run.
+**Preserve:** ready/playing/paused/over, pipe variation/narrowing, collisions, centered bonus, personal best, tap/Space, and pause. The baseline death→ready→playing interaction used two taps; the new result and ready states retain explicit replay/start actions. Only `aeroplay:flappy:best` is persisted; there is no saved mid-flight run.
 
 **Final page:** flight scene, Score/Best/Gates, shared navigation/mode, state-aware Start/Flap/Retry and Pause. Ready, paused, and failed content appears only in its relevant state.
 
 ## Sudoku
 
-Sources: `src/games/sudoku.ts:15-44,56-254,265-360,368-445,491-506`; `src/games/views/puzzles.ts:137-249`.
+Baseline sources (`2ee86c8`): `src/games/sudoku.ts:15-44,56-254,265-360,368-445,491-506`; `src/games/views/puzzles.ts:137-249`.
 
-| Current element / state | Decision | Result and reason |
+| Baseline element / state | Decision | Implemented result and reason |
 | --- | --- | --- |
 | Puzzle n/3, elapsed/best time, mistakes, filled count, solved text | Merge | Keep values in the HUD; solved state becomes one result. |
 | New puzzle | Merge | Compact action cycling the existing three puzzles, not same-puzzle Restart. |
@@ -201,15 +201,15 @@ Sources: `src/games/sudoku.ts:15-44,56-254,265-360,368-445,491-506`; `src/games/
 | `Solved!` / `Solved! Beautiful work.` | Merge | One result with time/best and New puzzle. |
 | Hidden/pagehide timer save/pause and AI pause | Keep | Preserve timer, state save, and controller pause behavior. |
 
-**Preserve:** all three puzzles, givens, notes, in-memory board-and-notes Undo, mistakes/conflicts, three hints, selection/navigation, keyboard digits/erase/arrows/shortcuts, timer/best, and current puzzle restore. Ordinary edits currently cap Undo history at 100; note-only edits do not enforce that cap. Existing `aeroplay:sudoku:state-v2` and `bestSeconds` remain readable, including optional notes/hints fields.
+**Preserve:** all three puzzles, givens, notes, in-memory board-and-notes Undo, mistakes/conflicts, three hints, selection/navigation, keyboard digits/erase/arrows/shortcuts, timer/best, and current puzzle restore. The baseline capped ordinary-edit Undo history at 100; note-only edits had no separate cap. Existing `aeroplay:sudoku:state-v2` and `bestSeconds` remain readable, including optional notes/hints fields.
 
-**Final page:** Three Sudoku board plus the ten-key input bank and Notes/Undo/Hint/New puzzle in one stage. Puzzle/time/best/mistakes/fill values remain legible. The current landscape scroll exemption is removed; keypad and controls must remain visible without covering cells.
+**Final page:** Three Sudoku board plus the ten-key input bank and Notes/Undo/Hint/New puzzle in one stage. Puzzle/time/best/mistakes/fill values remain legible. The baseline landscape scroll exemption is removed; the keypad and controls occupy reserved regions beside/below the board.
 
 ## Match-3
 
-Sources: `src/games/match3.ts:10-227,270-277`; `src/games/views/gems.ts:19-29,128-148`.
+Baseline sources (`2ee86c8`): `src/games/match3.ts:10-227,270-277`; `src/games/views/gems.ts:19-29,128-148`.
 
-| Current element / state | Decision | Result and reason |
+| Baseline element / state | Decision | Implemented result and reason |
 | --- | --- | --- |
 | Level, Score/target, Moves, Best | Merge | Keep all values in the stage HUD. |
 | Standalone target progress bar | Merge | Slim accessible meter within the score/target HUD region. |
@@ -224,15 +224,15 @@ Sources: `src/games/match3.ts:10-227,270-277`; `src/games/views/gems.ts:19-29,12
 | Loss target-deficit prose | Merge | Concise result with score deficit and Try again. |
 | AI pause / clearing-and-falling suspension | Keep | Preserve phase, clock, and hidden-page suspension. |
 
-**Preserve:** five gem types, adjacency, invalid-swap refund, 3+ matches, gravity/refill, cascades, 30 moves, target `1000 + 350 × (level - 1)`, free hint/reshuffle, stars, progression, best, and stable saved run. `aeroplay:match3:run` and `best` remain readable. The current game has no Undo; do not add it. Saves occur at stable boundaries, not during a falling animation.
+**Preserve:** five gem types, adjacency, invalid-swap refund, 3+ matches, gravity/refill, cascades, 30 moves, target `1000 + 350 × (level - 1)`, free hint/reshuffle, stars, progression, best, and stable saved run. `aeroplay:match3:run` and `best` remain readable. Match-3 has no Undo. Saves occur at stable boundaries, not during a falling animation.
 
 **Final page:** Three gem board with Level/Score/Target/Moves/Best, compact meter, Hint and state-aware Restart/Next/Retry. Selection/cascade/result feedback stays in the scene.
 
 ## Pocket Cargo
 
-Sources: `src/games/cargo.ts:33-157,194-322,337-449,509`; `src/games/cargo/levels.ts:4-156`; `src/games/cargo/model.ts:22-78`.
+Baseline sources (`2ee86c8`): `src/games/cargo.ts:33-157,194-322,337-449,509`; `src/games/cargo/levels.ts:4-156`; `src/games/cargo/model.ts:22-78`.
 
-| Current element / state | Decision | Result and reason |
+| Baseline element / state | Decision | Implemented result and reason |
 | --- | --- | --- |
 | Numbered/name level select with 12 options | Merge | Accessible compact in-stage selector; retain every island directly selectable. |
 | Delivered/total, pushes, Perfect par | Merge | Keep all values in the HUD. |
@@ -250,15 +250,15 @@ Sources: `src/games/cargo.ts:33-157,194-322,337-449,509`; `src/games/cargo/level
 | Next island / Play from the beginning | Keep | State-aware completion action; retain all 12 islands and wrap to island 1. |
 | Island, walls, crates, glowing docks, robot, hint marker | Keep | Rebuild from model snapshots in the shared Three stage; discard old assembly/camera/view code. |
 
-**Preserve:** all 12 level maps/names/par values, push-only rules, local solver/hints, corner warnings, Undo, level selection/progression, stars, sound, and current run restore. `aeroplay:cargo:run` preserves level/player/crates/moves/pushes/usedHint; `stars` preserves achievements. The allowed existing pure model/solver can be reused; old scene and worker wrappers are replaced.
+**Preserve:** all 12 level maps/names/par values, push-only rules, local solver/hints, corner warnings, Undo, level selection/progression, stars, sound, and current run restore. `aeroplay:cargo:run` preserves level/player/crates/moves/pushes/usedHint; `stars` preserves achievements. The permitted pure model/solver are retained; old scene and worker wrappers are replaced.
 
-**Final page:** complete visible island with selector/metrics and Undo/Hint/Restart/Sound; D-pad in a reserved control region. All currently clipped controls become usable without hiding docks or crates.
+**Final page:** complete visible island with selector/metrics and Undo/Hint/Restart/Sound; D-pad in a reserved control region. The formerly clipped controls occupy visible reserved regions without hiding docks or crates.
 
 ## Sky Rush
 
-Sources: `src/games/sky.ts:43-101,255-359,362-454,485-517`; `src/games/skyState.ts:74-159`.
+Baseline sources (`2ee86c8`): `src/games/sky.ts:43-101,255-359,362-454,485-517`; `src/games/skyState.ts:74-159`.
 
-| Current element / state | Decision | Result and reason |
+| Baseline element / state | Decision | Implemented result and reason |
 | --- | --- | --- |
 | Score and Best | Merge | Compact shared HUD values. |
 | Sector number and biome | Merge | Retain progression and biome identity in short state text. |
@@ -284,11 +284,11 @@ Sources: `src/games/sky.ts:43-101,255-359,362-454,485-517`; `src/games/skyState.
 
 ## Robot Pushball
 
-Sources: `src/games/pushball.ts:18-64,102-202`; `src/games/pushball/input.ts:3-83`; `src/games/pushball/model.ts:1-8,61-195`; `src/games/pushball/policy.ts:60-63`; `src/main.ts:160,178-179`.
+Baseline sources (`2ee86c8`): `src/games/pushball.ts:18-64,102-202`; `src/games/pushball/input.ts:3-83`; `src/games/pushball/model.ts:1-8,61-195`; `src/games/pushball/policy.ts:60-63`; `src/main.ts:160,178-179`.
 
-This page already has **no settings dialog and no generic Watch picker/session panel**. The human blue side stays human, and the coral opponent stays TAMEV. Do not add a Watch mode for the human side.
+This page had **no settings dialog or generic Watch picker/session panel** in the baseline and retains that fixed-opponent boundary. The human blue side stays human, and the coral opponent stays TAMEV. Do not add a Watch mode for the human side.
 
-| Current element / state | Decision | Result and reason |
+| Baseline element / state | Decision | Implemented result and reason |
 | --- | --- | --- |
 | External Back/title | Merge | Shared in-stage navigation and identity. |
 | YOU/BLUE and TAMEV/CORAL score blocks | Merge | Compact scoreboard retaining clear side ownership and both scores. |
@@ -317,27 +317,29 @@ This page already has **no settings dialog and no generic Watch picker/session p
 | External top-goal/joystick/WASD/arrows/Space/P instructions | Merge | Once-only input/rule hint. |
 | Arena, robots, ball, goals, rounded bumpers, dash feedback | Keep | Rebuild from pure model snapshots in the one shared stage; discard old view/input/assembly wrappers. |
 
-**Preserve:** fixed human-versus-TAMEV duel, goals/collisions/bumpers, first to three, equal movement/dash rules, kickoff/reset, Pause/Resume/New match/rematch, model-load/inference retry, sound, human wins/matches, reduced motion, and interruptions. `aeroplay:pushball:wins` and `matches` remain readable. The policy generates candidates; TAMEV must continue selecting them.
+**Preserve:** fixed human-versus-TAMEV duel, goals/collisions/bumpers, first to three, equal movement/dash rules, kickoff/reset, Pause/Resume/New match/rematch, model-load/inference retry, sound, human wins/matches, reduced motion, and interruptions. `aeroplay:pushball:wins` and `matches` remain readable. The policy generates candidates; TAMEV selects them.
 
 **Final page:** arena with compact scoreboard/status/navigation and Pause/Sound/conditional Retry; joystick and Dash in reserved edge regions. Start/loading/error/pause/result panels are short and contextual. No generic mode toggle or external diagnostic block.
 
 ## Explicit interpretations and preservation boundaries
 
-### One phone breakpoint including landscape
+### Approved phone breakpoint including landscape
 
-The literal width rule `width <= 700px` excludes the required 844×390 iPhone landscape. This review proposes **one shared threshold on the shorter viewport side: <=700px**, expressed by one common query `@media (max-width: 700px), (max-height: 700px)`. It selects both phone orientations and leaves 1440×900 / 1512×982 in MacBook rules. This is an explicit interpretation for confirmation, not a claim of literal width-only compliance. No per-game media queries are introduced.
+The approved and implemented phone rule uses **one shared threshold on the shorter viewport side: <=700px**, expressed by `@media (max-width: 700px), (max-height: 700px)`. This includes the required 844×390 landscape phone; 1440×900 and 1512×982 use MacBook rules. All games share the same variable-driven layout. There are no per-game media queries.
 
 ### AI counts and lazy initialization
 
-Current source has 11 planner game cases (`src/core/ai-plans.ts:252-265`), not ten. Removing three produces **eight total planners: seven optional Watch games plus Pushball's fixed opponent**. The old ten optional Watch pages become seven. No AI capability is added.
+The baseline had eleven planner cases (`src/core/ai-plans.ts:252-265` at `2ee86c8`). The implemented [planner worker](../src/ai/planner.worker.ts) has **eight planners: seven optional Watch games and Pushball's fixed opponent**. Retired-game planners and guards are removed. AI retains its previous capabilities.
 
-The seven switchable pages initialize inference on first Watch. Pushball initializes on first Start match, because it must load its required opponent and has no Watch control (`src/games/pushball.ts:102-114`). The model remains resident and is shared after successful initialization. Service-worker precaching of model/WASM files remains: file caching is separate from initializing the inference session (`src/core/ai-model.ts:16-27`; `vite.config.ts:21-52`; `public/service-worker.js:1-17`).
+The seven switchable pages initialize inference on first Watch. Pushball initializes on first Start match because its opponent is mandatory; it has no human Watch mode. The model remains resident across navigation. [player.ts](../src/ai/player.ts) owns loading and the resident client; [tamev.ts](../src/ai/tamev.ts) validates checksums, graph configuration, choice membership, and token budgets before same-origin single-thread WASM inference. [vite.config.ts](../vite.config.ts) and the [service worker](../public/service-worker.js) retain model/WASM precaching; caching files does not initialize the inference session.
 
 Preserve asynchronous candidate planning, read-only snapshots, ordinary input application, stale-plan checks, cancellation on pause/takeover/navigation/hiding, and empty queued inputs after cancellation. Lock gameplay inputs without disabling the new in-stage HUD.
 
+Baseline lazy-inference/cache references at `2ee86c8`: `src/games/pushball.ts:102-114`, `src/core/ai-model.ts:16-27`, `vite.config.ts:21-52`, and `public/service-worker.js:1-17`.
+
 ### Existing storage formats
 
-The explicit old-record requirement overrides the old AGENTS instruction to ignore backward compatibility. Existing human data must remain readable with the same key names and shapes. AI-owned runs remain under `aeroplay:ai:<game>:*`; takeover does not convert them to personal records (`src/core/storage.ts:5-8,37-44`). Preserve return to the saved personal run separately from takeover and from game reset/progression actions (`src/core/player-controls.ts:43`; `src/main.ts:156-185`).
+The implemented [storage layer](../src/core/storage.ts) retains existing key names and payload shapes. AI-owned runs stay under `aeroplay:ai:<game>:*`; takeover keeps that ownership. Your run remounts the saved personal profile independently of takeover or reset/progression actions. The original ownership behavior is documented by baseline `src/core/storage.ts:5-8,37-44`, `src/core/player-controls.ts:43`, and `src/main.ts:156-185`.
 
 | Scope | Existing keys / payload |
 | --- | --- |
@@ -353,25 +355,43 @@ The explicit old-record requirement overrides the old AGENTS instruction to igno
 
 Delete code that reads retired-game saves; do not erase unrelated old localStorage data. A removed `last-game` ID falls back to a surviving card. Sound/record/progress reads on the hub use human storage. Do not claim save restoration of unsupported data such as Flappy/Sky mid-flight state or unpersisted undo stacks.
 
-### Validation and deployment remain gated
+### Verification and release evidence
 
-After confirmation, implementation follows P0, P1, one P2 commit per game in the requested order, P3, then P4. Work stays on local `main`. Each stage reports additions/deletions, current source/style counts, and build status. No P0–P3 push is permitted.
+The build, model preparation, CSP, same-origin runtime resources, service-worker precache updates, and main push → GitHub Actions → Cloudflare Pages deployment chain are retained. The current [workflow](../.github/workflows/deploy-cloudflare-pages.yml) builds with `npm run build:decision`. The preserved baseline build/deployment references are `.husky/pre-commit:2`, `package.json:8-13`, and `.github/workflows/deploy-cloudflare-pages.yml:3-6,25-33` at `2ee86c8`. Phase commits and validation reports are maintained in [progress.md](../progress.md).
 
-The existing pre-commit build remains (`.husky/pre-commit:2`; `package.json:8-13`). Deployment stays main push → GitHub Actions `build:decision` → Cloudflare Pages (`.github/workflows/deploy-cloudflare-pages.yml:3-6,25-33`); CSP, same-origin resources, and automatic service-worker fingerprint/update behavior remain intact. No deployment or infrastructure change is part of this review.
+The four verifiers retain the following acceptance boundaries:
 
-The replacement verifiers must preserve meaningful coverage from the current distributed scripts:
-
-| Verifier | Required evidence |
+| Verifier | Evidence required |
 | --- | --- |
-| `verify-layout.mjs` | Hub + eight games × all three viewports; no scrolling/overflow; safe-area-aware reserved HUD/control regions; controls visible and reachable; playable bounds unobstructed. Check active and result states as relevant, including Sudoku keypad and Cargo/Sky controls. |
-| `verify-games.mjs` | All eight games open and reach settlement through real game inputs; relevant scoring, Undo, hints, restart/next, sound/input states, and legacy-save restore. Retain native keyboard/touch coverage, phase locks, navigation disposal, and reduced motion. |
-| `verify-ai.mjs` | Full existing Watch round, pause/retry where relevant, takeover on the same run with correct record ownership, and complete Pushball match with real local TAMEV. Preserve cancellation/stale-plan and resident-inference coverage. |
-| `verify-offline.mjs` | Serve the production build, verify same-origin-only resources, complete precache, then cold browser/app restart from a previously prepared cache without network; games and local AI remain usable. A device with no previously obtained site/cache cannot acquire assets while disconnected. |
+| [verify-layout.mjs](../scripts/verify-layout.mjs) | Hub + eight games × three viewports; no scroll/overflow; safe-area-aware reserved HUD/control regions; visible/reachable controls and unobstructed playable bounds. |
+| [verify-games.mjs](../scripts/verify-games.mjs) | All eight games reach results through native input, with rules, relevant scoring/undo/hints/restart/progression, legacy-save restoration, rendering/teardown, interruptions, and reduced motion. |
+| [verify-ai.mjs](../scripts/verify-ai.mjs) | Real TAMEV Watch completion, pause/retry/takeover, record ownership, cancellation/stale-plan guards, resident inference, and a full Pushball match. |
+| [verify-offline.mjs](../scripts/verify-offline.mjs) | Production precache, zero external runtime requests, a cold browser restart with the server stopped, offline games/real AI, CSP, and cache activation/update behavior. |
 
-No assertions are relaxed to hide failures. The Safari/device checks and new verifier results are outstanding. Push remains gated on successful build, complete layout/game verification, and human confirmation that all nine pages open; all four requested verifier results must be reported at final delivery. After the single P4 push, verify successful Actions, matching deployed/local asset hashes, and changed service-worker CACHE fingerprint.
+Targeted implementation evidence already established:
 
-## Confirmation-stage completion
+- All twelve Cargo levels solve through ordinary model inputs at their retained par; Undo, stars, and saved-run restoration work. Human Hint preserves the original 20,000-node solver budget and returns no route for a reachable trapped-crate state. Hint does not initialize the ONNX model or WASM.
+- Native WebKit Cargo checks cover D-pad/swipe, uppercase Z, per-level first-use help, SVG button targets, and sound persistence. Native Sky controls complete a sector and retain score/rings on the next sector; Boost, charge, shield, pause, start/resume keys, and upward swipe use the ordinary model contract.
+- Real WebKit TAMEV completes Lights Out, then allows Sudoku takeover without further AI inputs. The same inference worker remains resident across navigation with one initialization and the pinned 14,872,474-byte model.
+- Pushball starts only after successful real model preparation, applies actual TAMEV-selected inputs through unchanged physics, pauses both input authorities and the clock, and starts a fresh paused New match without counting the abandoned round. Idle Dash retains the last direction; P/Escape and normalized WASD remain available.
+- Those targeted browser checks recorded zero page errors and zero external requests. Build validation passed after the preservation fixes. These checks supplement the complete verifier suite; they do not substitute for its final results.
 
-The hub and all eight pages now have explicit Keep/Merge/Delete decisions, functional preservation notes, source references, and current screenshots at every requested viewport. The shared settings dialog and hidden/result labels have also been reviewed.
+Final four-verifier results and post-push deployment evidence are recorded at release acceptance. This page inventory does not assert that the final release or physical-device certification is complete. Post-push acceptance checks successful Actions, local/deployed asset hashes, and the changed service-worker CACHE fingerprint. Assertions are retained when failures occur.
 
-The user has confirmed proceeding through the entire rewrite and pushing the verified final result. Local staged implementation now follows this review; game deletion, renderer migration, architecture documents, and tests are tracked by the phase commits and `progress.md`. Final push remains gated by the required checks.
+## Implemented pages and tracked comparisons
+
+Each screenshot folder contains `before-iphone-portrait.png`, `before-iphone-landscape.png`, `before-macbook.png`, and the three matching `after-*` images. Before images are from `2ee86c8`; after images record the implemented Three presentation at capture time. Final verifier screenshots assess the current release state.
+
+| Page | Implemented elements and removals | Current implementation | Tracked before/after |
+| --- | --- | --- | --- |
+| Hub | Eight real preview/name/local-record cards, compact brand/offline state, last-played highlight. Hero, filters, marketing copy, emoji, and retired-game cards removed. | [hub](../src/hub/hub.ts), [registry](../src/games/registry.ts) | [Hub captures](screenshots/hub/) |
+| 2048 | Three tiles and value labels; Score/Best/Moves/milestone, swipe/arrows, Undo/Restart, and contextual AI actions. DOM board removed. | [index](../src/games/2048/index.ts), [model](../src/games/2048/model.ts), [view](../src/games/2048/view.ts), [hud](../src/games/2048/hud.ts) | [2048 captures](screenshots/2048/) |
+| Lights Out | Three lamps; puzzle/moves/par/lit values, Undo/Hint/Retry/Next, stars, and contextual AI actions. DOM lamps and external strips removed. | [index](../src/games/lightsout/index.ts), [model](../src/games/lightsout/model.ts), [view](../src/games/lightsout/view.ts), [hud](../src/games/lightsout/hud.ts) | [Lights Out captures](screenshots/lightsout/) |
+| Flappy Bird | Three flight scene, pipes and scoring; tap/Space, best, Pause/Resume/Retry/Sound, and contextual AI actions. Old canvas/Pixi and external strips removed. | [index](../src/games/flappy/index.ts), [model](../src/games/flappy/model.ts), [view](../src/games/flappy/view.ts), [hud](../src/games/flappy/hud.ts) | [Flappy Bird captures](screenshots/flappy/) |
+| Sudoku | Three cells/digits/notes with accessible selection status; ten-key bank, Notes/Undo/Hint/New, three puzzles, timer/best/mistakes/fill. DOM board and landscape scrolling removed. | [index](../src/games/sudoku/index.ts), [model](../src/games/sudoku/model.ts), [view](../src/games/sudoku/view.ts), [hud](../src/games/sudoku/hud.ts) | [Sudoku captures](screenshots/sudoku/) |
+| Match-3 | Three gems and cascades; score/target progress, moves/level/best, Hint/Restart/Next/Sound and result states. DOM gems and external action strips removed. | [index](../src/games/match3/index.ts), [model](../src/games/match3/model.ts), [view](../src/games/match3/view.ts), [hud](../src/games/match3/hud.ts) | [Match-3 captures](screenshots/match3/) |
+| Pocket Cargo | All twelve islands, selector/delivery/push/par data, D-pad/swipe, Undo/Hint/Restart/Next/Sound, stars and corner warnings. Clipped old controls and separate status rows removed. | [index](../src/games/cargo/index.ts), [model](../src/games/cargo/model.ts), [view](../src/games/cargo/view.ts), [hud](../src/games/cargo/hud.ts) | [Pocket Cargo captures](screenshots/cargo/) |
+| Sky Rush | Three flight/biome/cloud scene; score/best/rings/current-best streak/shield/distance, steer/Boost state, Start/Pause/Resume/Restart/Next/Sound. Old renderer and clipped strips removed. | [index](../src/games/sky/index.ts), [model](../src/games/sky/model.ts), [view](../src/games/sky/view.ts), [hud](../src/games/sky/hud.ts) | [Sky Rush captures](screenshots/sky/) |
+| Robot Pushball | Three arena and fixed human-versus-TAMEV scoreboard; joystick/Dash/charge, Start/loading/error/Retry AI, Pause/Resume/New match/rematch/Sound, human record and graphics recovery. External diagnostics removed. | [index](../src/games/pushball/index.ts), [model](../src/games/pushball/model.ts), [view](../src/games/pushball/view.ts), [hud](../src/games/pushball/hud.ts) | [Robot Pushball captures](screenshots/pushball/) |
+
+The shared [stage](../src/core/stage.ts), [HUD](../src/core/hud.ts), [input](../src/core/input.ts), [loop](../src/core/loop.ts), and [player contract](../src/ai/player.ts) implement the common boundaries. There are no old view modules, AI settings/preload dialogs, per-game renderer/camera/light factories, remote runtime adapters, or retired-game save readers.
