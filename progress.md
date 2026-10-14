@@ -260,3 +260,9 @@ Original prompt: Revisit all games in this project and make them more fun to pla
 - Sudoku on a landscape phone is the one documented exception: a 9x9 grid plus ten keys cannot fit 390px of height, so `verify-layout.mjs` allows that single route to scroll.
 - Validation: verify-layout (3 viewports x 11 games), verify-games (8 games plus 320/390/768), verify-3d and verify-pixi all pass.
 
+
+## Three-only eight-game rewrite (2026-10-15)
+- User request: destructive rewrite to one Three.js framework, eight games, in-stage HUD/controls, iPhone/MacBook only, existing local TAMEV capability; local staged main commits and one verified final push.
+- Page review and 27 before viewport screenshots completed; user authorized the complete rewrite and direct final push.
+- P0 removes the eleven-game presentation/AI assembly, Pixi stack, DOM boards, settings, old CSS and old verifier entrypoints; preserves reusable pure source snapshots for migration and model preparation/deployment assets.
+- New eight-game directory skeleton, styles/tokens and architecture documents created. Functional game/AI migration and consolidated verifier coverage follow P1-P4.

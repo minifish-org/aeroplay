@@ -1,275 +1,41 @@
-# AGENTS.md - FlightMode Games Project
-
-AGENT: FlightMode Games Project
-
-This project builds an offline-first frontend game collection optimized for iPhone flight-mode usage, using HTML, TypeScript, CSS, and locally bundled game libraries such as Three.js. All games share a unified Game Hub UI. The optional AI watch mode runs TAMEV entirely on the device; personal gameplay and game assets remain fully offline.
-
-Goal: produce a lightweight, responsive, mobile-friendly experience that runs entirely offline and can be added to Home Screen.
-
-## Default Output Style: i-have-adhd
-
-Enable ADHD-friendly output by default for every session in this workspace, without requiring a skill command. These rules are self-contained and do not require a separate skill installation. Apply them throughout the session, including after topic changes.
-
-1. Lead with the answer or next action: command, path, or snippet first.
-2. Number multi-step work; one bounded action per step.
-3. If anything remains open, end with one concrete next action doable in under two minutes.
-4. Finish the current issue before raising a new one; suppress unrelated tangents.
-5. Restate progress each turn when working through a multi-step task. If a task checklist is available, use it instead of repeating the full plan.
-6. Give time estimates in concrete units when useful, never vague phrases such as "a bit".
-7. After a change, show what now works in concrete terms.
-8. State errors matter-of-factly: location, cause, and fix. No drama.
-9. Aim for at most five visible items per group; rank and group longer lists. Never omit relevant information when completeness matters.
-10. No preamble, redundant recap, or closing pleasantries. Start with the answer and end when it is done.
-
-Explain fully when asked to explain. Confirm before destructive actions. After three failed fixes, stop and name the doubtful assumption. If the request is genuinely ambiguous, ask one short question. Higher-priority instructions, safety, and task completeness take precedence over style.
-
-If the user says "stop adhd mode" or "normal mode", confirm in one line and disable this style for the rest of the current session. An explicit request to enable it again restores the style. New sessions default to enabled.
-
-----------------------------------------------------------------
-
-## Critical Requirements
-
-### 1. Language Requirements
-
-- **ALL code must be written in English**
-- **ALL commit messages must be in English**
-- **ALL comments, variable names, function names, and documentation must be in English**
-- No exceptions to this rule
-
-### 2. Backward Compatibility
-
-- **DO NOT consider backward compatibility**
-- You are free to make breaking changes
-- Focus on correctness and maintainability over compatibility
-- Update all affected code paths when making changes
-
-----------------------------------------------------------------
-
-## PROJECT SCOPE
-
-Included Games
-Difficulty A (must implement)
-- Snake (Canvas)
-- Tetris (Canvas)
-- 2048 (DOM)
-- Flappy Bird (Canvas)
-- Maze Escape (random maze generator + movement)
-
-Difficulty B (must implement)
-- Match-3 
-- Pocket Cargo (3D Sokoban)
-- Sky Rush (3D flight arcade)
-- Sudoku
-- Lights Out
-- Robot Pushball (3D, human against the on-device TAMEV player)
-
-Additional Requirements
-- Unified Game Hub with responsive grid of icons
-- Each game runs in its own page or dynamically loaded view
-- Mobile touch controls required
-- All game assets local, no network dependency for personal gameplay; the optional AI player runs on-device only.
-- Use localStorage for save data
-- Optional: PWA support (service worker + manifest)
-
-----------------------------------------------------------------
-
-## RECOMMENDED PROJECT STRUCTURE
-
-/public
-  /assets
-    /common
-    /snake
-    /tetris
-    /2048
-    /flappy
-    /maze
-    /match3
-    /sokoban
-  index.html (Game Hub)
-  game.html (optional dynamic loader)
-  manifest.json (optional PWA)
-  service-worker.js (optional PWA)
-
-/src
-  /core
-    ui.ts (shared UI helpers)
-    storage.ts (localStorage wrapper)
-    engine.ts (game loop helpers)
-  /games
-    snake.ts
-    tetris.ts
-    2048.ts
-    flappy.ts
-    maze.ts
-    match3.ts
-    sokoban.ts
-  main.ts (hub logic)
-
-/styles
-  base.css
-  hub.css
-  game.css
-
-tsconfig.json
-package.json
-vite.config.ts (recommended)
-
-----------------------------------------------------------------
-
-## UI / UX REQUIREMENTS
-
-Game Hub
-- Grid layout of game cards
-- Each card has title + icon
-- Tapping card loads the game
-- Full-screen and mobile-responsive
-
-In-Game Layout
-- Minimal top bar with back button and title
-- Canvas or DOM game area centered
-- Touch controls where needed
-  - Swipe (Snake, Maze, 2048)
-  - Tap (Flappy Bird, Match-3, Lights Out, Sudoku)
-  - On-screen controls inside the play area (Cargo D-pad, Pushball stick and dash, Sky steer and boost, Tetris move and drop columns)
-
-Responsive Layout
-- Each 2D game owns one square `.game-surface`; the board keeps its aspect and never stretches with the viewport
-- Controls that belong to play stay inside the play area: 3D scenes use overlays, Tetris uses the surface gutters beside the well
-- Do not add arrow pads where swipe and keyboard already drive the game; do not stack buttons in a separate row under the board
-- Occasional actions (hint, undo, restart) belong in one compact row under the board on phones and beside it when width allows
-- Every game must fit a laptop (1512x982), a portrait phone (390x844) and a landscape phone (844x390) without scrolling or horizontal overflow, and safe-area insets must survive the compact padding rules
-
-----------------------------------------------------------------
-
-## TECH REQUIREMENTS
-
-General
-- Use TypeScript
-- Use PixiJS for 2D presentation and Three.js for the three 3D scenes (Sky Rush, Pocket Cargo, Robot Pushball)
-- Keep gameplay, native input, storage and AI adapters separate from renderer classes
-- Reuse one Pixi renderer across 2D scenes; destroy each scene's textures, filters and listeners on navigation
-- Keep particles bounded, stop idle rendering, and respect reduced-motion preferences
-- Load game modules on demand and bundle all dependencies locally
-- Dispose 3D resources, workers, audio contexts, and event handlers on navigation
-- No external CDN
-- Target 60 FPS
-
-localStorage
-storage.ts must expose:
-- save(key, value)
-- load(key, fallback)
-- Support per-game namespace
-
-Engine Helpers (engine.ts)
-- Basic game loop abstraction
-- Timing utilities
-
-----------------------------------------------------------------
-
-## GAME REQUIREMENTS
-
-Snake
-- Canvas rendering
-- Swipe control
-- Score tracking
-
-Tetris
-- Classic tetromino implementation
-- Rotate / left / right / drop mobile controls
-
-2048
-- DOM grid
-- Touch swipe
-- Smooth animations
-
-Flappy Bird
-- Canvas
-- Tap to jump
-- Random pipes
-- Score + best score
-
-Maze
-- Random maze generator (DFS or Kruskal)
-- Player movement
-- Track completion time
-
-Match-3
-- Swap adjacent tiles
-- Detect and clear 3+ matches
-- Drop-down gravity
-- Score system
-
-Sokoban
-- Tile-based maps
-- Multiple levels
-- Push rules
-- Touch directional buttons
-- Optional undo
-
-----------------------------------------------------------------
-
-## BUILD & TOOLING
-
-Use Vite for dev and build.
-Commands: npm install, npm run dev, npm run build
-
-Output must run 100% offline.
-
-----------------------------------------------------------------
-
-## MOBILE OPTIMIZATION
-
-- Disable double-tap zoom
-- Disable text selection
-- Proper viewport meta
-- Canvas resize logic
-- Swipe + tap gestures
-
-----------------------------------------------------------------
-
-## PERFORMANCE
-
-- Minimize DOM reflow
-- Prefer Canvas for animations
-- Cap FPS if needed
-- No runtime network usage. The on-device AI player uses bundled local resources only; never add an external dependency to personal gameplay.
-
-----------------------------------------------------------------
-
-## QA REQUIREMENTS
-
-Test on:
-- iPhone Safari and macOS Safari
-- Chrome mobile
-- Must work in Flight Mode
-- All resources load locally
-- Touch controls reliable
-- Run `node scripts/verify-layout.mjs` (laptop, portrait phone, landscape phone), `verify-games.mjs` for the 2D games, `verify-3d.mjs` for the 3D scenes and `verify-pixi.mjs` for rendering and teardown
-
-----------------------------------------------------------------
-
-## WHAT AGENTS SHOULD DO
-
-1. Scaffold full folder structure
-2. Implement Game Hub UI
-3. Implement each game in /src/games
-4. Implement core helpers
-5. Ensure mobile touch UX and the responsive layout rules above
-6. Add optional PWA
-7. Produce final offline build
-8. Keep the browser verifiers green before pushing: layout, 2D games, 3D scenes and Pixi rendering
-
-----------------------------------------------------------------
-
-## ACCEPTANCE CRITERIA
-
-Project is complete when:
-- All 11 games are playable offline
-- Hub UI loads each game
-- No external requests at runtime; every asset, model and script is served from the same origin
-- Saves stored locally
-- Touch controls fully functional
-- Every game fits laptop and phone viewports, portrait and landscape, without scrolling
-- Build outputs static files runnable anywhere
-
-END OF AGENTS.md
+# AeroPlay
+
+Build an offline-first collection for iPhone Safari and MacBook Safari using TypeScript and Three.js. All code, comments, documentation, and commit messages are English.
+
+## Scope
+
+Exactly eight games: 2048, Lights Out, Flappy Bird, Sudoku, Match-3, Pocket Cargo, Sky Rush, Robot Pushball. There is no Snake, Tetris, Maze, Pixi, DOM game board, or remote runtime service. Keep all existing non-AI game functions and only the existing local TAMEV capabilities.
+
+## Architecture
+
+- `src/core/`: stage.ts, hud.ts, input.ts, storage.ts, loop.ts, audio.ts. One persistent Three renderer and shared camera/light authority.
+- `src/ai/`: player.ts, tamev.ts, planner.worker.ts. Read-only snapshots; ordinary shared inputs; resident local ONNX inference.
+- `src/hub/hub.ts`: eight preview/name/local-record cards.
+- `src/games/<game>/`: index.ts assembles; model.ts is pure logic with no Three/DOM/storage; view.ts presents; hud.ts defines in-stage controls. Registry changes by one line per new game.
+- `styles/`: tokens.css, hub.css, game.css only.
+
+Allowed old logic reuse: mergeLogic, flappyFlight, lightsLogic, puzzleSolvers, skyState, Cargo model/solver, Pushball model/policy. Preserve all three Sudoku puzzles and twelve Cargo level data records. Never reuse old view/assembly code.
+
+## Presentation and input
+
+Use three-point lighting, soft shadows, ACES tone mapping, consistent materials, and pixel ratio <=2. Orthographic games use shaped geometry and lighting. Bounded particles; entry/score/failure/result easing <=400ms; reduced motion applies final states directly. DOM is for accessible HUD text/controls, never boards or transparent grid overlays. HUD and touch inputs stay inside the stage, >=12px from its edges and outside reserved playable bounds. Keep keyboard focus cues.
+
+One shared short-side threshold <=700px selects both iPhone orientations; no per-game media queries. Required viewports: 390x844, 844x390, 1512x982; MacBook lower bound 1440x900. No scrolling, horizontal overflow, clipped controls, or obstructed playfield. Only touch/in-stage controls on iPhone; keyboard/mouse on MacBook.
+
+The mode control combines Human/Watch/takeover. Remove settings/dialog/preload UI. Initialize TAMEV on first Watch; Pushball's mandatory opponent initializes on first Start match. Pause/retry/replay/return-to-personal-run remain contextual in-stage actions. Cancel queued plans on pause/takeover/navigation/hiding; never disable HUD recovery controls when locking AI-owned play input.
+
+## Storage and offline
+
+Keep existing key names and saved shapes readable, including `aeroplay:game2048:*`. Human and AI runs stay separate; takeover never makes AI records personal. Preserve global sound/last-game values. No runtime external resources: model, WASM, assets, and scripts share the origin. Keep build:decision, CSP, SW precache/version updates, and the deployment pipeline.
+
+## Delivery gates
+
+Work directly on local main. P0 skeleton, P1 core, P2 one game commit each (2048, Lights, Flappy, Sudoku, Match3, Cargo, Sky, Pushball), P3 AI, P4 cleanup. Each stage builds and reports added/deleted lines plus current source/style counts. Commit messages describe change and validation. Pre-commit runs tsc -b and Vite build. Never push incomplete or unverified stages. No force push.
+
+Before the single final push: npm run build, verify-layout.mjs, verify-games.mjs, verify-ai.mjs, verify-offline.mjs, and manual browser opening of hub/all eight games. Do not relax assertions. Preserve existing meaningful coverage, render_game_to_text, advanceTime, and PLAYWRIGHT_MODULE support. After push verify successful GitHub Actions, deployed/local asset hashes, and updated SW CACHE.
+
+Budgets: src TS <=6000 lines, styles CSS <=900, scripts <=2000; model+view+hud <=450 per game. Keep code readable. If a game cannot meet its budget with adequate presentation, stop and describe the constraint instead of compressing it artificially.
+
+## Workflow and communication
+
+Use rg and targeted reads for discovery. Prefer RTK for supported shell commands and rtk proxy when exact output is needed; follow /Users/yusp/.codex/RTK.md. Never commit plans or intermediate thinking. Keep progress.md append-only. Default concise ADHD-friendly communication: next action/outcome first, bounded numbered steps, at most five items per group, factual errors, concrete progress, and one short next action when work remains. Explain fully on request. Explicit destructive authorization already covers this rewrite.
