@@ -266,3 +266,5 @@ Original prompt: Revisit all games in this project and make them more fun to pla
 - Page review and 27 before viewport screenshots completed; user authorized the complete rewrite and direct final push.
 - P0 removes the eleven-game presentation/AI assembly, Pixi stack, DOM boards, settings, old CSS and old verifier entrypoints; preserves reusable pure source snapshots for migration and model preparation/deployment assets.
 - New eight-game directory skeleton, styles/tokens and architecture documents created. Functional game/AI migration and consolidated verifier coverage follow P1-P4.
+- P0 committed as 90451be: +552/-15931 text lines; source110/CSS26; build passed; removed render/game/verifier code is replaced in later stages, not considered validated coverage.
+- P1 adds the shared persistent Three stage (three-point lights, ACES, shadows, bounded effects), accessible in-stage HUD, reserved input/play bounds, common input/clock/storage/audio and compact eight-card hub. Build and required browser client passed after refreshing Vite optimized dependencies; the fresh stage screenshot was visually inspected.

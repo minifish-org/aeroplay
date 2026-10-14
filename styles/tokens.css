@@ -16,3 +16,4 @@ button, select { font: inherit; }
 button { color: inherit; cursor: pointer; }
 button:focus-visible, select:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
 button:disabled { opacity: .45; cursor: default; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:0s!important;transition-duration:0s!important; } }

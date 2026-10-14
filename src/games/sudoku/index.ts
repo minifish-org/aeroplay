@@ -1,5 +1,6 @@
-export default function mount(root: HTMLElement, back: () => void) {
-  root.innerHTML = '<main class="game-stage"><h1>Sudoku</h1><p>Getting ready for your next round.</p><button>Back</button></main>';
-  root.querySelector('button')!.addEventListener('click', back);
-  return () => {};
+import type { GameContext } from "../../core/loop";
+export default function mount({stage,hud}:GameContext) {
+  stage.board(6,6);const tile=stage.tile(0,0,2,2,0x96d5b5);tile.rotation.z=.08;
+  const label=stage.label("Sudoku",3);label.position.set(0,-2,.3);stage.render();
+  hud.notice("Getting ready for your next round.");return ()=>{};
 }

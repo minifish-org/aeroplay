@@ -1,1 +1,69 @@
-export {};
+import { Player, planningSignature, getAIModelState, subscribeAIModel, getLocalDecisionDiagnostics, type PlanningState } from '../ai/player';
+import { bindInput } from './input';
+import { HUD } from './hud';
+import { Stage, type Preset } from './stage';
+import type { Store } from './storage';
+import type { GameEntry } from '../games/registry';
+export interface GameContext { entry:GameEntry; stage:Stage; hud:HUD; store:Store; player:Player; returnPersonal:()=>void; watchAgain:()=>void }
+export interface Model {
+  mode:string;act:(input:unknown)=>boolean;step:(dt:number)=>void;pause:()=>void;resume:()=>void;
+  reset:()=>void;snapshot:()=>object;planning:()=>PlanningState|null;
+}
+export interface RunOptions {
+  model:Model; render:(dt:number)=>void; refresh:()=>void; persist?:()=>void;
+  keys?:(key:string)=>unknown; swipe?:boolean; pick?:(x:number,y:number)=>unknown;
+  continuous?:boolean; active?:()=>boolean; timer?:boolean; start?:()=>void; clearInput?:()=>void; dispose?:()=>void;
+  inspect?:()=>object; preset?:Preset;
+}
+declare global { interface Window { render_game_to_text?:()=>string; advanceTime?:(ms:number)=>void } }
+export class GameLoop {
+  private frame=0;private last=0;
+  constructor(private update:(dt:number)=>void,private render:(dt:number)=>void,private active=()=>true) {}
+  private tick=(now:number)=>{this.frame=0;const dt=Math.min(.05,this.last?(now-this.last)/1000:1/60);this.last=now;this.update(dt);this.render(dt);if(this.active())this.frame=requestAnimationFrame(this.tick);else this.last=0;};
+  start(){if(!this.frame)this.frame=requestAnimationFrame(this.tick);}
+  stop(){cancelAnimationFrame(this.frame);this.frame=0;this.last=0;}
+  advance(ms:number){this.stop();for(let left=Math.max(0,ms)/1000;left>0;){const dt=Math.min(1/120,left);this.update(dt);left-=dt;}this.render(ms/1000);}
+}
+export function mountRun(context:GameContext,options:RunOptions) {
+  const {stage,hud,player,entry}=context,{model}=options;
+  let frame=0,last=0,disposed=false,runtimeTime=0;
+  const finished=()=>['won','over'].includes(model.mode);
+  const persist=()=>options.persist?.();
+  const draw=(dt=0)=>{options.render(dt);options.refresh();stage.advance(dt);stage.render();};
+  const active=()=>!document.hidden&&!hud.helpOpen&&((options.continuous&&model.mode==='playing')||options.active?.()||stage.animating||player.type==='ai');
+  const tick=(dt:number)=>{runtimeTime+=dt;if(!options.timer&&!hud.helpOpen&&model.mode!=='paused')model.step(dt);draw(dt);};
+  const animate=(now:number)=>{frame=0;if(disposed)return;const dt=Math.min(.05,last?(now-last)/1000:1/60);last=now;tick(dt);if(active())frame=requestAnimationFrame(animate);else last=0;};
+  const wake=()=>{if(disposed)return;draw();if(active()&&!frame)frame=requestAnimationFrame(animate);};
+  const apply=(input:unknown)=>{if(hud.helpOpen)return false;const accepted=model.act(input);if(accepted){persist();wake();}return accepted;};
+  const key=()=>{const state=model.planning();return state?planningSignature(state)+(options.continuous?':'+Math.floor(runtimeTime*7):''):'';};
+  const port=player.connect<unknown>({game:entry.id,planning:()=>model.planning(),observe:()=>model.planning()?{key:key(),context:entry.name+'. Use the visible state and normal controls.',question:'Which normal input advances the game?',choices:{wait:'Wait'},inputs:{wait:'wait'}}:null,
+    isCurrent:(value)=>value===key(),apply,clearInput:options.clearInput,
+    start:()=>{if(finished())model.reset();model.resume();options.start?.();wake();},
+    pause:()=>{model.pause();options.clearInput?.();persist();wake();},resume:()=>{model.resume();wake();},isFinished:finished,isPaused:()=>model.mode==='paused'});
+  const unbind=bindInput(hud.element,options.keys??(()=>undefined),input=>{port.human(input);},options.pick??((x,y)=>stage.pick(x,y)),options.swipe);
+  const mode=entry.id==='pushball'?null:hud.button('mode','Watch TAMEV','ai',()=>{if(player.type==='ai')player.takeOver();else player.watchAI();});
+  const personal=entry.id==='pushball'?null:hud.button('personal','Your run','human',context.returnPersonal);
+  const pause=entry.id==='pushball'?null:hud.button('ai-pause','Pause','pause',()=>{if(player.status==='paused'||model.mode==='paused')player.resume();else player.pause();});
+  const retry=entry.id==='pushball'?null:hud.button('ai-retry','Retry AI','restart',()=>player.retry());
+  const again=entry.id==='pushball'?null:hud.button('ai-again','Watch again','play',context.watchAgain);
+  function syncPlayer() {
+    if(mode)hud.label(mode,player.type==='ai'?'Take over':'Watch',player.type==='ai'?'Take over':'Watch TAMEV');
+    if(personal)personal.hidden=!player.hasUsedAI||player.type==='ai';
+    if(pause){pause.hidden=player.type!=='ai'||finished();hud.label(pause,player.status==='paused'?'Resume':'Pause');}
+    if(retry)retry.hidden=player.type!=='ai'||!player.error||finished();
+    if(again)again.hidden=player.type!=='ai'||!finished();
+    hud.element.dataset.player=player.type;hud.element.dataset.playerStatus=player.status;
+    const state=getAIModelState();if(player.error)hud.notice(player.error);else if(state.status==='loading')hud.notice('Loading TAMEV…');
+    wake();
+  }
+  const off=player.subscribe(syncPlayer),offModel=subscribeAIModel(syncPlayer);
+  const pauseHidden=()=>{if(document.hidden&&model.mode==='playing'){player.pause();options.clearInput?.();}};
+  const lost=()=>{if(model.mode==='playing')player.pause();};
+  document.addEventListener('visibilitychange',pauseHidden);window.addEventListener('pagehide',persist);hud.element.addEventListener('stage-lost',lost);
+  hud.onChange=wake;
+  window.render_game_to_text=()=>JSON.stringify({...model.snapshot(),coordinates:'Board origin top-left; x right, y down. Scene picks use screen CSS pixels.',...stage.inspect(),player:player.diagnostics(),ai:getLocalDecisionDiagnostics(),...options.inspect?.()});
+  window.advanceTime=(ms:number)=>{if(frame)cancelAnimationFrame(frame);frame=0;for(let remaining=Math.max(0,ms)/1000;remaining>0;){const dt=Math.min(1/120,remaining);runtimeTime+=dt;if(!hud.helpOpen&&model.mode!=='paused')model.step(dt);options.render(dt);options.refresh();stage.advance(dt);remaining-=dt;}draw();last=0;};
+  const timer=options.timer?window.setInterval(()=>{if(!document.hidden&&!hud.helpOpen&&model.mode==='playing'){model.step(1);options.refresh();}},1000):0;
+  syncPlayer();persist();wake();
+  return ()=>{disposed=true;if(frame)cancelAnimationFrame(frame);window.clearInterval(timer);persist();unbind();off();offModel();port.dispose();options.dispose?.();document.removeEventListener('visibilitychange',pauseHidden);window.removeEventListener('pagehide',persist);hud.element.removeEventListener('stage-lost',lost);delete window.render_game_to_text;delete window.advanceTime;};
+}
