@@ -2,7 +2,7 @@ import { applyToggle, isSolved, solveLights } from './lightsLogic';
 export { solveLights } from './lightsLogic';
 import { GameModule } from './gameTypes';
 import { LightsView } from './views/puzzles';
-import { createGameShell, createTouchButton, wrapSurface, surfaceActions } from '../core/ui';
+import { createGameShell, createTouchButton, wrapSurface, surfaceStrip } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
 
@@ -27,10 +27,13 @@ const lightsOut: GameModule = {
     const boardEl = document.createElement('div');
     boardEl.className = 'lights-grid';
     const surface = wrapSurface(boardEl, 'surface-board');
-    area.append(info, surface);
+    area.append(surface);
+    const top = surfaceStrip(surface, 'top');
+    const bottom = surfaceStrip(surface, 'bottom');
+    top.append(info);
     const view = new LightsView(boardEl);
     const status = message(
-      area,
+      bottom,
       'Tap a light to flip it and its four neighbors. Turn them all off.'
     );
     let level = 1,
@@ -41,7 +44,7 @@ const lightsOut: GameModule = {
       hinted = -1;
     let paused = false;
     const history: number[][] = [];
-    const controls = surfaceActions(surface);
+    const controls = top;
     const undo = createTouchButton('Undo', () => {
       const old = history.pop();
       if (!old) return;

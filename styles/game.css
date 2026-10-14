@@ -36,21 +36,9 @@
 .game-canvas {
   display: block;
   width: 100%;
-  max-width: 420px;
-  height: auto;
   border-radius: 14px;
   border: 1px solid #365168;
-  margin: 0 auto;
   touch-action: none;
-}
-.flappy-canvas {
-  max-width: min(360px, calc((100svh - 255px) * 0.75));
-  min-width: 210px;
-}
-.tetris-canvas {
-  max-width: min(240px, calc((100svh - 330px) * 0.5));
-  min-width: 145px;
-  aspect-ratio: 1 / 2;
 }
 .info-row {
   display: flex;
@@ -789,19 +777,6 @@
     overflow-y: auto;
     margin-bottom: 0;
   }
-  .game-canvas {
-    width: auto !important;
-    height: min(760px, calc(100svh - 200px)) !important;
-    max-width: 100%;
-    aspect-ratio: 1;
-    margin: 0;
-  }
-  .flappy-canvas {
-    aspect-ratio: 3 / 4;
-  }
-  .tetris-canvas {
-    aspect-ratio: 1 / 2;
-  }
   .info-row {
     font-size: 13px;
   }
@@ -931,19 +906,6 @@
   .game-message {
     min-height: 0;
     padding: 8px 10px;
-  }
-  .game-canvas {
-    width: auto !important;
-    height: min(430px, calc(100svh - 132px)) !important;
-    max-width: 100%;
-    aspect-ratio: 1;
-    margin: 0;
-  }
-  .flappy-canvas {
-    aspect-ratio: 3 / 4;
-  }
-  .tetris-canvas {
-    aspect-ratio: 1 / 2;
   }
   .control-grid {
     width: 148px;
@@ -1116,249 +1078,242 @@
     font-size: 11px;
   }
 }
-
-/* --- Play surface: the board owns its controls --- */
+/* --- Play panel: the board carries its own status strips --- */
+:root {
+  --panel-cap: 460px;
+}
 .game-surface {
   position: relative;
-  width: min(100%, 420px);
-  max-height: calc(100svh - 300px);
-  aspect-ratio: 1;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 8px;
+  width: min(100%, var(--panel-cap));
   margin: 0 auto;
-  justify-self: center;
 }
 .game-surface > canvas,
-.game-surface > .game-canvas[data-renderer='pixi'],
-.game-surface > .pixi-board {
-  position: absolute;
-  inset: 0;
+.game-surface > .game-canvas[data-renderer='pixi'] {
+  grid-column: 1;
+  grid-row: 2;
+  position: static;
+  inset: auto;
   width: 100% !important;
-  height: 100% !important;
-  max-width: none;
-  aspect-ratio: auto;
+  height: auto !important;
+  aspect-ratio: 1;
   margin: 0;
+  border-radius: 14px;
+}
+/* The board keeps position: relative: its DOM grid is absolutely anchored to it. */
+.game-surface > .pixi-board {
+  grid-column: 1;
+  grid-row: 2;
+  inset: auto;
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1;
+  margin: 0;
+  border-radius: 14px;
 }
 .surface-flappy > canvas,
 .surface-flappy > .game-canvas[data-renderer='pixi'] {
-  inset: 0 12.5%;
-  width: 75% !important;
+  aspect-ratio: 3 / 4;
+  max-width: calc(var(--panel-cap) * 0.75);
+  justify-self: center;
+}
+.surface-strip {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.surface-strip-top {
+  grid-row: 1;
+  justify-content: space-between;
+}
+.surface-strip-bottom {
+  grid-row: 3;
+  justify-content: space-between;
+}
+.surface-strip .info-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+  gap: 8px;
+  font-size: 12px;
+}
+.surface-strip .game-message {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  background: none;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #9fb6c6;
+}
+.surface-strip .touch-btn {
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+.surface-strip .tetris-previews {
+  padding: 4px 8px;
+}
+.surface-strip .sudoku-keypad {
+  flex: 1 1 auto;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+}
+.surface-strip .sudoku-btn {
+  padding: 6px 4px;
+  font-size: 12px;
+}
+
+/* Tetris: previews and start on top, move and drop rails beside the well. */
+.game-surface.surface-tetris {
+  grid-template-columns: minmax(42px, 58px) auto minmax(42px, 58px);
+  width: min(100%, calc(var(--panel-cap) + 124px));
 }
 .surface-tetris > canvas,
 .surface-tetris > .game-canvas[data-renderer='pixi'] {
-  inset: 0 25%;
-  width: 50% !important;
+  grid-column: 2;
+  grid-row: 2;
+  aspect-ratio: 1 / 2;
+  max-width: calc(var(--panel-cap) * 0.5);
+  justify-self: center;
 }
-.surface-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: center;
+.surface-tetris > .surface-strip {
+  grid-column: 1 / -1;
 }
-.surface-actions .touch-btn {
-  min-height: 34px;
-  padding: 6px 10px;
-  font-size: 12px;
+.surface-tetris .surface-left {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: center;
+  justify-self: end;
 }
-.surface-corner {
-  position: absolute;
-  display: flex;
-  gap: 6px;
-  z-index: 2;
+.surface-tetris .surface-right {
+  grid-column: 3;
+  grid-row: 2;
+  align-self: center;
+  justify-self: start;
 }
-.surface-corner .touch-btn {
-  background: #0d1f2dcc;
-  border-color: #ffffff2e;
-  min-height: 32px;
-  padding: 5px 9px;
-  font-size: 11px;
-  border-radius: 10px;
-}
-.surface-tl {
-  top: 6px;
-  left: 6px;
-}
-.surface-tr {
-  top: 6px;
-  right: 6px;
-}
-.surface-left,
-.surface-right {
-  top: 50%;
-  transform: translateY(-50%);
+.surface-tetris .surface-left,
+.surface-tetris .surface-right {
+  position: static;
+  transform: none;
   flex-direction: column;
-  align-items: center;
-}
-.surface-left {
-  left: 4px;
-}
-.surface-right {
-  right: 4px;
-}
-.surface-tetris .surface-tr {
-  top: 0;
-  right: 2px;
+  gap: 8px;
 }
 .surface-tetris .surface-corner .touch-btn {
-  width: 85%;
-  min-height: 40px;
-  font-size: 13px;
+  width: 100%;
+  min-height: 52px;
+  font-size: 15px;
 }
-.surface-tetris .surface-tr .touch-btn {
-  width: auto;
-}
+
 @media (min-width: 1000px) {
-  .game-surface {
-    width: min(100%, 760px);
-    max-height: calc(100svh - 240px);
+  :root {
+    --panel-cap: min(740px, calc(100svh - 312px));
   }
-  .surface-actions {
-    justify-content: flex-start;
+  .game-shell:not(.immersive-shell):not(.pushball-shell) .game-area {
+    display: block;
+    padding: 16px;
   }
 }
 @media (orientation: landscape) and (max-height: 560px) {
-  .game-surface {
-    width: min(100%, 430px);
-    max-height: calc(100svh - 132px);
+  :root {
+    --panel-cap: min(430px, calc(100svh - 206px));
   }
-  .surface-actions {
-    justify-content: flex-start;
+  .game-shell:not(.immersive-shell):not(.pushball-shell) .game-area {
+    display: block;
+    padding: 10px;
+  }
+  .surface-strip-bottom .game-message {
+    display: none;
+  }
+  .surface-strip .touch-btn {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .surface-strip .info-row {
+    font-size: 11px;
+  }
+  .surface-strip .tetris-previews {
+    padding: 2px 6px;
+  }
+  .surface-strip .mini-piece {
+    grid-template-columns: repeat(4, 6px);
+    grid-template-rows: repeat(4, 6px);
+  }
+  .surface-tetris .piece-preview span {
+    display: none;
+  }
+  .surface-tetris .surface-corner .touch-btn {
+    min-height: 42px;
+    font-size: 13px;
+  }
+  .game-surface.surface-tetris {
+    grid-template-columns: 40px auto 40px;
+  }
+}
+
+@media (min-width: 1000px) {
+  .game-surface.surface-tetris {
+    --panel-cap: min(660px, calc(100svh - 344px));
   }
 }
 
 
-/* --- 3D scenes: controls live inside the view --- */
-.sky-shell .game-area,
-.cargo-shell .game-area,
-.pushball-shell .game-area {
-  display: block;
-  padding: 0;
-}
-.sky-shell .sky-view,
-.cargo-shell .cargo-view,
-.pushball-shell .pushball-view {
-  width: min(100%, 1120px);
-  height: min(680px, calc(100svh - 200px));
-  aspect-ratio: auto;
+
+/* Grid cells are sized by their aspect ratio, never by a touch minimum. */
+.sudoku-cell,
+.match3-cell,
+.light-cell {
+  min-width: 0;
   min-height: 0;
-  max-height: none;
-  margin: 0 auto;
 }
-.flight-controls {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 10px;
+
+
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .sudoku-shell .game-surface {
+    width: min(100%, calc(var(--panel-cap) * 2));
+  }
+  .sudoku-shell .surface-sudoku > .pixi-board {
+    width: var(--panel-cap) !important;
+    justify-self: center;
+  }
+  .sudoku-shell .surface-strip {
+    flex-wrap: nowrap;
+  }
+}
+
+.sudoku-tools {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  pointer-events: none;
-  z-index: 3;
+  flex-direction: column;
+  gap: 6px;
 }
-.flight-controls > * {
-  pointer-events: auto;
-}
-.flight-controls .boost-button {
+.surface-strip .sudoku-keypad {
   flex: 1 1 auto;
 }
-.flight-controls .touch-btn {
-  min-height: 46px;
-}
-.flight-utility {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  justify-content: flex-end;
-  padding: 0;
-  z-index: 3;
-}
-.flight-utility .touch-btn,
-.pushball-utility .touch-btn {
-  background: #0d1f2dcc;
-  border-color: #ffffff2e;
-  backdrop-filter: blur(5px);
-  min-height: 30px;
-  padding: 5px 9px;
-  font-size: 11px;
-  border-radius: 10px;
-}
-.flight-meta {
-  bottom: 74px;
-}
-.cargo-header {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  right: 10px;
-  z-index: 3;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: #193a46d9;
-}
-.cargo-controls {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 10px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 14px;
-  pointer-events: none;
-  z-index: 3;
-}
-.cargo-controls > * {
-  pointer-events: auto;
-}
-.cargo-controls .control-grid {
-  width: 132px;
-  grid-template-rows: repeat(3, 38px);
-}
-.cargo-status {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 160px;
-  z-index: 2;
-  min-height: 0;
-  padding: 0;
-  text-align: center;
-  color: #eaf4ee;
-  text-shadow: 0 1px 3px #0b1f2a;
-}
-@media (orientation: landscape) and (max-height: 560px) {
-  .sky-shell .sky-view,
-  .cargo-shell .cargo-view,
-  .pushball-shell .pushball-view {
-    width: 100%;
-    height: min(430px, calc(100svh - 132px));
-  }
-  .flight-controls {
-    bottom: 6px;
-    padding: 0 10px;
-  }
-  .flight-controls .touch-btn {
-    min-height: 40px;
-  }
-  .flight-meta {
-    bottom: 58px;
-  }
-  .cargo-status {
-    bottom: 132px;
-  }
-}
 
-@media (orientation: portrait) and (max-width: 480px) {
-  .cargo-shell .cargo-view {
-    height: min(620px, calc(100svh - 214px));
-  }
-}
-
-/* Landscape phone: the 3D views keep only what the player needs. */
 @media (orientation: landscape) and (max-height: 560px) {
-  .sky-shell .three-instruction,
-  .pushball-shell .pushball-ai,
-  .pushball-shell .pushball-instructions {
+  .sudoku-shell .surface-strip-top .info-row {
     display: none;
+  }
+}
+
+
+
+/* Sudoku on a landscape phone: the 9x9 grid plus ten keys still scroll a little. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .sudoku-shell .sudoku-keypad {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .sudoku-shell .sudoku-btn {
+    min-height: 38px;
+    padding: 6px 4px;
+    font-size: 12px;
   }
 }

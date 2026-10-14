@@ -1,7 +1,7 @@
 import { GameModule } from './gameTypes';
 import { createGameCanvas } from '../core/pixi/scene';
 import { FlappyView } from './views/flappy';
-import { createGameShell, createTouchButton, bindTap, wrapSurface, surfaceActions } from '../core/ui';
+import { createGameShell, createTouchButton, bindTap, wrapSurface, surfaceStrip } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { Mode, exposeGame, message } from '../core/play';
@@ -27,9 +27,12 @@ const flappy: GameModule = {
     const canvas = createGameCanvas(W, H);
     canvas.className = 'game-canvas flappy-canvas';
     const surface = wrapSurface(canvas, 'surface-flappy');
-    area.append(info, surface);
+    area.append(surface);
+    const top = surfaceStrip(surface, 'top');
+    const bottom = surfaceStrip(surface, 'bottom');
+    top.append(info);
     const status = message(
-      area,
+      bottom,
       'Tap the sky or press Space. Fly through the center for +2.'
     );
     const view = new FlappyView(canvas);
@@ -45,7 +48,7 @@ const flappy: GameModule = {
       perfect = false;
     let flightVersion = 0;
     let flightClock = 0;
-    const controls = surfaceActions(surface);
+    const controls = top;
     const flapButton = createTouchButton('Take flight', () => input.human('flap'));
     const pause = createTouchButton('Pause', () => {
       if (mode === 'playing') pauseFlight();

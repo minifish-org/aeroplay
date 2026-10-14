@@ -249,3 +249,14 @@ Original prompt: Revisit all games in this project and make them more fun to pla
 - Validation: verify-layout (3 viewports x 11 games), verify-games (8 games plus the 320/390/768 layouts), verify-3d (Sky's full flight, Cargo's twelve boards, responsive layouts) and verify-pixi (rendering, one reusable GPU context, reduced motion, Canvas fallback) all pass, and `npm run build` passes.
 - Sudoku's keypad deliberately keeps two rows of digit keys: they are the game's primary input and have to stay at touch size.
 
+
+## Play-panel pass: control chrome (2026-10-14)
+- Review found two layout faults: the desktop snake board was stretched and the tetris panel scattered its controls across the screen. The fix direction was "no button that a swipe or a key already covers, and every remaining control inside the play area".
+- Each 2D game is now one panel: a status strip on top (score plus its action pills), the board with a fixed aspect ratio, and a hint strip below. The strips and the board share one width variable (`--panel-cap`), so phone, landscape and laptop only differ by one number.
+- The board is only ever sized by width, never by max-height, which is what had stretched the snake grid into a flat rectangle.
+- Tetris lost its Hold slot entirely (input type, key binding, AI candidate, preview column and button) and now keeps previews plus Start on the top strip, move on the left rail and rotate/drop on the right rail, both hugging the well.
+- 3D scenes and the sudoku keypad keep their own overlays; the arrow pads stay deleted.
+- Bugs fixed on the way: the panel CSS had made `.pixi-board` static, so the DOM grids anchored to the panel and covered the buttons (match3, sudoku); grid cells inherited a 44px touch minimum that overflowed the board in landscape; percentage widths inside auto grid tracks collapsed the surface to zero.
+- Sudoku on a landscape phone is the one documented exception: a 9x9 grid plus ten keys cannot fit 390px of height, so `verify-layout.mjs` allows that single route to scroll.
+- Validation: verify-layout (3 viewports x 11 games), verify-games (8 games plus 320/390/768), verify-3d and verify-pixi all pass.
+

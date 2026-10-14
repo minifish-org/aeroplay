@@ -1,7 +1,7 @@
 import { GameModule } from './gameTypes';
 import { createGameCanvas } from '../core/pixi/scene';
 import { SnakeView } from './views/snake';
-import { createGameShell, createTouchButton, bindSwipe, wrapSurface, surfaceActions } from '../core/ui';
+import { createGameShell, createTouchButton, bindSwipe, wrapSurface, surfaceStrip } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { Mode, exposeGame, message } from '../core/play';
@@ -22,10 +22,13 @@ const snake: GameModule = {
     const canvas = createGameCanvas(SIZE * CELL);
     canvas.className = 'game-canvas';
     const surface = wrapSurface(canvas, 'surface-board');
-    area.append(info, surface);
+    area.append(surface);
+    const top = surfaceStrip(surface, 'top');
+    top.append(info);
+    const bottom = surfaceStrip(surface, 'bottom');
     const view = new SnakeView(canvas);
     const status = message(
-      area,
+      bottom,
       'Swipe the board or use arrows. Golden crystals are worth 30 points.'
     );
     let segments: Point[] = [];
@@ -41,7 +44,7 @@ const snake: GameModule = {
     let acc = 0;
     let relaxed = false;
     let stepVersion = 0;
-    const row = surfaceActions(surface);
+    const row = top;
     const start = createTouchButton('Start', () => {
       if (mode === 'over' || mode === 'won') reset();
       mode = mode === 'playing' ? 'paused' : 'playing';
@@ -55,6 +58,7 @@ const snake: GameModule = {
       draw();
     });
     row.append(start, difficulty);
+    row.classList.add('surface-strip-actions');
     function turn(x: number, y: number) {
       if (mode === 'over' || mode === 'won' || mode === 'paused') return false;
       if (mode === 'ready') mode = 'playing';

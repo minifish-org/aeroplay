@@ -200,12 +200,6 @@ try {
 
   await open('tetris');
   await button('Start').tap();
-  const first = (await state()).current;
-  await button('Hold').tap();
-  assert.equal((await state()).held, first);
-  const held = await state();
-  await button('Hold').tap();
-  assert.deepEqual(await state(), held);
   await button('Pause').tap();
   const pausedTetris = await state();
   await advance(3000);
@@ -279,7 +273,7 @@ try {
   assert((await state()).score > 0);
   await layout();
   console.log(
-    'PASS Tetris: hold lock, pause, rotation, placement, line clears, scoring, top-out'
+    'PASS Tetris: pause, rotation, placement, line clears, scoring, top-out'
   );
 
   const fixture2048 = {

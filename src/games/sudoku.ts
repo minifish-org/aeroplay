@@ -1,6 +1,6 @@
 import { GameModule } from './gameTypes';
 import { SudokuView } from './views/puzzles';
-import { createGameShell, createTouchButton } from '../core/ui';
+import { createGameShell, createTouchButton, wrapSurface, surfaceStrip } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
 import { sudokuCandidates } from './puzzleSolvers';
@@ -60,21 +60,28 @@ const sudoku: GameModule = {
     const mistakesEl = document.createElement('div');
     const statusEl = document.createElement('div');
     info.append(puzzleEl, timeEl, mistakesEl, statusEl);
-    area.appendChild(info);
 
     const boardEl = document.createElement('div');
     boardEl.className = 'sudoku-grid';
-    area.appendChild(boardEl);
+    const surface = wrapSurface(boardEl, 'surface-board surface-sudoku');
+    area.closest('.game-shell')?.classList.add('sudoku-shell');
+    area.append(surface);
+    const top = surfaceStrip(surface, 'top');
+    const bottom = surfaceStrip(surface, 'bottom');
+    top.append(info);
     const view = new SudokuView(boardEl);
 
+    const tools = document.createElement('div');
+    tools.className = 'sudoku-tools';
+    area.append(tools);
     const keypad = document.createElement('div');
     keypad.className = 'sudoku-keypad';
-    area.appendChild(keypad);
+    tools.append(keypad);
 
     const newBtn = document.createElement('button');
     newBtn.className = 'sudoku-action';
     newBtn.textContent = 'New puzzle';
-    area.appendChild(newBtn);
+    top.append(newBtn);
 
     let puzzleIndex = 0;
     let board: Board = [];
@@ -92,7 +99,7 @@ const sudoku: GameModule = {
     let paused = false;
     const history: { board: Board; notes: number[][] }[] = [];
     const helper = message(
-      area,
+      bottom,
       'Choose a cell, then a number. Use Notes to pencil in candidates.'
     );
     const actions = document.createElement('div');
@@ -130,7 +137,7 @@ const sudoku: GameModule = {
         'One cell revealed. Check its row, column and box for your next move.';
     });
     actions.append(noteButton, undoButton, hintButton);
-    area.insertBefore(actions, newBtn);
+    tools.prepend(actions);
 
     hydrateFromSave();
     buildKeypad();

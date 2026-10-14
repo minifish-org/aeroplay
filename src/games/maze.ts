@@ -1,7 +1,7 @@
 import { GameModule } from './gameTypes';
 import { createGameCanvas } from '../core/pixi/scene';
 import { MazeView } from './views/maze';
-import { createGameShell, createTouchButton, bindSwipe, wrapSurface, surfaceActions } from '../core/ui';
+import { createGameShell, createTouchButton, bindSwipe, wrapSurface, surfaceStrip } from '../core/ui';
 import { GameLoop } from '../core/engine';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
@@ -24,9 +24,12 @@ const maze: GameModule = {
     const canvas = createGameCanvas(360);
     canvas.className = 'game-canvas';
     const surface = wrapSurface(canvas, 'surface-board');
-    area.append(info, surface);
+    area.append(surface);
+    const top = surfaceStrip(surface, 'top');
+    const bottom = surfaceStrip(surface, 'bottom');
+    top.append(info);
     const status = message(
-      area,
+      bottom,
       'Find the green exit. Take a detour for the three stars.'
     );
     const view = new MazeView(canvas);
@@ -45,7 +48,7 @@ const maze: GameModule = {
     let trail = new Set<string>(),
       path: Point[] = [],
       showTrail = true;
-    const controls = surfaceActions(surface);
+    const controls = top;
     const hint = createTouchButton('Hint · 3', () => {
       if (!hints || finished) return;
       hints--;

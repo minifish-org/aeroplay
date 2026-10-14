@@ -2,7 +2,7 @@ import { createBoard, collides, merge, clearLines, rotatedPiece, boardHeights } 
 import { GameModule } from './gameTypes';
 import { createGameCanvas } from '../core/pixi/scene';
 import { TetrisView } from './views/tetris';
-import { createGameShell, createTouchButton, wrapSurface, surfaceActions, surfaceCorner } from '../core/ui';
+import { createGameShell, createTouchButton, wrapSurface, surfaceStrip, surfaceCorner } from '../core/ui';
 import { namespace } from '../core/storage';
 import { GameLoop } from '../core/engine';
 import { Mode, exposeGame, message } from '../core/play';
@@ -68,7 +68,7 @@ interface Piece {
   y: number;
 }
 
-type TetrisInput = 'left' | 'right' | 'rotate' | 'down' | 'drop' | 'hold';
+type TetrisInput = 'left' | 'right' | 'rotate' | 'down' | 'drop';
 const tetris: GameModule = {
   id: 'tetris',
   name: 'Tetris',
@@ -84,38 +84,35 @@ const tetris: GameModule = {
     const canvas = createGameCanvas(WIDTH * CELL, HEIGHT * CELL);
     canvas.className = 'game-canvas tetris-canvas';
     const surface = wrapSurface(canvas, 'surface-tetris');
-    area.append(info, surface);
-    const display = surfaceCorner(surface, 'tr');
-    display.append(previews);
+    area.append(surface);
+    const top = surfaceStrip(surface, 'top');
+    const bottom = surfaceStrip(surface, 'bottom');
+    top.append(info, previews);
     const view = new TetrisView(canvas);
     const status = message(
-      area,
-      'Arrows move and rotate · Space drops · C holds · P pauses'
+      bottom,
+      'Arrows move and rotate · Space drops · P pauses'
     );
-    const controls = surfaceActions(surface);
     const start = createTouchButton('Start', () => {
       if (mode === 'over') reset();
       mode = mode === 'playing' ? 'paused' : 'playing';
       draw();
     });
-    controls.append(start);
+    top.append(start);
     const moveColumn = surfaceCorner(surface, 'left');
     moveColumn.append(
       createTouchButton('◀', () => input.human('left')),
-      createTouchButton('⟳', () => input.human('rotate')),
       createTouchButton('▶', () => input.human('right'))
     );
     const dropColumn = surfaceCorner(surface, 'right');
     dropColumn.append(
-      createTouchButton('Drop', () => input.human('drop')),
-      createTouchButton('Hold', () => input.human('hold'))
+      createTouchButton('⟳', () => input.human('rotate')),
+      createTouchButton('Drop', () => input.human('drop'))
     );
     let board = createBoard();
     let bag: number[] = [],
       next: number[] = [];
-    let current = 0,
-      held: number | null = null,
-      heldThisTurn = false;
+    let current = 0;
     let piece: Piece = { matrix: [], x: 3, y: 0 };
     let score = 0,
       lines = 0,
@@ -155,23 +152,20 @@ const tetris: GameModule = {
       board = createBoard();
       bag = [];
       next = [take(), take(), take()];
-      held = null;
-      heldThisTurn = false;
       score = 0;
       lines = 0;
       combo = -1;
       mode = 'ready';
       nextPiece();
-      status.textContent =
-        'Arrows move and rotate · Space drops · C holds · P pauses';
+      status.textContent = 'Arrows move and rotate · Space drops · P pauses';
     }
     function renderPreviews() {
       previews.innerHTML = '';
-      [held, ...next].forEach((id, index) => {
+      next.forEach((id, index) => {
         const item = document.createElement('div');
         item.className = 'piece-preview';
         const title = document.createElement('span');
-        title.textContent = index === 0 ? 'HOLD' : `NEXT ${index}`;
+        title.textContent = `NEXT ${index + 1}`;
         const mini = document.createElement('div');
         mini.className = 'mini-piece';
         for (let y = 0; y < 4; y++)
@@ -203,7 +197,6 @@ const tetris: GameModule = {
       }
       best = Math.max(best, score);
       storage.save('best', best);
-      heldThisTurn = false;
       nextPiece();
     }
     function shiftLock(grounded: boolean) {
@@ -229,15 +222,6 @@ const tetris: GameModule = {
         piece = candidate;
         shiftLock(grounded);
       }
-      draw();
-    }
-    function hold() {
-      if (mode !== 'playing' || heldThisTurn) return;
-      const old = held;
-      held = current;
-      if (old === null) nextPiece();
-      else spawn(old);
-      heldThisTurn = true;
       draw();
     }
     function drop() {
@@ -295,7 +279,6 @@ const tetris: GameModule = {
         if (mode === 'ready' || mode === 'over') start.click();
         else input.human('drop');
       }
-      if (e.key.toLowerCase() === 'c' && !e.repeat) input.human('hold');
       if (e.key === 'p' && !e.repeat) start.click();
     };
     const hidden = () => {
@@ -318,14 +301,12 @@ const tetris: GameModule = {
         piece,
         current,
         next,
-        held,
-        heldThisTurn,
         score,
         lines
       }),
       (ms) => loop.advance(ms)
     );
-    const placementKey = () => `${pieceVersion}:${piece.x}:${piece.y}:${piece.matrix.flat().join('')}:${heldThisTurn}`;
+    const placementKey = () => `${pieceVersion}:${piece.x}:${piece.y}:${piece.matrix.flat().join('')}`;
     function options() {
       const candidates: { action: TetrisInput; piece: Piece }[] = [];
       for (const [action, dx] of [['left', -1], ['right', 1]] as const) {
@@ -336,7 +317,6 @@ const tetris: GameModule = {
       if (rotated) candidates.push({ action: 'rotate', piece: rotated });
       candidates.push({ action: 'drop', piece });
       if (!collides(board, { ...piece, y: piece.y + 1 })) candidates.push({ action: 'down', piece });
-      if (!heldThisTurn) candidates.push({ action: 'hold', piece: { matrix: SHAPES[held ?? next[0]], x: 3, y: 0 } });
       return candidates.map(candidate => {
         const landing = { ...candidate.piece };
         while (!collides(board, { ...landing, y: landing.y + 1 })) landing.y++;
@@ -377,7 +357,6 @@ const tetris: GameModule = {
         if (action === 'right') move(1);
         if (action === 'rotate') rotate();
         if (action === 'drop') drop();
-        if (action === 'hold') hold();
         if (action === 'down' && !collides(board, { ...piece, y: piece.y + 1 })) { piece.y++; score++; draw(); }
         return before !== `${placementKey()}:${score}:${lockResets}`;
       },

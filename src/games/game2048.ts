@@ -2,7 +2,7 @@ import { compressAndMerge, gridToString, preview2048Move } from './mergeLogic';
 export { preview2048Move } from './mergeLogic';
 import { GameModule } from './gameTypes';
 import { MergeView, type MergeAnimation } from './views/merge';
-import { createGameShell, bindSwipe, createTouchButton, wrapSurface, surfaceActions } from '../core/ui';
+import { createGameShell, bindSwipe, createTouchButton, wrapSurface, surfaceStrip } from '../core/ui';
 import { namespace } from '../core/storage';
 import { exposeGame, message } from '../core/play';
 
@@ -39,9 +39,11 @@ const game2048: GameModule = {
     const gridEl = document.createElement('div');
     gridEl.className = 'grid-2048';
     const surface = wrapSurface(gridEl, 'surface-board');
-    area.append(info, surface);
-    const actions = surfaceActions(surface);
-    actions.append(restart);
+    area.append(surface);
+    const top = surfaceStrip(surface, 'top');
+    const bottom = surfaceStrip(surface, 'bottom');
+    top.append(info, restart);
+    const actions = top;
     const view = new MergeView(gridEl);
 
     type Snapshot = { grid: Grid; score: number; moves: number };
@@ -63,7 +65,7 @@ const game2048: GameModule = {
     let score = validSave ? saved.score : 0;
     let moves = validSave ? saved.moves : 0;
     const history: Snapshot[] = [];
-    const status = message(area, 'Swipe the board to combine matching tiles.');
+    const status = message(bottom, 'Swipe the board to combine matching tiles.');
     const undo = createTouchButton('Undo', () => {
       const previous = history.pop();
       if (!previous) return;

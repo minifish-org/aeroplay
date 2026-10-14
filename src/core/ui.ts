@@ -60,6 +60,15 @@ export function surfaceActions(surface: HTMLElement) {
   return bar;
 }
 
+/** A status strip inside the play surface: score above, hints below. */
+export function surfaceStrip(surface: HTMLElement, position: 'top' | 'bottom') {
+  const strip = document.createElement('div');
+  strip.className = `surface-strip surface-strip-${position}`;
+  if (position === 'top') surface.prepend(strip);
+  else surface.append(strip);
+  return strip;
+}
+
 /** A control group pinned to an edge of the play surface. */
 export function surfaceCorner(
   surface: HTMLElement,
