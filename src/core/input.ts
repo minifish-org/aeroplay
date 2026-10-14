@@ -1,5 +1,5 @@
 export type Direction = 'left' | 'right' | 'up' | 'down';
-export function bindInput(host: HTMLElement, keyInput: (key: string) => unknown, submit: (input: unknown) => void,
+export function bindInput(host: HTMLElement, keyInput: (key: string, repeat: boolean) => unknown, submit: (input: unknown) => void,
   pick: (x: number, y: number) => unknown, swipe = false) {
   let start: { x: number; y: number; id: number } | null = null;
   const down = (event: PointerEvent) => {
@@ -17,7 +17,7 @@ export function bindInput(host: HTMLElement, keyInput: (key: string) => unknown,
   const key = (event: KeyboardEvent) => {
     if(event.target instanceof Element && event.target.closest('select,input,textarea')) return;
     if(event.target instanceof Element && event.target.closest('button') && [' ', 'Enter'].includes(event.key)) return;
-    const value = keyInput(event.key); if(value === undefined) return; event.preventDefault(); submit(value);
+    const value = keyInput(event.key,event.repeat); if(value === undefined) return; event.preventDefault(); submit(value);
   };
   host.addEventListener('pointerdown',down); host.addEventListener('pointerup',up); host.addEventListener('pointercancel',cancel);
   window.addEventListener('keydown',key);

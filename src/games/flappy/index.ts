@@ -15,6 +15,6 @@ export default function mount(context: GameContext) {
   return mountRun(context, { model, continuous: true,
     render: () => { view.draw(); if (serial !== model.serial) { serial = model.serial; if (model.event === 'score') audio.play('collect'); else if (model.event === 'hit') audio.play('hit'); } },
     refresh: () => { updateHUD(); sound.setAttribute('aria-pressed', String(audio.enabled)); persist(); }, persist,
-    keys: key => { if (key.toLowerCase() === 'p') { if (player.type === 'ai') { if (model.mode === 'paused') player.resume(); else player.pause(); } else { utility('pause'); hud.onChange(); } return undefined; } return key === ' ' ? 'flap' : undefined; }, pick: () => 'flap',
+    keys: (key, repeat) => { if (repeat && (key === ' ' || key.toLowerCase() === 'p')) return undefined; if (key.toLowerCase() === 'p') { if (player.type === 'ai') { if (model.mode === 'paused') player.resume(); else player.pause(); } else { utility('pause'); hud.onChange(); } return undefined; } return key === ' ' ? 'flap' : undefined; }, pick: () => 'flap',
     start: () => { if (model.mode === 'ready') model.act('flap'); }, dispose: () => audio.dispose() });
 }

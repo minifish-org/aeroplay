@@ -14,20 +14,24 @@ export function icon(name:string) {
 }
 export class HUD {
   readonly element:HTMLElement; readonly playArea:HTMLElement; readonly inputs:HTMLElement; readonly actions:HTMLElement;
-  private statsArea:HTMLElement; private status:HTMLElement; private panelArea:HTMLElement; private fields=new Map<string,HTMLElement>(); private lastPanel='';
+  private statsArea:HTMLElement; private status:HTMLElement; private panelArea:HTMLElement; private selectionArea:HTMLElement; private fields=new Map<string,HTMLElement>(); private lastPanel='';
+  private gameNotice=''; private playerNotice='';
+  private graphicsLost=false; private disabledBeforeLoss=new Map<HTMLButtonElement|HTMLSelectElement,boolean>();
   helpOpen=false; onChange=()=>{};
   constructor(root:HTMLElement,name:string,back:()=>void) {
-    root.innerHTML='<section class="game-stage"><div class="hud"><div class="hud-top"><div class="hud-nav"></div><div class="hud-stats"></div><div class="hud-actions"></div></div><div class="play-area"><div class="hud-notice" role="status" aria-live="polite"></div><div class="hud-panel" hidden></div></div><div class="hud-inputs"></div></div></section>';
+    root.innerHTML='<section class="game-stage"><div class="hud"><div class="hud-top"><div class="hud-nav"></div><div class="hud-stats"></div><div class="hud-actions"></div></div><div class="play-area"><div class="hud-notice" role="status" aria-live="polite"></div><div id="game-selection" class="hud-selection" role="status" aria-live="polite" aria-atomic="true"></div><div class="hud-panel" hidden></div></div><div class="hud-inputs"></div></div></section>';
     this.element=root.querySelector('.game-stage')!;this.playArea=root.querySelector('.play-area')!;this.inputs=root.querySelector('.hud-inputs')!;
-    this.actions=root.querySelector('.hud-actions')!;this.statsArea=root.querySelector('.hud-stats')!;this.status=root.querySelector('.hud-notice')!;this.panelArea=root.querySelector('.hud-panel')!;
+    this.actions=root.querySelector('.hud-actions')!;this.statsArea=root.querySelector('.hud-stats')!;this.status=root.querySelector('.hud-notice')!;this.panelArea=root.querySelector('.hud-panel')!;this.selectionArea=root.querySelector('.hud-selection')!;
     const nav=root.querySelector('.hud-nav')!;const button=this.button('back','Back','back',back);nav.append(button);
     const title=document.createElement('h1');title.textContent=name;nav.append(title);
     const wide=innerWidth>innerHeight&&Math.min(innerWidth,innerHeight)<=700;this.element.dataset.wide=String(wide);
+    this.element.addEventListener('stage-lost',()=>this.graphics(false));
+    this.element.addEventListener('stage-restored',()=>this.graphics(true));
   }
   button(id:string,label:string,symbol:string,press:()=>void,parent:HTMLElement=this.actions) {
     const button=document.createElement('button');button.type='button';button.className='hud-button';button.dataset.action=id;button.setAttribute('aria-label',label);
     button.append(icon(symbol));const text=document.createElement('span');text.textContent=label;button.append(text);
-    button.addEventListener('click',event=>{event.preventDefault();press();this.onChange();});parent.append(button);return button;
+    button.addEventListener('click',event=>{event.preventDefault();if(this.graphicsLost&&id!=='back')return;press();this.onChange();});parent.append(button);return button;
   }
   label(button:HTMLButtonElement,text:string,accessible=text) { button.querySelector('span')!.textContent=text;button.setAttribute('aria-label',accessible); }
   stats(values:Record<string,string|number>) {
@@ -37,7 +41,23 @@ export class HUD {
       const text=String(value);if(field.querySelector('strong')!.textContent!==text)field.querySelector('strong')!.textContent=text;
     }
   }
-  notice(text:string) { if(this.status.textContent!==text)this.status.textContent=text;this.status.hidden=!text; }
+  notice(text:string) { this.gameNotice=text;this.showNotice(); }
+  controllerNotice(text:string) { this.playerNotice=text;this.showNotice(); }
+  private showNotice() { const text=this.graphicsLost?'Graphics interrupted · Waiting for recovery.':this.playerNotice||this.gameNotice;if(this.status.textContent!==text)this.status.textContent=text;this.status.hidden=!text; }
+  selection(text:string) { if(this.selectionArea.textContent!==text)this.selectionArea.textContent=text; }
+  private graphics(available:boolean) {
+    this.graphicsLost=!available;
+    if(available){this.disabledBeforeLoss.forEach((disabled,control)=>{control.disabled=disabled;});this.disabledBeforeLoss.clear();}
+    this.enforceGraphics();this.showNotice();this.onChange();
+  }
+  enforceGraphics() {
+    if(!this.graphicsLost)return;
+    this.element.querySelectorAll<HTMLButtonElement|HTMLSelectElement>('button,select').forEach(control=>{
+      if(control.dataset.action==='back')return;
+      if(!this.disabledBeforeLoss.has(control))this.disabledBeforeLoss.set(control,control.disabled);
+      control.disabled=true;
+    });
+  }
   bank(kind:string,width=190) {
     const bank=document.createElement('div');bank.className='input-bank';bank.dataset.bank=kind;this.inputs.append(bank);this.element.classList.add('has-inputs');this.element.style.setProperty('--input-width',width+'px');return bank;
   }

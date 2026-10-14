@@ -11,7 +11,7 @@ export interface Model {
 }
 export interface RunOptions {
   model:Model; render:(dt:number)=>void; refresh:()=>void; persist?:()=>void;
-  keys?:(key:string)=>unknown; swipe?:boolean; pick?:(x:number,y:number)=>unknown;
+  keys?:(key:string,repeat:boolean)=>unknown; swipe?:boolean; pick?:(x:number,y:number)=>unknown;
   continuous?:boolean; active?:()=>boolean; timer?:boolean; start?:()=>void; clearInput?:()=>void; dispose?:()=>void;
   inspect?:()=>object; preset?:Preset;
 }
@@ -29,31 +29,31 @@ export function mountRun(context:GameContext,options:RunOptions) {
   let frame=0,last=0,disposed=false,runtimeTime=0;
   const finished=()=>['won','over'].includes(model.mode);
   const persist=()=>options.persist?.();
-  const draw=(dt=0)=>{options.render(dt);options.refresh();stage.advance(dt);stage.render();};
-  const active=()=>!document.hidden&&!hud.helpOpen&&((options.continuous&&model.mode==='playing')||options.active?.()||stage.animating||player.type==='ai');
+  const draw=(dt=0)=>{options.render(dt);options.refresh();hud.enforceGraphics();stage.advance(dt);stage.render();};
+  const active=()=>!document.hidden&&!hud.helpOpen&&((options.continuous&&model.mode==='playing')||options.active?.()||stage.animating);
   const tick=(dt:number)=>{runtimeTime+=dt;if(!options.timer&&!hud.helpOpen&&model.mode!=='paused')model.step(dt);draw(dt);};
   const animate=(now:number)=>{frame=0;if(disposed)return;const dt=Math.min(.05,last?(now-last)/1000:1/60);last=now;tick(dt);if(active())frame=requestAnimationFrame(animate);else last=0;};
   const wake=()=>{if(disposed)return;draw();if(active()&&!frame)frame=requestAnimationFrame(animate);};
-  const apply=(input:unknown)=>{if(hud.helpOpen)return false;const accepted=model.act(input);if(accepted){persist();wake();}return accepted;};
+  const apply=(input:unknown)=>{if(hud.helpOpen||!stage.available)return false;const accepted=model.act(input);if(accepted){persist();wake();}return accepted;};
   const key=()=>{const state=model.planning();return state?planningSignature(state)+(options.continuous?':'+Math.floor(runtimeTime*7):''):'';};
   const port=player.connect<unknown>({game:entry.id,planning:()=>model.planning(),observe:()=>model.planning()?{key:key(),context:entry.name+'. Use the visible state and normal controls.',question:'Which normal input advances the game?',choices:{wait:'Wait'},inputs:{wait:'wait'}}:null,
     isCurrent:(value)=>value===key(),apply,clearInput:options.clearInput,
-    start:()=>{if(finished())model.reset();model.resume();options.start?.();wake();},
-    pause:()=>{model.pause();options.clearInput?.();persist();wake();},resume:()=>{model.resume();wake();},isFinished:finished,isPaused:()=>model.mode==='paused'});
+    start:()=>{if(!stage.available)return;if(finished())model.reset();model.resume();options.start?.();wake();},
+    pause:()=>{model.pause();options.clearInput?.();persist();wake();},resume:()=>{if(!stage.available)return;model.resume();wake();},isFinished:finished,isPaused:()=>model.mode==='paused'});
   const unbind=bindInput(hud.element,options.keys??(()=>undefined),input=>{port.human(input);},options.pick??((x,y)=>stage.pick(x,y)),options.swipe);
-  const mode=entry.id==='pushball'?null:hud.button('mode','Watch TAMEV','ai',()=>{if(player.type==='ai')player.takeOver();else player.watchAI();});
+  const mode=entry.id==='pushball'?null:hud.button('mode','Watch TAMEV','ai',()=>{if(hud.helpOpen)return;if(player.type==='ai')player.takeOver();else player.watchAI();});
   const personal=entry.id==='pushball'?null:hud.button('personal','Your run','human',context.returnPersonal);
   const pause=entry.id==='pushball'?null:hud.button('ai-pause','Pause','pause',()=>{if(player.status==='paused'||model.mode==='paused')player.resume();else player.pause();});
   const retry=entry.id==='pushball'?null:hud.button('ai-retry','Retry AI','restart',()=>player.retry());
   const again=entry.id==='pushball'?null:hud.button('ai-again','Watch again','play',context.watchAgain);
   function syncPlayer() {
-    if(mode)hud.label(mode,player.type==='ai'?'Take over':'Watch',player.type==='ai'?'Take over':'Watch TAMEV');
+    if(mode){hud.label(mode,player.type==='ai'?'Take over':'Watch',player.type==='ai'?'Take over':'Watch TAMEV');mode.setAttribute('aria-pressed',String(player.type==='ai'));}
     if(personal)personal.hidden=!player.hasUsedAI||player.type==='ai';
     if(pause){pause.hidden=player.type!=='ai'||finished();hud.label(pause,player.status==='paused'?'Resume':'Pause');}
     if(retry)retry.hidden=player.type!=='ai'||!player.error||finished();
     if(again)again.hidden=player.type!=='ai'||!finished();
     hud.element.dataset.player=player.type;hud.element.dataset.playerStatus=player.status;
-    const state=getAIModelState();if(player.error)hud.notice(player.error);else if(state.status==='loading')hud.notice('Loading TAMEV…');
+    const state=getAIModelState();hud.controllerNotice(player.type==='ai'?(player.error||(state.status==='loading'?'Loading TAMEV…':'')):'');
     wake();
   }
   const off=player.subscribe(syncPlayer),offModel=subscribeAIModel(syncPlayer);

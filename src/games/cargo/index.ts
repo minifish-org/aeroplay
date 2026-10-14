@@ -16,5 +16,5 @@ export default function mount(context:GameContext) {
   },audio);
   function persist(){store.save('run',model.save());store.save('stars',model.stars);}
   return mountRun(context,{model,render:()=>{const key=model.planning()?planningSignature(model.planning()!):model.mode;if(lastKey&&lastKey!==key&&thinking){job?.abort();thinking=false;message='';}lastKey=key;if(model.moves!==lastMoves){audio.unlock();audio.play(model.mode==='won'?'win':model.pushes>lastPushes?'collect':'move');lastMoves=model.moves;lastPushes=model.pushes;}view.render(model);},refresh:()=>refresh(thinking,message),persist,swipe:true,
-    keys:key=>({ArrowUp:'up',ArrowRight:'right',ArrowDown:'down',ArrowLeft:'left',w:'up',d:'right',s:'down',a:'left',z:'undo'} as Record<string,string>)[key],dispose:()=>{job?.abort();audio.dispose();}});
+    keys:key=>({ArrowUp:'up',ArrowRight:'right',ArrowDown:'down',ArrowLeft:'left',w:'up',d:'right',s:'down',a:'left',z:'undo',Z:'undo'} as Record<string,string>)[key],dispose:()=>{job?.abort();audio.dispose();}});
 }

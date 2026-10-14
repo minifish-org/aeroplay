@@ -175,7 +175,7 @@ export class SkyRun {
     if(input==='pause'){this.mode==='paused'?this.resume():this.pause();return true;}
     if(this.mode!=='playing')return false;
     if(input==='wait')return true;
-    if(input==='boost')return boostFlight(this.state);
+    if(input==='boost'||input==='up')return boostFlight(this.state);
     if(input!=='left'&&input!=='right')return false;
     const before=this.state.lane;steerFlight(this.state,input==='left'?-1:1);return before!==this.state.lane;
   }

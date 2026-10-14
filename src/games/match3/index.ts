@@ -12,7 +12,7 @@ export default function mount(context: GameContext) {
     if (model.phase !== 'clearing' && model.phase !== 'falling') { const state = model.saved(), key = JSON.stringify(state); if (key !== saved) { saved = key; store.save('run', state); } }
     if (best !== model.best) { best = model.best; store.save('best', best); }
   };
-  const utility = (input: unknown) => { if (player.type !== 'human' || hud.helpOpen) return; model.act(input); if (input === 'resume') model.resume(); persist(); };
+  const utility = (input: unknown) => { if (hud.helpOpen) return; if (input === 'resume' && player.type === 'ai') { player.resume(); return; } if (player.type !== 'human') return; model.act(input); if (input === 'resume') model.resume(); persist(); };
   const updateHUD = createMatch3HUD(hud, model, utility, () => player.type === 'human');
   const sound = hud.button('sound', 'Sound', 'sound', () => audio.toggle());
   return mountRun(context, { model, active: () => model.mode === 'playing' && ['clearing', 'falling'].includes(model.phase),

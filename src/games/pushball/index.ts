@@ -8,8 +8,8 @@ export default function mount(context:GameContext) {
   const {stage,hud,store,player:human}=context;stage.mount(hud.element,hud.playArea,'arena',16,24,0x203d50);
   const model=new PushballRun(store.load('wins',0),store.load('matches',0)),view=new PushballView(stage),audio=new GameAudio(),opponent=new Player(new TamevPlayer());
   let disposed=false,loading=false,modelReady=false,error='',selectedPlan='Waiting for kickoff',goal=0,storedMatches=model.matches;
-  const controls=pushballHUD(hud,model,()=>{void startMatch();},togglePause,()=>opponent.retry(),audio);
-  const render=(dt=0)=>{view.render(model.state,dt);controls.refresh(loading,error,opponent.error);stage.advance(dt);stage.render();};
+  const controls=pushballHUD(hud,model,()=>{void startMatch();},togglePause,()=>opponent.retry(),audio,()=>stage.available);
+  const render=(dt=0)=>{view.render(model.state,dt);controls.refresh(loading,error,opponent.error);hud.enforceGraphics();stage.advance(dt);stage.render();};
   const loop=new GameLoop(dt=>{if(hud.helpOpen||document.hidden||model.mode!=='playing')return;humanPort.human(controls.read());model.step(dt);
     if(model.state.goalSerial!==goal){goal=model.state.goalSerial;controls.reset();selectedPlan='Waiting for kickoff';audio.play(model.state.lastScorer===0?'collect':'hit');}
     if(model.matches!==storedMatches){storedMatches=model.matches;store.save('matches',model.matches);store.save('wins',model.wins);void opponent.tick();if(model.state.winner===0)audio.play('win');}
@@ -25,7 +25,7 @@ export default function mount(context:GameContext) {
   }
   const humanPort=human.connect(port(0)),opponentPort=opponent.connect(port(1));
   async function startMatch() {
-    if(loading||disposed||hud.helpOpen)return;human.pause();opponent.pause();controls.reset();model.reset();goal=0;error='';selectedPlan='Waiting for kickoff';loading=true;const ticket=model.version;audio.unlock();render();
+    if(loading||disposed||hud.helpOpen||!stage.available)return;human.pause();opponent.pause();controls.reset();model.reset();goal=0;error='';selectedPlan='Waiting for kickoff';loading=true;const ticket=model.version;audio.unlock();render();
     try{await prepareTamev();if(disposed||ticket!==model.version)return;loading=false;modelReady=true;if(document.hidden||!stage.available){render();return;}human.start();opponent.start();wake();}
     catch(failure){if(disposed||ticket!==model.version)return;loading=false;modelReady=false;error=failure instanceof Error?failure.message:'The local player could not load.';render();}
   }

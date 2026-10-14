@@ -145,7 +145,7 @@ export class Stage {
     this.content.traverse(object=>{if(object.userData.input!==undefined){const world=object.getWorldPosition(new Vector3());picks.push({input:object.userData.input,...this.project(world.x,world.y,world.z)});}});
     const grid=this.grid; let boardBounds=null;
     if(grid&&this.preset==='board') {const a=this.project(-grid.width/2,grid.height/2),b=this.project(grid.width/2,-grid.height/2);boardBounds={x:a.x,y:a.y,width:b.x-a.x,height:b.y-a.y,cols:grid.cols,rows:grid.rows};}
-    return {playBounds:bounds,boardBounds,picks,renderer:{mounts:this.mounts,frames:this.frames,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,drawCalls:this.renderer.info.render.calls,contexts:1,pixelRatio:this.renderer.getPixelRatio()},motion:{reduced:this.reducedMotion,tweens:this.tweens.length,particles:this.particles.length,maxParticles:48}};
+    return {playBounds:bounds,boardBounds,picks,renderer:{mounts:this.mounts,frames:this.frames,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,drawCalls:this.renderer.info.render.calls,contexts:1,pixelRatio:this.renderer.getPixelRatio(),available:this.available},motion:{reduced:this.reducedMotion,tweens:this.tweens.length,particles:this.particles.length,maxParticles:48}};
   }
   private releaseGPU() {
     // Release old context listeners before restoration; retain CPU shapes for upload.
