@@ -442,6 +442,9 @@ try {
   assert.equal((await ph.state()).record.matches, 1);
   assert.equal((await ph.state()).ai.info.initializations, 1);
   await ph.page.waitForFunction(() => JSON.parse(window.render_game_to_text()).kickoff === 0);
+  const more = ph.page.locator('summary[aria-label="More options"]'); await more.focus(); await ph.page.keyboard.press('Space');
+  assert(await more.evaluate(el => el.parentElement.open), 'Focused More opens with native Space'); await ph.page.waitForFunction(() => JSON.parse(window.render_game_to_text()).mode === 'paused');
+  await ph.page.keyboard.press('Space'); assert(!await more.evaluate(el => el.parentElement.open)); await ph.page.waitForFunction(() => JSON.parse(window.render_game_to_text()).mode === 'playing');
   await ph.page.locator('canvas').click({ position: { x: 4, y: 4 } });
   const before = await ph.state();
   await ph.page.keyboard.down('ArrowRight');

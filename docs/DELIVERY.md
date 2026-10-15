@@ -50,13 +50,13 @@ Line counts include readable source formatting and every `.mjs` file in `scripts
 
 | Metric | Baseline | Current | Target |
 | --- | ---: | ---: | ---: |
-| TypeScript | 10,016 lines / 59 files | 5,583 lines / 44 files | ≤6,000 |
+| TypeScript | 10,016 lines / 59 files | 5,586 lines / 44 files | ≤6,000 |
 | CSS | 2,017 lines / 6 files | 391 lines / 3 files | ≤900 |
-| Scripts | 3,476 lines / 21 files | 1,938 lines / 7 files | ≤2,000 |
+| Scripts | 3,476 lines / 21 files | 1,946 lines / 7 files | ≤2,000 |
 | Games | 11 | 8 | 8 |
 | Rendering libraries | Pixi + Three | Three | Three |
 | Rendering chunks, raw decimal kB | 392.95 + 559.10 | 552.48 | One Three chain |
-| Largest model + view + HUD | 500–900 lines | 432 lines | ≤450 |
+| Largest model + view + HUD | 500–900 lines | 435 lines | ≤450 |
 
 | Game | Model + view + HUD lines |
 | --- | ---: |
@@ -67,9 +67,9 @@ Line counts include readable source formatting and every `.mjs` file in `scripts
 | Match-3 | 391 |
 | Pocket Cargo | 321 |
 | Sky Rush | 374 |
-| Robot Pushball | 432 |
+| Robot Pushball | 435 |
 
-The current production build is 31,278,965 bytes including the pinned 14,872,474-byte model and 14,239,897-byte WASM. Its service worker precaches 33 resources. Current cache fingerprint: `aeroplay-3d642862081e`; the preceding Cargo camera release used `aeroplay-99bc0be4862c`.
+The current production build is 31,279,207 bytes including the pinned 14,872,474-byte model and 14,239,897-byte WASM. Its service worker precaches 33 resources. Current cache fingerprint: `aeroplay-6838edb9e81b`; the preceding HTML-policy release used `aeroplay-3d642862081e`.
 
 ## Phase commits
 
@@ -92,17 +92,19 @@ The pre-existing `2ee86c8`, unpublished at the start of the rewrite, is preserve
 
 ## Current player polish acceptance
 
-The complete frozen acceptance run passed with unchanged source/runtime/test fingerprint `bab4db9441b8124435ddd0bc433f2763a3ab50ce04d9dee1b089d6e60e2711e1`.
+The complete frozen acceptance run passed with unchanged source/runtime/test fingerprint `2f12a25e764a2e7f7ed7a2b3dd286e47d78e1d3d6895b69607a3770dc6de66d6`.
 
 | Check | Result | Current coverage |
 | --- | --- | --- |
 | TypeScript/Vite build and pinned model preparation | PASS | Existing five local model resources verified; no new runtime dependency |
-| Layout, WebKit | PASS · 76.36 s | 36 initial layouts and open menus, rotation, active/paused AI, all settlements, scene-transform reset, menu-dismiss input, idle/GPU teardown/recovery and reduced motion |
-| Games, WebKit | PASS · 49.20 s | All eight game flows, original Cargo/Sudoku content, persistent Undo, full paused flight/sector reload, contextual Next/Pause and real first-to-three Pushball completion |
-| AI, WebKit | PASS · 23.11 s | Original guards/planners, delayed real-WASM cold Watch freeze, resident reuse, exact personal flight restoration, fresh Watch again, cancellation/takeover and complete Pushball match |
-| Offline, Chromium | PASS · 28.65 s | All 33 resources, cold browser restart with stopped server, native controls, real TAMEV, cache activation/removal and new-asset offline reload |
+| Layout, WebKit | PASS · 76.79 s | 36 initial layouts and open menus, rotation, active/paused AI, all settlements, scene-transform reset, menu-dismiss input, idle/GPU teardown/recovery and reduced motion |
+| Games, WebKit | PASS · 52.48 s | All eight game flows, original Cargo/Sudoku content, persistent Undo, full paused flight/sector reload, contextual Next/Pause, native More Space and real first-to-three Pushball completion |
+| AI, WebKit | PASS · 23.94 s | Original guards/planners, delayed real-WASM cold Watch freeze, resident reuse, exact personal flight restoration, fresh Watch again, cancellation/takeover and complete Pushball match |
+| Offline, Chromium | PASS · 31.00 s | All 33 resources, cold browser restart with stopped server, native controls including simultaneous two-finger joystick/Dash, real TAMEV, cache activation/removal and new-asset offline reload |
 
 The original full-match deadline, winner and three-goal assertions remain. Hidden menus are excluded from the visible-control measurement; open menus and their summary controls are now checked explicitly in all viewports. Desktop checks use the actual keyboard/mouse paths where phone control banks are intentionally absent. No remaining failure is counted as a pass. New flight reload assertions preserve every durable field and explicitly check that transient boost messages clear on re-entry.
+
+The last live touch pass exposed a second-finger Dash press without a click. The new permanent cold-offline regression first failed with the original strict cooldown assertion. Pointer-press activation now supports that second finger, suppresses duplicate release clicks and retains detail-zero native keyboard/assistive clicks. Real touch, long-held mouse release and focused keyboard activation passed; More also keeps native summary Space/Enter. No physics, cooldown, model or opponent strategy changed.
 
 Current logs, fingerprints and metrics are retained locally under `output/player-review/final-acceptance.json`, `acceptance-*.log` and `final-metrics.json`. The earlier failing assertion on intentionally expired boost text is preserved in `before-contextual-phase-fix/`; it was corrected to assert durable fields exactly plus cleared transient text. The gameplay issue found through saved-win Next/Pause has a permanent regression and native replay proof. The tracked [player review](PLAYER-EXPERIENCE.md) and images contain the readable experience evidence. CI and live resource/cache checks follow publication and are reported with the pushed commit.
 

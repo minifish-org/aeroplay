@@ -9,6 +9,9 @@ export function pushballHUD(hud: HUD, model: PushballRun, start: () => void, pau
   bank.append(stick);
   const pad = joystick(stick, (x, y) => { action = { ...action, x, y }; });
   const dash = hud.button('dash', 'Dash', 'boost', () => { action.dash = true; }, bank), pauseButton = hud.button('pause', 'Pause', 'pause', pause), retryButton = hud.button('retry-ai', 'Retry AI', 'restart', retry);
+  dash.addEventListener('pointerdown', event => { if (event.button === 0 && !dash.disabled) { event.preventDefault(); action.dash = true; } });
+  dash.addEventListener('click', event => { if (event.detail > 0) event.stopImmediatePropagation(); }, true);
+  dash.addEventListener('pointercancel', () => { action.dash = false; });
   const sound = hud.button('sound', 'Sound', 'sound', () => audio.toggle());
   const charge = document.createElement('progress');
   charge.max = 1;
@@ -16,7 +19,7 @@ export function pushballHUD(hud: HUD, model: PushballRun, start: () => void, pau
   charge.style.cssText = 'width:28px;height:5px';
   dash.append(charge);
   const reset = () => { held.clear(); action = idleAction(); pad.reset(); };
-  const down = (event: KeyboardEvent) => { if (event.metaKey || event.ctrlKey || event.altKey || event.target instanceof HTMLElement && event.target.closest('button,select,input'))
+  const down = (event: KeyboardEvent) => { if (event.metaKey || event.ctrlKey || event.altKey || event.target instanceof HTMLElement && event.target.closest('button,select,input,summary'))
     return; const key = event.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) {
     event.preventDefault();
     held.add(key);
