@@ -98,7 +98,7 @@ export class Stage {
     this.scene.background = new Color(background);
     this.scene.fog = preset === 'flight' ? new Fog(background, 35, 120) : null;
     this.camera = preset === 'flight' ? this.perspective : this.ortho;
-    this.camera.position.set(...(preset === 'board' ? [0, 0, 20] : preset === 'island' ? [8, 11, 10] : preset === 'arena' ? [0, 18, 15] : [0, 4.1, 9]) as [
+    this.camera.position.set(...(preset === 'board' ? [0, 0, 20] : preset === 'island' ? [0, 18, 8] : preset === 'arena' ? [0, 18, 15] : [0, 4.1, 9]) as [
       number,
       number,
       number
