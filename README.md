@@ -14,7 +14,7 @@ npm run dev -- --host 127.0.0.1
 
 `build:decision` prepares the pinned TAMEV files, verifies their checksums, and builds the static site. This build-time download is the only model acquisition step. Once those files are present, `npm run build` creates `dist/` without a model download.
 
-Preview the production build with `npm run preview -- --host 127.0.0.1`. Service-worker installation runs in the production build; the development server does not install its offline cache.
+Preview the production build with `npm run preview -- --host 127.0.0.1`. Service-worker installation runs in the production build; the development server does not install its offline cache. The HTML-only Pages headers prevent intermediary script injection. Deployment policy files affect the cache version but are not precached as runtime assets.
 
 ## Play and controls
 

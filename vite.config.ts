@@ -26,7 +26,7 @@ export default defineConfig({
         const assets = [
           "/",
           ...files.map((file) => `/${file}`),
-          ...staticFiles,
+          ...staticFiles.filter((file) => !["/_headers", "/_redirects"].includes(file)),
         ];
         const template = readFileSync(
           resolve("public/service-worker.js"),

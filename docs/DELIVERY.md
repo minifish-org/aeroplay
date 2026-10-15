@@ -52,7 +52,7 @@ Line counts include readable source formatting and every `.mjs` file in `scripts
 | --- | ---: | ---: | ---: |
 | TypeScript | 10,016 lines / 59 files | 5,583 lines / 44 files | ≤6,000 |
 | CSS | 2,017 lines / 6 files | 391 lines / 3 files | ≤900 |
-| Scripts | 3,476 lines / 21 files | 1,932 lines / 7 files | ≤2,000 |
+| Scripts | 3,476 lines / 21 files | 1,938 lines / 7 files | ≤2,000 |
 | Games | 11 | 8 | 8 |
 | Rendering libraries | Pixi + Three | Three | Three |
 | Rendering chunks, raw decimal kB | 392.95 + 559.10 | 552.48 | One Three chain |
@@ -69,7 +69,7 @@ Line counts include readable source formatting and every `.mjs` file in `scripts
 | Sky Rush | 374 |
 | Robot Pushball | 432 |
 
-The current production build is 31,278,818 bytes including the pinned 14,872,474-byte model and 14,239,897-byte WASM. Its service worker precaches 33 resources. Current cache fingerprint: `aeroplay-72c490db3536`; the preceding Cargo camera release used `aeroplay-99bc0be4862c`.
+The current production build is 31,278,965 bytes including the pinned 14,872,474-byte model and 14,239,897-byte WASM. Its service worker precaches 33 resources. Current cache fingerprint: `aeroplay-3d642862081e`; the preceding Cargo camera release used `aeroplay-99bc0be4862c`.
 
 ## Phase commits
 
@@ -92,19 +92,25 @@ The pre-existing `2ee86c8`, unpublished at the start of the rewrite, is preserve
 
 ## Current player polish acceptance
 
-The complete frozen acceptance run passed with unchanged source/runtime/test fingerprint `4f80cdf689d85ba137435242ebcbe4fbdab82675d711df042ec31180cdbe6dfd`.
+The complete frozen acceptance run passed with unchanged source/runtime/test fingerprint `bab4db9441b8124435ddd0bc433f2763a3ab50ce04d9dee1b089d6e60e2711e1`.
 
 | Check | Result | Current coverage |
 | --- | --- | --- |
 | TypeScript/Vite build and pinned model preparation | PASS | Existing five local model resources verified; no new runtime dependency |
-| Layout, WebKit | PASS · 76.82 s | 36 initial layouts and open menus, rotation, active/paused AI, all settlements, scene-transform reset, menu-dismiss input, idle/GPU teardown/recovery and reduced motion |
-| Games, WebKit | PASS · 50.24 s | All eight game flows, original Cargo/Sudoku content, persistent Undo, full paused flight/sector reload, contextual Next/Pause and real first-to-three Pushball completion |
-| AI, WebKit | PASS · 23.46 s | Original guards/planners, delayed real-WASM cold Watch freeze, resident reuse, exact personal flight restoration, fresh Watch again, cancellation/takeover and complete Pushball match |
-| Offline, Chromium | PASS · 26.78 s | All 33 resources, cold browser restart with stopped server, native controls, real TAMEV, cache activation/removal and new-asset offline reload |
+| Layout, WebKit | PASS · 76.36 s | 36 initial layouts and open menus, rotation, active/paused AI, all settlements, scene-transform reset, menu-dismiss input, idle/GPU teardown/recovery and reduced motion |
+| Games, WebKit | PASS · 49.20 s | All eight game flows, original Cargo/Sudoku content, persistent Undo, full paused flight/sector reload, contextual Next/Pause and real first-to-three Pushball completion |
+| AI, WebKit | PASS · 23.11 s | Original guards/planners, delayed real-WASM cold Watch freeze, resident reuse, exact personal flight restoration, fresh Watch again, cancellation/takeover and complete Pushball match |
+| Offline, Chromium | PASS · 28.65 s | All 33 resources, cold browser restart with stopped server, native controls, real TAMEV, cache activation/removal and new-asset offline reload |
 
 The original full-match deadline, winner and three-goal assertions remain. Hidden menus are excluded from the visible-control measurement; open menus and their summary controls are now checked explicitly in all viewports. Desktop checks use the actual keyboard/mouse paths where phone control banks are intentionally absent. No remaining failure is counted as a pass. New flight reload assertions preserve every durable field and explicitly check that transient boost messages clear on re-entry.
 
 Current logs, fingerprints and metrics are retained locally under `output/player-review/final-acceptance.json`, `acceptance-*.log` and `final-metrics.json`. The earlier failing assertion on intentionally expired boost text is preserved in `before-contextual-phase-fix/`; it was corrected to assert durable fields exactly plus cleared transient text. The gameplay issue found through saved-win Next/Pause has a permanent regression and native replay proof. The tracked [player review](PLAYER-EXPERIENCE.md) and images contain the readable experience evidence. CI and live resource/cache checks follow publication and are reported with the pushed commit.
+
+### Hosting response policy
+
+The first published player-polish commit was `f3c8de1`; its CI deployment succeeded and both domains matched all local resource bytes. A fresh browser on the custom domain exposed Cloudflare's automatically inserted analytics beacon, which the existing CSP correctly blocked. The page-only `public, max-age=0, must-revalidate, no-transform` response policy prevents that injected external script using [Cloudflare's documented mechanism](https://developers.cloudflare.com/web-analytics/get-started/). Hashed game/model/WASM responses retain their existing compression/cache behavior.
+
+[Pages treats `_headers` as deployment configuration](https://developers.cloudflare.com/pages/configuration/headers/), so `_headers` and `_redirects` are excluded from the precache URLs while their contents still participate in the cache version. Permanent build regression checks verify that a policy change changes the version and that unserved configuration is never requested offline. Fresh production browser/cache checks follow this narrow policy publication; CSP and zero-error assertions remain unchanged.
 
 ## Historical rewrite acceptance evidence
 

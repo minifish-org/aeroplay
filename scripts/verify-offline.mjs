@@ -60,8 +60,12 @@ try {
   const artwork = await generate();
   assert.notEqual(initial, artwork, 'Artwork-only updates change cache version');
   assert.equal(await generate(), artwork, 'Identical content retains its version');
+  await writeFile('public/_headers', '/\n  Cache-Control: public, no-transform\n');
+  const headers = await generate();
+  assert.notEqual(headers, artwork, 'Response-policy changes invalidate cached HTML');
+  assert(!JSON.parse(headers.match(/const ASSETS = (\[[\s\S]*?\]);/)[1]).includes('/_headers'), 'Pages configuration is not a fetchable precache asset');
   bundle['index.html'].source = '<html>Updated CSP</html>';
-  assert.notEqual(await generate(), artwork, 'HTML-only updates change cache version');
+  assert.notEqual(await generate(), headers, 'HTML-only updates change cache version');
 } finally {
   process.chdir(cwd);
   await rm(fixture, { recursive: true, force: true });
@@ -80,6 +84,8 @@ console.log('PASS source/style/script/game size budgets, exactly8 directories an
 
 const dist = resolve('dist'), sw = await readFile(join(dist, 'service-worker.js'), 'utf8'), cacheName = sw.match(/const CACHE = ['"]([^'"]+)/)[1];
 const assets = JSON.parse(sw.match(/const ASSETS = (\[[\s\S]*?\]);/)[1]);
+assert.match(await readFile(join(dist, '_headers'), 'utf8'), /^\/\n\s+Cache-Control: [^\n]*no-transform/m, 'Published HTML opts out of injected external scripts');
+assert(!assets.includes('/_headers') && !assets.includes('/_redirects'), 'Unserved deployment configuration is excluded from offline resources');
 assert(assets.includes('/')); assert(assets.includes('/models/tamev-nano/model_int8.onnx')); assert(assets.some(file => file.endsWith('.wasm'))); assert(assets.some(file => file.includes('planner.worker')));
 for (const game of games) assert(assets.some(file => new RegExp(`/${game}[^/]*\\.(?:js|png|webp)$`).test(file) || file.includes(`/previews/${game}.`)), `${game} has local precached assets`);
 const files = await readdir(join(dist, 'assets')); assert(!files.some(file => /pixi|snake|tetris|maze/.test(file)), 'No deleted render/game bundles');
