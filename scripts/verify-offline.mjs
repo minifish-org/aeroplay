@@ -1,4 +1,4 @@
-import { assert, games, engine, harness, browserName, fullMatch, until } from './verify-lib.mjs';
+import { assert, games, engine, harness, browserName, fullMatch, until, touchStickDash } from './verify-lib.mjs';
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdtemp, mkdir, rm, readdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
@@ -225,6 +225,11 @@ try {
         assert.equal(completed.ai.info.initializations, 1);
       } catch (error) { matchFailure = error; }
       assert.equal((await h.state()).ai.info?.initializations, 1, 'Actual model remains resident for the independent offline checks');
+      if (!matchFailure && browserName === 'chromium') {
+        await h.shot('pushball-complete-match'); await h.button('Play again').click();
+        await h.page.waitForFunction(() => { const s = JSON.parse(window.render_game_to_text()); return s.mode === 'playing' && s.kickoff === 0 && !document.querySelector('[data-action="dash"]').disabled; });
+        await touchStickDash(ctx, h); await h.button('Pause').click();
+      }
     }
     await h.shot(game + '-cold-offline');
   }
