@@ -18,19 +18,18 @@ export function skyHUD(context: GameContext, model: SkyRun, audio: GameAudio) {
   hud.intro('sky', 'Steer toward golden rings and avoid barriers. Boost doubles ring points. Your shield absorbs one hit.');
   return () => {
     const state = model.state, biome = ['Cloud Coast', 'Amber Heights', 'Blue Horizon'][(state.sector - 1) % 3];
-    hud.stats({ Score: state.score, Best: model.best, Rings: state.rings, Streak: state.combo + ' / ' + state.maxCombo, Sector: state.sector + ' · ' + biome, Shield: state.shield ? 'Ready' : 'Used' });
+    hud.stats({ Score: state.score, Sector: state.sector + ' · ' + biome });
     meter.value = state.distance;
     meter.setAttribute('aria-valuetext', Math.round(state.distance) + ' of ' + SECTOR_LENGTH + ' meters');
     caption.textContent = Math.round(state.distance) + ' / ' + SECTOR_LENGTH + ' m';
     hud.label(sound, audio.enabled ? 'Sound on' : 'Sound off');
     sound.setAttribute('aria-pressed', String(audio.enabled));
-    restart.hidden = state.mode === 'ready' || state.mode === 'over';
+    restart.hidden = state.mode !== 'paused';
     boost.disabled = state.charge < 100 || state.boost > 0 || state.mode !== 'playing' || player.type === 'ai';
     hud.label(boost, state.boost > 0 ? 'Boost ' + state.boost.toFixed(1) + 's' : state.charge < 100 ? 'Boost ' + Math.round(state.charge) + '%' : 'Boost', state.boost > 0 ? 'Boost active: ' + state.boost.toFixed(1) + ' seconds remaining' : state.charge < 100 ? 'Boost charge: ' + Math.round(state.charge) + ' percent' : 'Boost ready');
-    pause.disabled = !['playing', 'paused'].includes(state.mode) || player.type === 'ai';
-    hud.label(pause, state.mode === 'paused' ? 'Resume' : 'Pause');
-    const title = state.mode === 'ready' ? 'Ready to fly' : state.mode === 'paused' ? 'Flight paused' : state.mode === 'over' ? 'Flight complete' : state.mode === 'won' ? 'Sector cleared' : '';
-    hud.panel(title, state.mode === 'ready' ? 'Find the open lane.' : state.score + ' points · ' + state.rings + ' rings', state.mode === 'paused' ? [] : [{ label: state.mode === 'ready' ? 'Start flight' : state.mode === 'won' ? 'Next sector' : 'Fly again', symbol: 'play', press: () => send(state.mode === 'ready' ? 'start' : state.mode === 'won' ? 'next' : 'restart') }]);
+    pause.hidden = player.type === 'ai' || state.mode !== 'playing';
+    const title = state.mode === 'ready' ? 'Ready to fly' : state.mode === 'paused' ? 'Flight paused' : state.mode === 'over' ? 'Barrier hit' : state.mode === 'won' ? 'Sector cleared' : '';
+    hud.panel(title, state.mode === 'ready' ? 'Fly through gold rings. Avoid marked barriers.' : state.score + ' points · ' + state.rings + ' rings' + (state.mode === 'over' ? ' · ' + Math.round(state.distance) + ' m' : state.mode === 'won' ? ' · Best streak ' + state.maxCombo : ''), player.type === 'ai' ? [] : [{ label: state.mode === 'ready' ? 'Start flight' : state.mode === 'won' ? 'Next sector' : state.mode === 'paused' ? 'Resume' : 'Fly again', symbol: 'play', press: () => send(state.mode === 'ready' ? 'start' : state.mode === 'won' ? 'next' : state.mode === 'paused' ? 'pause' : 'restart') }]);
     hud.notice(state.messageTime > 0 ? state.message : '');
   };
 }

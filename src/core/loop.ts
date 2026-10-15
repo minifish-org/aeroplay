@@ -38,6 +38,7 @@ export interface RunOptions {
   clearInput?: () => void;
   dispose?: () => void;
   inspect?: () => object;
+  rejected?: (input: unknown) => void;
   preset?: Preset;
 }
 declare global {
@@ -66,11 +67,16 @@ export class GameLoop {
 export function mountRun(context: GameContext, options: RunOptions) {
   const { stage, hud, player, entry } = context, { model } = options;
   let frame = 0, last = 0, disposed = false, runtimeTime = 0;
+  let resultControls = () => { }, renderedMode = model.mode;
   const finished = () => ['won', 'over'].includes(model.mode);
+  const waitingForModel = () => player.type === 'ai' && ['loading', 'error'].includes(getAIModelState().status);
   const persist = () => options.persist?.();
-  const draw = (dt = 0) => { options.render(dt); options.refresh(); hud.enforceGraphics(); stage.advance(dt); stage.render(); };
-  const active = () => !document.hidden && !hud.helpOpen && ((options.continuous && model.mode === 'playing') || options.active?.() || stage.animating);
-  const tick = (dt: number) => { runtimeTime += dt; if (!options.timer && !hud.helpOpen && model.mode !== 'paused')
+  const draw = (dt = 0) => { options.render(dt); options.refresh();
+    if (model.mode === 'paused' && player.type === 'human' && !options.continuous)
+      hud.panel('Paused', '', [{ label: 'Resume', press: () => player.resume() }]);
+    resultControls(); hud.enforceGraphics(); stage.advance(dt); stage.render(); };
+  const active = () => !document.hidden && !hud.helpOpen && ((!waitingForModel() && ((options.continuous && model.mode === 'playing') || options.active?.())) || stage.animating);
+  const tick = (dt: number) => { if (!waitingForModel()) runtimeTime += dt; if (!waitingForModel() && !options.timer && !hud.helpOpen && model.mode !== 'paused')
     model.step(dt); draw(dt); };
   const animate = (now: number) => { frame = 0; if (disposed)
     return; const dt = Math.min(.05, last ? (now - last) / 1000 : 1 / 60); last = now; tick(dt); if (active())
@@ -84,6 +90,9 @@ export function mountRun(context: GameContext, options: RunOptions) {
     return false; const accepted = model.act(input); if (accepted) {
     persist();
     wake();
+  } else if (player.type === 'human' && model.mode === 'playing' && options.rejected) {
+    options.rejected(input);
+    wake();
   } return accepted; };
   const key = () => { const state = model.planning(); return state ? planningSignature(state) + (options.continuous ? ':' + Math.floor(runtimeTime * 7) : '') : ''; };
   const port = player.connect<unknown>({ game: entry.id, planning: () => model.planning(), observe: () => model.planning() ? { key: key(), context: entry.name + '. Use the visible state and normal controls.', question: 'Which normal input advances the game?', choices: { wait: 'Wait' }, inputs: { wait: 'wait' } } : null,
@@ -93,12 +102,25 @@ export function mountRun(context: GameContext, options: RunOptions) {
       model.reset(); model.resume(); options.start?.(); wake(); },
     pause: () => { model.pause(); options.clearInput?.(); persist(); wake(); }, resume: () => { if (!stage.available)
       return; model.resume(); wake(); }, isFinished: finished, isPaused: () => model.mode === 'paused' });
+  let menuPaused = false;
+  hud.onMenuChange = open => {
+    if (disposed) return;
+    if (open && model.mode === 'playing' && (options.continuous || player.type === 'ai')) {
+      menuPaused = true;
+      player.pause();
+    } else if (!open && menuPaused) {
+      menuPaused = false;
+      if (model.mode === 'paused') player.resume();
+    }
+  };
   const unbind = bindInput(hud.element, (key, repeat) => stage.available ? options.keys?.(key, repeat) : undefined, input => { port.human(input); }, options.pick ?? ((x, y) => stage.pick(x, y)), options.swipe);
   const mode = entry.id === 'pushball' ? null : hud.button('mode', 'Watch TAMEV', 'ai', () => { if (hud.helpOpen)
     return; if (player.type === 'ai')
     player.takeOver();
-  else
-    player.watchAI(); });
+  else {
+    persist();
+    player.watchAI();
+  } });
   const personal = entry.id === 'pushball' ? null : hud.button('personal', 'Your run', 'human', context.returnPersonal);
   const pause = entry.id === 'pushball' ? null : hud.button('ai-pause', 'Pause', 'pause', () => { if (player.status === 'paused' || model.mode === 'paused')
     player.resume();
@@ -106,15 +128,23 @@ export function mountRun(context: GameContext, options: RunOptions) {
     player.pause(); });
   const retry = entry.id === 'pushball' ? null : hud.button('ai-retry', 'Retry AI', 'restart', () => player.retry());
   const again = entry.id === 'pushball' ? null : hud.button('ai-again', 'Watch again', 'play', context.watchAgain);
-  function syncPlayer() {
+  resultControls = () => {
+    if (renderedMode !== model.mode) { renderedMode = model.mode; syncControls(); }
+    if (player.type === 'ai' && finished() && again && personal) hud.resultControls([again, personal]);
+  };
+  function syncControls() {
     if (mode) {
+      hud.primary(mode, player.type === 'ai' && !finished());
       hud.label(mode, player.type === 'ai' ? 'Take over' : 'Watch', player.type === 'ai' ? 'Take over' : 'Watch TAMEV');
       mode.setAttribute('aria-pressed', String(player.type === 'ai'));
     }
-    if (personal)
-      personal.hidden = !player.hasUsedAI || player.type === 'ai';
+    if (personal) {
+      personal.hidden = !player.hasUsedAI || player.type === 'ai' && !finished();
+      if (!finished() || player.type !== 'ai') hud.primary(personal, false);
+    }
     if (pause) {
-      pause.hidden = player.type !== 'ai' || finished();
+      pause.hidden = finished() || player.type !== 'ai' && !!options.continuous;
+      hud.primary(pause, player.type === 'ai');
       hud.label(pause, player.status === 'paused' ? 'Resume' : 'Pause');
     }
     if (retry)
@@ -125,8 +155,8 @@ export function mountRun(context: GameContext, options: RunOptions) {
     hud.element.dataset.playerStatus = player.status;
     const state = getAIModelState();
     hud.controllerNotice(player.type === 'ai' ? (player.error || (state.status === 'loading' ? 'Loading TAMEV…' : '')) : '');
-    wake();
   }
+  function syncPlayer() { syncControls(); wake(); }
   const off = player.subscribe(syncPlayer), offModel = subscribeAIModel(syncPlayer);
   const pauseHidden = () => { if (document.hidden && model.mode === 'playing') {
     player.pause();
@@ -142,15 +172,15 @@ export function mountRun(context: GameContext, options: RunOptions) {
   window.advanceTime = (ms: number) => { if (frame)
     cancelAnimationFrame(frame); frame = 0; for (let remaining = Math.max(0, ms) / 1000; remaining > 0;) {
     const dt = Math.min(1 / 120, remaining);
-    runtimeTime += dt;
-    if (!hud.helpOpen && model.mode !== 'paused')
+    if (!waitingForModel()) runtimeTime += dt;
+    if (!waitingForModel() && !hud.helpOpen && model.mode !== 'paused')
       model.step(dt);
     options.render(dt);
     options.refresh();
     stage.advance(dt);
     remaining -= dt;
   } draw(); last = 0; };
-  const timer = options.timer ? window.setInterval(() => { if (!document.hidden && !hud.helpOpen && model.mode === 'playing') {
+  const timer = options.timer ? window.setInterval(() => { if (!waitingForModel() && !document.hidden && !hud.helpOpen && model.mode === 'playing') {
     model.step(1);
     options.refresh();
   } }, 1000) : 0;

@@ -86,12 +86,14 @@ export const CARGO_LEVELS: CargoLevel[] = [
   { "name": "Last Mile", "tip": "Protect your walking space. A crate in a corner may need Undo.", "map": ["#######", "#  .# #", "#  $$ #", "#     #", "## $@##", "# ..  #", "#######"], "par": 7 },
   { "name": "Master Courier", "tip": "Protect your walking space. A crate in a corner may need Undo.", "map": ["#######", "##  #+#", "# . *$#", "#   # #", "# $#  #", "#     #", "#######"], "par": 9 }
 ];
+type CargoUndo = { state: CargoState; pushes: number };
 export type CargoSave = {
   level: number;
   state: CargoState;
   moves: number;
   pushes: number;
   usedHint: boolean;
+  history?: CargoUndo[];
 };
 export class CargoRun {
   mode = 'playing';
@@ -104,10 +106,7 @@ export class CargoRun {
   hintDirection: CargoDirection | null = null;
   epoch = 0;
   stars: Record<string, number>;
-  history: {
-    state: CargoState;
-    pushes: number;
-  }[] = [];
+  history: CargoUndo[] = [];
   constructor(saved: CargoSave | null = null, stars: Record<string, number> = {}) {
     this.stars = stars;
     this.level = Math.max(0, Math.min(11, Math.floor(saved?.level ?? 0)));
@@ -118,6 +117,8 @@ export class CargoRun {
       this.moves = Math.max(0, saved.moves || 0);
       this.pushes = Math.max(0, saved.pushes || 0);
       this.usedHint = !!saved.usedHint;
+      if (Array.isArray(saved.history) && saved.history.length <= 200 && saved.history.length <= this.moves && saved.history.every(item => item && Number.isInteger(item.pushes) && item.pushes >= 0 && item.pushes <= this.pushes && item.state && Array.isArray(item.state.crates) && item.state.crates.length === this.state.crates.length && new Set(item.state.crates).size === item.state.crates.length && item.state.crates.every(c => this.board.floor.includes(c)) && this.board.floor.includes(item.state.player) && !item.state.crates.includes(item.state.player)))
+        this.history = structuredClone(saved.history);
     }
     this.sync();
   }
@@ -184,7 +185,7 @@ export class CargoRun {
     this.mode = 'paused'; this.hintDirection = null; }
   resume() { if (this.mode === 'paused')
     this.sync(); }
-  save(): CargoSave { return { level: this.level, state: structuredClone(this.state), moves: this.moves, pushes: this.pushes, usedHint: this.usedHint }; }
+  save(): CargoSave { return { level: this.level, state: structuredClone(this.state), moves: this.moves, pushes: this.pushes, usedHint: this.usedHint, history: structuredClone(this.history.slice(-200)) }; }
   planning() { return this.mode === 'playing' ? { game: 'cargo' as const, epoch: String(this.epoch) + ':' + this.level, board: structuredClone(this.board), state: structuredClone(this.state) } : null; }
   snapshot() { return { game: 'cargo', mode: this.mode, level: this.level + 1, name: CARGO_LEVELS[this.level].name, board: this.board, state: this.state, moves: this.moves, pushes: this.pushes, par: CARGO_LEVELS[this.level].par, usedHint: this.usedHint, hintDirection: this.hintDirection, stars: this.stars, history: this.history.length }; }
 }

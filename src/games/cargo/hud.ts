@@ -22,7 +22,7 @@ export function cargoHUD(context: GameContext, model: CargoRun, hint: () => void
   return (thinking = false, message = '') => {
     if (tipLevel !== model.level) {
       tipLevel = model.level;
-      hud.intro('cargo-level-' + model.level, CARGO_LEVELS[model.level].tip + ' Arrows, WASD or swipe move one cell.');
+      if (model.level < 3) hud.intro('cargo-level-' + model.level, CARGO_LEVELS[model.level].tip);
     }
     hud.label(sound, audio.enabled ? 'Sound on' : 'Sound off');
     sound.setAttribute('aria-pressed', String(audio.enabled));
@@ -30,8 +30,8 @@ export function cargoHUD(context: GameContext, model: CargoRun, hint: () => void
     selector.disabled = player.type === 'ai';
     undo.disabled = !model.history.length || player.type === 'ai';
     help.disabled = thinking || model.mode !== 'playing' || player.type === 'ai';
-    hud.stats({ Delivered: model.state.crates.filter(c => model.board.goals.includes(c)).length + '/' + model.board.goals.length, Pushes: model.pushes, Par: CARGO_LEVELS[model.level].par });
+    hud.stats({ Delivered: model.state.crates.filter(c => model.board.goals.includes(c)).length + '/' + model.board.goals.length, Pushes: model.pushes + '/' + CARGO_LEVELS[model.level].par });
     hud.notice(message || (thinking ? 'Finding a route…' : model.hintDirection ? 'Next step: ' + model.hintDirection : model.state.crates.some(c => cargoCorner(model.board, c)) ? 'Crate in a corner · Undo can help' : ''));
-    hud.panel(model.mode === 'won' ? 'Delivered!' : '', model.moves + ' moves · ' + model.pushes + ' pushes · ' + (model.stars[model.level] ?? 0) + ' stars', [{ label: model.level === 11 ? 'First island' : 'Next island', symbol: 'next', press: () => send('next') }]);
+    hud.panel(model.mode === 'won' ? 'Delivered!' : '', model.moves + ' moves · ' + model.pushes + ' pushes · ' + (model.stars[model.level] ?? 0) + ' stars' + (model.usedHint ? ' · Hint used' : ''), player.type === 'ai' ? [] : [{ label: model.level === 11 ? 'First island' : 'Next island', symbol: 'next', press: () => send('next') }]);
   };
 }

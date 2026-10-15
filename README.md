@@ -18,7 +18,7 @@ Preview the production build with `npm run preview -- --host 127.0.0.1`. Service
 
 ## Play and controls
 
-Choose a preview card on the hub. Back, scores, status, and actions share the game stage. Touch controls occupy reserved regions outside the playable board or scene. Entry help appears once; Cargo also has a first-visit hint for each island.
+Choose a preview card on the hub. The scene fills the available screen, with scores and core actions above it. More holds occasional actions and Watch. Brief first-play tips disappear after input; the first three Cargo islands introduce their mechanics. Results sit below or beside the visible board. Phone controls reserve their own space; MacBook uses keyboard and mouse.
 
 | Game | iPhone | MacBook | Game actions |
 | --- | --- | --- | --- |
@@ -26,14 +26,14 @@ Choose a preview card on the hub. Back, scores, status, and actions share the ga
 | Lights Out | Tap a lamp | Click a lamp | Undo, Hint, Retry, Next |
 | Flappy Bird | Tap to flap | Space to flap; P to pause | Start, Pause/Resume, Retry, Sound |
 | Sudoku | Tap a cell, then a digit | Arrows select; digits enter; Backspace/Delete/0 erase; N notes; Z undo | Notes, Undo, Hint, New puzzle |
-| Match-3 | Tap adjacent gems | Click adjacent gems | Hint, Restart, Next, Sound |
+| Match-3 | Tap adjacent gems or drag between them | Click adjacent gems or drag | Hint, Restart, Next, Sound |
 | Pocket Cargo | D-pad or swipe | Arrows/WASD; Z to undo | Level selector, Undo, Hint, Restart, Next island, Sound |
 | Sky Rush | Steer, swipe, and Boost | Left/Right or A/D steer; Space/Up start or boost; P pause; Enter start/resume/next/retry | Start, Pause/Resume, Boost, Restart, Next sector, Sound |
-| Robot Pushball | Joystick and Dash | Arrows/WASD move; Space dashes in the last direction; P/Escape pause | Start match, Pause/Resume, paused New match, Play again, Retry AI, Sound |
+| Robot Pushball | Joystick and Dash; landscape rotates the pitch and controls together | Arrows/WASD move in screen directions; Space dashes in the last direction; P/Escape pause | Start match, Pause/Resume, paused New match, Play again, Retry AI, Sound |
 
 MacBook also supports F to enter or exit fullscreen. Buttons retain keyboard focus cues. Sound is optional and its on/off preference is saved globally.
 
-The seven solo games provide one **Watch TAMEV / Take over** control. First Watch loads the local model; takeover continues the same run and cancels queued AI inputs. AI Pause/Resume, Retry AI, Watch again, and Your run appear when relevant. **Your run** returns to the saved personal profile. Robot Pushball always pairs a human blue robot with a TAMEV coral opponent; Start match loads that required opponent.
+The seven solo games provide **Watch TAMEV** in More and a contextual **Take over** control while watching. First Watch pauses the action clock until the local model is ready; takeover continues the same run and cancels queued AI inputs. AI Pause/Resume, Retry AI, Watch again, and Your run appear when relevant. **Your run** returns to the saved personal profile. Robot Pushball always pairs a human blue robot with a TAMEV coral opponent; Start match loads that required opponent.
 
 ## Architecture
 
@@ -62,7 +62,7 @@ The shared layout targets 390×844 and 844×390 iPhone viewports, and MacBook vi
 
 Records and supported run state stay in localStorage under the existing `aeroplay:<game>:*` names. The 2048 route retains its `aeroplay:game2048:*` namespace. Existing record and save shapes remain readable.
 
-2048, Lights Out, Sudoku, Match-3, and Cargo restore saved run state. Flappy and Sky retain best scores without saving an in-flight session. Pushball retains wins and completed matches. Undo history remains in memory. All three Sudoku puzzles and twelve Cargo maps, names, par values, and achievements are retained.
+All seven solo games restore saved personal runs. Flappy and Sky reopen an active flight paused, including after Watch/takeover; best scores remain separate. Pushball retains wins and completed matches. Bounded Undo history survives navigation and reload in 2048, Lights Out, Sudoku, and Cargo. All three Sudoku puzzles and twelve Cargo maps, names, par values, and achievements are retained.
 
 AI-owned records use `aeroplay:ai:<game>:*` (including `ai:game2048`). A takeover keeps that ownership for the current run; it does not convert AI results into personal records. Your run remounts the saved personal profile. Human Cargo hints use the original 20,000-node solver budget and report an unsolvable board without initializing TAMEV.
 
@@ -97,6 +97,6 @@ The bundled automated WebKit build leaves CacheStorage empty even in an independ
 
 ## Review and delivery
 
-[Page decisions](docs/PAGES.md) preserve the baseline element inventory and link the implemented pages and tracked before/after screenshots. [Delivery acceptance](docs/DELIVERY.md) records the final measurements, phase commits, four verifier results, screenshots and remaining risks. [Progress](progress.md) records phase commits and validation evidence.
+[Player experience review](docs/PLAYER-EXPERIENCE.md) records the eight-game play coverage, improvements, replay evidence and device limits. [Page decisions](docs/PAGES.md) preserve the baseline element inventory and link the implemented pages and tracked before/after screenshots. [Delivery acceptance](docs/DELIVERY.md) records measurements, phase commits, verifier results, screenshots and remaining risks. [Progress](progress.md) records phase commits and validation evidence.
 
 A push to `main` triggers GitHub Actions, which runs `npm run build:decision` and deploys `dist/` to Cloudflare Pages. Release acceptance requires a successful build, all four verifiers, and opening the hub plus every game. Post-push checks verify successful Actions, matching local/deployed asset hashes, and the service-worker cache fingerprint.

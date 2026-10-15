@@ -22,6 +22,14 @@ export type FlightMotion = {
   pipes: FlightPipe[];
   passed: number;
 };
+type SavedFlight = FlightMotion & {
+  version: 1;
+  mode: 'playing' | 'paused' | 'over';
+  score: number;
+  distance: number;
+  time: number;
+  perfect: boolean;
+};
 export const flightSpeed = (passed: number) => Math.min(170, 110 + passed * 2);
 export function flightCollision(y: number, pipes: FlightPipe[], margin = 0) {
   const radius = FLIGHT.radius + margin;
@@ -108,16 +116,19 @@ export function planFlight(y: number, velocity: number, pipes: FlightPipe[], pas
   };
 }
 export function createFlappyModel(best = 0, random = Math.random) {
+  let visibleWidth = FLIGHT.width;
   const model = {
     mode: 'ready' as 'ready' | 'playing' | 'paused' | 'over',
     y: FLIGHT.height / 2, velocity: 0, pipes: [] as FlightPipe[], passed: 0,
     score: 0, best: Math.max(0, best), distance: 0, time: 0, epoch: 0,
     perfect: false, flash: 0, serial: 0, event: '' as '' | 'flap' | 'score' | 'hit',
-    spawn() {
-      const gap = Math.max(142, 200 - model.passed * 3);
+    setVisibleWidth(width: number) { if (Number.isFinite(width))
+      visibleWidth = Math.max(FLIGHT.width, Math.min(1800, width)); },
+    spawn(x = FLIGHT.width + 28, passed?: number) {
+      const gap = Math.max(142, 200 - (passed ?? model.passed) * 3);
       const previous = model.pipes.at(-1)?.gapY ?? (FLIGHT.height - gap) / 2;
       const gapY = Math.max(48, Math.min(FLIGHT.height - 32 - gap - 48, previous + (random() - 0.5) * 130));
-      model.pipes.push({ x: FLIGHT.width + 28, gapY, gap, scored: false });
+      model.pipes.push({ x, gapY, gap, scored: false });
     },
     reset() {
       model.epoch++;
@@ -147,7 +158,6 @@ export function createFlappyModel(best = 0, random = Math.random) {
         return false;
       if (model.mode === 'over') {
         model.reset();
-        return true;
       }
       if (model.mode === 'ready') {
         model.mode = 'playing';
@@ -185,6 +195,10 @@ export function createFlappyModel(best = 0, random = Math.random) {
         }
         if (!model.pipes.length || model.pipes.at(-1)!.x < FLIGHT.width - 190)
           model.spawn();
+        while (model.pipes.at(-1)!.x < visibleWidth - 190) {
+          const upcoming = model.pipes.filter(pipe => !pipe.scored).length;
+          model.spawn(model.pipes.at(-1)!.x + 218, model.passed + Math.max(0, upcoming - 1));
+        }
       }
     },
     pause() { if (model.mode === 'playing') {
@@ -193,6 +207,30 @@ export function createFlappyModel(best = 0, random = Math.random) {
     } },
     resume() { if (model.mode === 'paused')
       model.mode = 'playing'; },
+    savedRun(): SavedFlight | null {
+      if (model.mode === 'ready')
+        return null;
+      return { version: 1, mode: model.mode, y: model.y, velocity: model.velocity, pipes: model.pipes.map(pipe => ({ ...pipe })), passed: model.passed, score: model.score, distance: model.distance, time: model.time, perfect: model.perfect };
+    },
+    restore(raw: unknown) {
+      if (!raw || typeof raw !== 'object')
+        return false;
+      const run = raw as SavedFlight;
+      const finite = (value: number, low: number, high: number) => Number.isFinite(value) && value >= low && value <= high;
+      if (run.version !== 1 || !['playing', 'paused', 'over'].includes(run.mode) ||
+        !finite(run.y, -50, FLIGHT.height + 50) || !finite(run.velocity, -1000, 2000) ||
+        !Number.isInteger(run.passed) || !finite(run.passed, 0, 1e7) ||
+        !Number.isInteger(run.score) || !finite(run.score, run.passed, run.passed * 2) ||
+        !finite(run.distance, 0, 1e10) || !finite(run.time, 0, 1e8) || typeof run.perfect !== 'boolean' ||
+        !Array.isArray(run.pipes) || run.pipes.length < 1 || run.pipes.length > 12 ||
+        !run.pipes.every(pipe => pipe && typeof pipe === 'object' && finite(pipe.x, -80, 2300) && finite(pipe.gap, 142, 200) && finite(pipe.gapY, 0, FLIGHT.ground - pipe.gap) && typeof pipe.scored === 'boolean'))
+        return false;
+      Object.assign(model, { y: run.y, velocity: run.velocity, pipes: run.pipes.map(pipe => ({ ...pipe })), passed: run.passed, score: run.score, distance: run.distance, time: run.time, perfect: run.perfect, mode: run.mode === 'over' ? 'over' : 'paused', event: '', flash: 0 });
+      model.best = Math.max(model.best, model.score);
+      model.epoch++;
+      model.serial++;
+      return true;
+    },
     saved() { return { best: model.best }; },
     snapshot() {
       return { game: 'flappy', mode: model.mode, bird: { x: FLIGHT.birdX, y: model.y, radius: FLIGHT.radius, velocity: model.velocity },

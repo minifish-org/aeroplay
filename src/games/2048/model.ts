@@ -81,6 +81,7 @@ export type MergeSave = {
   grid: Grid;
   score: number;
   moves: number;
+  history?: { grid: Grid; score: number; moves: number }[];
 };
 export type TileChange = {
   sources: number[];
@@ -151,7 +152,7 @@ export function create2048Model(saved: unknown = null, best = 0, random = Math.r
       const next = preview2048Move(model.grid, direction);
       if (!next.changed)
         return false;
-      history.push(model.saved());
+      history.push({ grid: copyGrid(model.grid), score: model.score, moves: model.moves });
       if (history.length > 20)
         history.shift();
       model.changes = [];
@@ -179,9 +180,13 @@ export function create2048Model(saved: unknown = null, best = 0, random = Math.r
       model.mode = 'paused'; },
     resume() { if (model.mode === 'paused')
       model.mode = 'playing'; },
-    saved(): MergeSave { return { grid: copyGrid(model.grid), score: model.score, moves: model.moves }; },
+    saved(): MergeSave {
+      return { grid: copyGrid(model.grid), score: model.score, moves: model.moves,
+        history: history.map(frame => ({ grid: copyGrid(frame.grid), score: frame.score, moves: frame.moves })) };
+    },
     snapshot() {
-      return { game: '2048', mode: model.mode, ...model.saved(), best: model.best, undoCount: history.length,
+      return { game: '2048', mode: model.mode, grid: copyGrid(model.grid), score: model.score, moves: model.moves,
+        best: model.best, undoCount: history.length,
         highest: Math.max(...model.grid.flat()), epoch: model.epoch };
     },
     planning() {
@@ -199,6 +204,9 @@ export function create2048Model(saved: unknown = null, best = 0, random = Math.r
     model.score = saved.score;
     model.moves = saved.moves;
     model.best = Math.max(model.best, model.score);
+    if (Array.isArray(saved.history) && saved.history.length <= 20 && saved.history.every((frame, index) =>
+      validMergeSave(frame) && frame.moves === saved.moves - saved.history!.length + index && frame.score <= saved.score))
+      history.push(...saved.history.map(frame => ({ grid: copyGrid(frame.grid), score: frame.score, moves: frame.moves })));
     if (!model.canMove())
       model.mode = 'over';
   }

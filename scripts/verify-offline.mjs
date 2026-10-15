@@ -180,7 +180,7 @@ try {
       assert.equal((await h.state()).moves, 1);
     }
     if (game === 'flappy') {
-      await h.button('Take flight').click();
+      await h.startFlappy();
       await h.advance(120);
       assert.equal((await h.state()).mode, 'playing');
       await h.button('Pause').click();

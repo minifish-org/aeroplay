@@ -79,6 +79,7 @@ export type SudokuSave = {
   bestSeconds: number | null;
   notes?: number[][];
   hints?: number;
+  history?: { board: number[]; notes: number[][] }[];
 };
 export type SudokuInput = {
   type: 'select';
@@ -118,9 +119,9 @@ export function createSudokuModel(saved: unknown = null, bestSeconds: number | n
       history.length = 0;
     },
     next() { model.puzzleIndex = (model.puzzleIndex + 1) % PUZZLES.length; model.reset(); return true; },
-    remember(limit = true) {
+    remember() {
       history.push({ board: [...model.board], notes: cloneNotes(model.notes) });
-      if (limit && history.length > 100)
+      if (history.length > 100)
         history.shift();
     },
     undo() {
@@ -140,7 +141,7 @@ export function createSudokuModel(saved: unknown = null, bestSeconds: number | n
         !Number.isInteger(value) || value < 0 || value > 9)
         return false;
       if (model.noteMode && value && !model.board[index]) {
-        model.remember(false);
+        model.remember();
         model.notes[index] = model.notes[index].includes(value)
           ? model.notes[index].filter(note => note !== value) : [...model.notes[index], value];
         return true;
@@ -207,13 +208,14 @@ export function createSudokuModel(saved: unknown = null, bestSeconds: number | n
       model.mode = 'playing'; },
     conflict(index: number) { return !!model.board[index] && !sudokuCandidates(model.board, index).includes(model.board[index]); },
     invalid(index: number) { return !!model.board[index] && model.board[index] !== solution[index]; },
-    saved(): SudokuSave {
+    saved(withHistory = true): SudokuSave {
       return { puzzleIndex: model.puzzleIndex, board: [...model.board], notes: cloneNotes(model.notes),
         elapsedSeconds: Math.floor(model.elapsedSeconds), mistakes: model.mistakes,
-        bestSeconds: model.bestSeconds, hints: model.hints };
+        bestSeconds: model.bestSeconds, hints: model.hints,
+        history: withHistory ? history.map(item => ({ board: [...item.board], notes: cloneNotes(item.notes) })) : undefined };
     },
     snapshot() {
-      return { game: 'sudoku', mode: model.mode, ...model.saved(), givens: [...model.givens], selected: model.selected,
+      return { game: 'sudoku', mode: model.mode, ...model.saved(false), givens: [...model.givens], selected: model.selected,
         noteMode: model.noteMode, undoCount: history.length, epoch: model.epoch };
     },
     planning() {
@@ -240,6 +242,13 @@ export function createSudokuModel(saved: unknown = null, bestSeconds: number | n
     if (save.notes?.length === 81 && save.notes.every(note => Array.isArray(note) &&
       note.every(value => Number.isInteger(value) && value >= 1 && value <= 9)))
       model.notes = cloneNotes(save.notes);
+    if (Array.isArray(save.history)) {
+      const valid = save.history.slice(-100).filter(item => item && Array.isArray(item.board) && item.board.length === 81 &&
+        item.board.every(value => Number.isInteger(value) && value >= 0 && value <= 9) &&
+        model.givens.every(index => item.board[index] === model.board[index]) && Array.isArray(item.notes) &&
+        item.notes.length === 81 && item.notes.every(note => Array.isArray(note) && note.every(value => Number.isInteger(value) && value >= 1 && value <= 9)));
+      history.push(...valid.map(item => ({ board: [...item.board], notes: cloneNotes(item.notes) })));
+    }
     if (model.solved())
       model.mode = 'won';
   }

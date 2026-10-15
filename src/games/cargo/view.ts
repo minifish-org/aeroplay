@@ -19,14 +19,13 @@ export class CargoView {
     this.signature = '';
     this.delivered = 0;
     const { width, height, floor, goals } = model.board;
-    this.stage.framing('island', width + height * .65 + 1, height + 3);
-    this.box(width + 1.3, .6, height + 1.3, 0x41686f, this.world, 0, -.5);
-    this.box(width + 2.5, .08, height + 2.5, 0x4d8390, this.world, 0, -.86);
+    this.stage.framing('island', width + .6, height + .8);
+    this.box(width + .45, .28, height + .45, 0x41686f, this.world, 0, -.3);
     for (let cell = 0; cell < width * height; cell++) {
       const p = this.position(cell, model), open = floor.includes(cell);
-      this.box(.94, open ? .16 : .7, .94, open ? (cell % 2 ? 0xc8d6ba : 0xdde2c6) : 0x7c9c87, this.world, p.x, open ? -.1 : .18, p.z);
+      this.box(.94, open ? .12 : .34, .94, open ? (cell % 2 ? 0xc8d6ba : 0xdde2c6) : 0x658b7a, this.world, p.x, open ? -.08 : .06, p.z);
       if (goals.includes(cell)) {
-        const ring = this.stage.shape('ring', .31, 0x74d5bb);
+        const ring = this.stage.shape('ring', .34, 0x36c99a);
         ring.rotation.x = -Math.PI / 2;
         ring.position.set(p.x, .015, p.z);
         this.world.add(ring);
@@ -42,11 +41,11 @@ export class CargoView {
     }
     this.courier = new Group();
     this.box(.42, .43, .4, 0x579b96, this.courier, 0, .24);
-    const head = this.stage.shape('sphere', .24, 0xefeddc);
-    head.position.y = .64;
+    const head = this.stage.shape('sphere', .2, 0xefeddc);
+    head.position.y = .6;
     this.courier.add(head);
     this.box(.34, .09, .06, 0x263f55, this.courier, 0, .64, .21);
-    this.box(.48, .1, .48, 0xe7bd75, this.courier, 0, .84);
+    this.box(.36, .08, .36, 0xe7bd75, this.courier, 0, .78);
     this.world.add(this.courier);
     this.world.scale.setScalar(.9);
     this.stage.tween(this.world, { scale: 1 }, 'entry');
@@ -83,5 +82,12 @@ export class CargoView {
       const d = { up: [0, -1], right: [1, 0], down: [0, 1], left: [-1, 0] }[model.hintDirection], p = this.position(model.state.player, model);
       this.hint.position.set(p.x + d[0], .08, p.z + d[1]);
     }
+  }
+  bump(input: unknown, model: CargoRun) {
+    const d = ({ up: [0, -1], right: [1, 0], down: [0, 1], left: [-1, 0] } as Record<string, number[]>)[input as string];
+    if (!d || this.stage.reducedMotion) return;
+    const p = this.position(model.state.player, model);
+    this.courier.position.set(p.x + d[0] * .15, 0, p.z + d[1] * .15);
+    this.stage.tween(this.courier, p, 'failure');
   }
 }

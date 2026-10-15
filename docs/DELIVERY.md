@@ -1,6 +1,6 @@
 # AeroPlay rewrite acceptance
 
-Measured on 2026-10-15, before the single P4 release push. The complete eight-game Three.js rewrite is implemented on `main`. **Build:decision and all four complete verifiers pass.** The inherited Pushball fixed points are repaired through existing candidate validity; steering, physics, the pinned TAMEV model and ordinary inputs are retained. Actions, deployed asset hashes and the cache fingerprint are checked after publication and reported in the release message.
+Updated on 2026-10-15 after the eight-game player experience polish. The original rewrite phases and their historical evidence remain below. [Player experience review](PLAYER-EXPERIENCE.md) records the current phone/MacBook gameplay findings, changes and genuine replays. Current release gates and publication evidence are recorded separately from the earlier P4 measurements.
 
 ## Pages and screenshots
 
@@ -50,26 +50,26 @@ Line counts include readable source formatting and every `.mjs` file in `scripts
 
 | Metric | Baseline | Current | Target |
 | --- | ---: | ---: | ---: |
-| TypeScript | 10,016 lines / 59 files | 5,202 lines / 44 files | ≤6,000 |
-| CSS | 2,017 lines / 6 files | 481 lines / 3 files | ≤900 |
-| Scripts | 3,476 lines / 21 files | 1,855 lines / 7 files | ≤2,000 |
+| TypeScript | 10,016 lines / 59 files | 5,583 lines / 44 files | ≤6,000 |
+| CSS | 2,017 lines / 6 files | 391 lines / 3 files | ≤900 |
+| Scripts | 3,476 lines / 21 files | 1,932 lines / 7 files | ≤2,000 |
 | Games | 11 | 8 | 8 |
 | Rendering libraries | Pixi + Three | Three | Three |
-| Rendering chunks, raw decimal kB | 392.95 + 559.10 | 550.44 | One Three chain |
-| Largest model + view + HUD | 500–900 lines | 430 lines | ≤450 |
+| Rendering chunks, raw decimal kB | 392.95 + 559.10 | 552.48 | One Three chain |
+| Largest model + view + HUD | 500–900 lines | 432 lines | ≤450 |
 
 | Game | Model + view + HUD lines |
 | --- | ---: |
-| 2048 | 275 |
-| Lights Out | 255 |
-| Flappy Bird | 336 |
-| Sudoku | 328 |
-| Match-3 | 364 |
-| Pocket Cargo | 314 |
-| Sky Rush | 332 |
-| Robot Pushball | 430 |
+| 2048 | 312 |
+| Lights Out | 269 |
+| Flappy Bird | 381 |
+| Sudoku | 367 |
+| Match-3 | 391 |
+| Pocket Cargo | 321 |
+| Sky Rush | 374 |
+| Robot Pushball | 432 |
 
-The production build is 31,134,791 bytes including the pinned 14,872,474-byte model and 14,239,897-byte WASM. Its service worker precaches 33 resources. Release cache fingerprint: `aeroplay-e9f93392bdeb`; the previous production site was observed using `aeroplay-569addfa0659` before release.
+The current production build is 31,278,818 bytes including the pinned 14,872,474-byte model and 14,239,897-byte WASM. Its service worker precaches 33 resources. Current cache fingerprint: `aeroplay-72c490db3536`; the preceding Cargo camera release used `aeroplay-99bc0be4862c`.
 
 ## Phase commits
 
@@ -90,7 +90,23 @@ The production build is 31,134,791 bytes including the pinned 14,872,474-byte mo
 
 The pre-existing `2ee86c8`, unpublished at the start of the rewrite, is preserved. Each of the ten P0/P1/P2 snapshots independently built from `git archive` with only dependencies shared; no pending source was borrowed. No phase used a failed-build bypass, branch, worktree or force push.
 
-## Acceptance evidence
+## Current player polish acceptance
+
+The complete frozen acceptance run passed with unchanged source/runtime/test fingerprint `4f80cdf689d85ba137435242ebcbe4fbdab82675d711df042ec31180cdbe6dfd`.
+
+| Check | Result | Current coverage |
+| --- | --- | --- |
+| TypeScript/Vite build and pinned model preparation | PASS | Existing five local model resources verified; no new runtime dependency |
+| Layout, WebKit | PASS · 76.82 s | 36 initial layouts and open menus, rotation, active/paused AI, all settlements, scene-transform reset, menu-dismiss input, idle/GPU teardown/recovery and reduced motion |
+| Games, WebKit | PASS · 50.24 s | All eight game flows, original Cargo/Sudoku content, persistent Undo, full paused flight/sector reload, contextual Next/Pause and real first-to-three Pushball completion |
+| AI, WebKit | PASS · 23.46 s | Original guards/planners, delayed real-WASM cold Watch freeze, resident reuse, exact personal flight restoration, fresh Watch again, cancellation/takeover and complete Pushball match |
+| Offline, Chromium | PASS · 26.78 s | All 33 resources, cold browser restart with stopped server, native controls, real TAMEV, cache activation/removal and new-asset offline reload |
+
+The original full-match deadline, winner and three-goal assertions remain. Hidden menus are excluded from the visible-control measurement; open menus and their summary controls are now checked explicitly in all viewports. Desktop checks use the actual keyboard/mouse paths where phone control banks are intentionally absent. No remaining failure is counted as a pass. New flight reload assertions preserve every durable field and explicitly check that transient boost messages clear on re-entry.
+
+Current logs, fingerprints and metrics are retained locally under `output/player-review/final-acceptance.json`, `acceptance-*.log` and `final-metrics.json`. The earlier failing assertion on intentionally expired boost text is preserved in `before-contextual-phase-fix/`; it was corrected to assert durable fields exactly plus cleared transient text. The gameplay issue found through saved-win Next/Pause has a permanent regression and native replay proof. The tracked [player review](PLAYER-EXPERIENCE.md) and images contain the readable experience evidence. CI and live resource/cache checks follow publication and are reported with the pushed commit.
+
+## Historical rewrite acceptance evidence
 
 | Check | Result | Evidence |
 | --- | --- | --- |
@@ -111,5 +127,5 @@ Final logs, source/test fingerprints and snapshots are retained under `output/fi
 
 1. Physical iPhone Safari/Home Screen validation is outstanding. Native Mac Safari inspection was attempted while the Mac was locked and could not run. Automated WebKit gameplay/layout and Chromium offline proof are identified separately.
 2. The pinned small model can choose slow routes on unusual positions. An isolated first-corner replay made progress and scored but was still moving after 150 choices; it is not claimed as a completed match. The mandatory native and cold-offline full-match paths all passed without changing their assertions.
-3. The Three chunk is 550.44 raw kB; Vite reports its existing size warning. The locally cached model/WASM dominate the 31.13 MB offline download. No rendering or physics dependency was added.
-4. The existing Actions/Pages deployment is unchanged. Post-push checks must identify the release SHA, compare deployed/local asset bytes and confirm `aeroplay-e9f93392bdeb`; their results are recorded in the release message rather than inferred from local tests.
+3. The Three chunk is 552.48 raw kB; Vite reports its existing size warning. The locally cached model/WASM dominate the 31.28 MB offline download. No rendering or physics dependency was added.
+4. The existing Actions/Pages deployment is unchanged. Post-push checks must identify the release SHA, compare deployed/local asset bytes and confirm the current release cache fingerprint above; their results are recorded in the release message rather than inferred from local tests.

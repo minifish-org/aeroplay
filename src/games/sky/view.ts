@@ -5,6 +5,7 @@ export class SkyView {
   private ship = new Group();
   private shield: Mesh;
   private flame: Mesh;
+  private trail = new Group();
   private rows: {
     ring: Mesh;
     barriers: Mesh[];
@@ -51,6 +52,12 @@ export class SkyView {
     this.flame = stage.shape('gem', .18, 0xf2ad75);
     this.flame.position.z = .8;
     this.ship.add(this.flame);
+    for (const x of [-.55, .55]) {
+      const streak = stage.box(.06, .05, 1.25, 0xf2cd83);
+      streak.position.set(x, -.04, 1.7);
+      this.trail.add(streak);
+    }
+    this.ship.add(this.trail);
     this.shield = stage.shape('ring', .78, 0x98d7e4);
     this.shield.rotation.x = Math.PI / 2;
     this.ship.add(this.shield);
@@ -58,7 +65,13 @@ export class SkyView {
     for (let i = 0; i < 14; i++) {
       const ring = stage.shape('ring', .95, 0xf3cf83), barriers = [];
       for (let lane = 0; lane < 3; lane++) {
-        const block = stage.box(2.4, 2.4, .7, 0xa2b5bb);
+        const block = stage.box(2.4, 2.4, .7, 0xf2aa8b);
+        for (const angle of [-Math.PI / 4, Math.PI / 4]) {
+          const mark = stage.box(1.5, .16, .06, 0xeef5f8);
+          mark.position.z = .38;
+          mark.rotation.z = angle;
+          block.add(mark);
+        }
         block.position.x = (lane - 1) * LANE_WIDTH;
         stage.content.add(block);
         barriers.push(block);
@@ -85,9 +98,12 @@ export class SkyView {
     state.rows.forEach((row, index) => { const view = this.rows[index]; view.ring.position.set((row.safeLane - 1) * LANE_WIDTH, 1.35, -row.distance); view.ring.visible = !row.passed; view.ring.rotation.z = this.stage.reducedMotion ? 0 : this.time * .6; view.barriers.forEach((block, lane) => { block.visible = row.obstacles.includes(lane); block.position.y = 1.15; block.position.z = -row.distance; }); });
     this.ship.position.set(state.x, state.mode === 'over' ? .65 : 1.2, 2);
     this.ship.rotation.z = -(state.lane - 1 - state.x / LANE_WIDTH) * .3;
-    this.ship.visible = state.invincible <= 0 || this.stage.reducedMotion || Math.floor(this.time * 12) % 2 === 0;
+    this.ship.visible = true;
     this.flame.scale.z = state.boost > 0 ? 2.7 : 1;
-    this.shield.visible = state.shield > 0;
+    this.trail.visible = state.boost > 0;
+    this.shield.visible = state.shield > 0 || state.invincible > 0;
+    this.shield.material = this.stage.material(state.shield > 0 ? 0x98d7e4 : 0xf2aa8b);
+    this.shield.scale.setScalar(state.invincible > 0 && !this.stage.reducedMotion ? 1 + Math.sin(this.time * 16) * .08 : 1);
     if (this.mode !== state.mode) {
       this.mode = state.mode;
       if (state.mode === 'playing')

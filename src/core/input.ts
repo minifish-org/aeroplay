@@ -6,7 +6,7 @@ export function bindInput(host: HTMLElement, keyInput: (key: string, repeat: boo
     id: number;
   } | null = null;
   const down = (event: PointerEvent) => {
-    if (event.target instanceof Element && event.target.closest('button,select,input,.hud-panel,.hud-inputs'))
+    if (event.target instanceof Element && event.target.closest('button,summary,details,select,input,.hud-panel,.hud-inputs'))
       return;
     host.querySelector('canvas')?.focus({ preventScroll: true });
     start = { x: event.clientX, y: event.clientY, id: event.pointerId };
@@ -29,7 +29,7 @@ export function bindInput(host: HTMLElement, keyInput: (key: string, repeat: boo
   const key = (event: KeyboardEvent) => {
     if (event.target instanceof Element && event.target.closest('select,input,textarea'))
       return;
-    if (event.target instanceof Element && event.target.closest('button') && [' ', 'Enter'].includes(event.key))
+    if (event.target instanceof Element && event.target.closest('button,summary') && [' ', 'Enter'].includes(event.key))
       return;
     const value = keyInput(event.key, event.repeat);
     if (value === undefined)

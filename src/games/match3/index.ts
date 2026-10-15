@@ -1,6 +1,6 @@
 import { mountRun, type GameContext } from '../../core/loop';
 import { GameAudio } from '../../core/audio';
-import { createMatch3Model } from './model';
+import { createMatch3Model, type GemPoint } from './model';
 import { createMatch3View } from './view';
 import { createMatch3HUD } from './hud';
 export default function mount(context: GameContext) {
@@ -30,7 +30,34 @@ export default function mount(context: GameContext) {
     model.resume(); persist(); };
   const updateHUD = createMatch3HUD(hud, model, utility, () => player.type === 'human');
   const sound = hud.button('sound', 'Sound', 'sound', () => audio.toggle());
-  return mountRun(context, { model, active: () => model.mode === 'playing' && ['clearing', 'falling'].includes(model.phase),
+  let drag: { x: number; y: number; id: number; from: GemPoint } | null = null;
+  const cancelDrag = () => { drag = null; };
+  const down = (event: PointerEvent) => {
+    if (event.target instanceof Element && event.target.closest('button,summary,details,.hud-panel,.hud-inputs'))
+      return;
+    const from = stage.pick(event.clientX, event.clientY) as GemPoint | undefined;
+    if (from && Number.isInteger(from.x) && Number.isInteger(from.y))
+      drag = { x: event.clientX, y: event.clientY, id: event.pointerId, from };
+  };
+  const up = (event: PointerEvent) => {
+    if (!drag || drag.id !== event.pointerId)
+      return;
+    const gesture = drag, dx = event.clientX - gesture.x, dy = event.clientY - gesture.y;
+    cancelDrag();
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20 || hud.helpOpen)
+      return;
+    const to = { x: gesture.from.x + (Math.abs(dx) > Math.abs(dy) ? Math.sign(dx) : 0), y: gesture.from.y + (Math.abs(dy) >= Math.abs(dx) ? Math.sign(dy) : 0) };
+    if (to.x < 0 || to.x > 7 || to.y < 0 || to.y > 7)
+      return;
+    if (model.selected)
+      player.submitHumanInput({ ...model.selected });
+    player.submitHumanInput(gesture.from);
+    player.submitHumanInput(to);
+  };
+  hud.element.addEventListener('pointerdown', down);
+  hud.element.addEventListener('pointerup', up);
+  hud.element.addEventListener('pointercancel', cancelDrag);
+  const dispose = mountRun(context, { model, clearInput: cancelDrag, active: () => model.mode === 'playing' && ['clearing', 'falling'].includes(model.phase),
     render: () => { view.draw(); if (score !== model.score) {
       score = model.score;
       audio.play('collect');
@@ -41,4 +68,10 @@ export default function mount(context: GameContext) {
     } },
     refresh: () => { updateHUD(); sound.setAttribute('aria-pressed', String(audio.enabled)); persist(); }, persist,
     pick: (x, y) => { audio.unlock(); return stage.pick(x, y); }, dispose: () => audio.dispose() });
+  return () => {
+    dispose();
+    hud.element.removeEventListener('pointerdown', down);
+    hud.element.removeEventListener('pointerup', up);
+    hud.element.removeEventListener('pointercancel', cancelDrag);
+  };
 }

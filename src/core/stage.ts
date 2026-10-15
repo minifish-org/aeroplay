@@ -44,6 +44,8 @@ export class Stage {
     life: number;
   }[] = [];
   private world = { width: 8, height: 8 };
+  private anchor?: { x: number; screen: number };
+  private horizontal = false;
   private preset: Preset = 'board';
   private frames = 0;
   private mounts = 0;
@@ -92,13 +94,16 @@ export class Stage {
     this.host = host;
     this.play = play;
     this.preset = preset;
+    this.host.dataset.preset = preset;
     this.world = { width, height };
+    this.anchor = undefined;
     this.mounts++;
     host.prepend(this.renderer.domElement);
     this.scene.background = new Color(background);
     this.scene.fog = preset === 'flight' ? new Fog(background, 35, 120) : null;
     this.camera = preset === 'flight' ? this.perspective : this.ortho;
-    this.camera.position.set(...(preset === 'board' ? [0, 0, 20] : preset === 'island' ? [0, 18, 8] : preset === 'arena' ? [0, 18, 15] : [0, 4.1, 9]) as [
+    this.camera.up.set(0, 1, 0);
+    this.camera.position.set(...(preset === 'board' ? [0, 0, 20] : preset === 'island' ? [0, 18, 8] : preset === 'arena' ? [0, 30, 7] : [0, 4.1, 9]) as [
       number,
       number,
       number
@@ -108,7 +113,12 @@ export class Stage {
     this.observer.observe(play);
     this.resize();
   }
-  framing(preset: Preset, width: number, height: number) { this.preset = preset; this.world = { width, height }; this.resize(); }
+  framing(preset: Preset, width: number, height: number, anchor?: { x: number; screen: number }) { this.preset = preset; this.world = { width, height }; this.anchor = anchor; this.resize(); }
+  bounds() {
+    const { left, right, top, bottom } = this.ortho, x = this.ortho.position.x;
+    return { left: left + x, right: right + x, top, bottom, width: right - left, height: top - bottom };
+  }
+  groundDirection(x: number, y: number) { return this.preset === 'arena' && this.horizontal ? { x: y, y: -x } : { x, y }; }
   private viewport() {
     const h = this.host?.getBoundingClientRect(), p = this.play?.getBoundingClientRect();
     return h && p ? { x: p.x - h.x, y: p.y - h.y, width: p.width, height: p.height } : { x: 0, y: 0, width: 1, height: 1 };
@@ -120,19 +130,34 @@ export class Stage {
     if (this.host.dataset.wide !== wide)
       this.host.dataset.wide = wide;
     const h = this.host.getBoundingClientRect(), p = this.viewport(), aspect = p.width / Math.max(1, p.height);
+    this.horizontal = aspect > 1;
+    this.host.dataset.horizontal = String(this.horizontal);
     if (this.size.width !== h.width || this.size.height !== h.height) {
       this.size = { width: h.width, height: h.height };
       this.renderer.setSize(Math.max(1, h.width), Math.max(1, h.height), false);
     }
     if (this.camera === this.ortho) {
-      const height = Math.max(this.world.height, this.world.width / aspect);
+      const arenaHorizontal = this.preset === 'arena' && this.horizontal;
+      const width = arenaHorizontal ? this.world.height : this.world.width;
+      const height = Math.max(arenaHorizontal ? this.world.width : this.world.height, width / aspect);
       this.ortho.left = -height * aspect / 2;
       this.ortho.right = height * aspect / 2;
       this.ortho.top = height / 2;
       this.ortho.bottom = -height / 2;
+      if (this.preset === 'board')
+        this.ortho.position.x = this.anchor ? this.anchor.x + (.5 - this.anchor.screen) * height * aspect : 0;
+      if (this.preset === 'arena') {
+        this.ortho.up.set(arenaHorizontal ? -1 : 0, arenaHorizontal ? 0 : 1, 0);
+        this.ortho.lookAt(0, 0, 0);
+      }
     }
-    else
+    else {
       this.perspective.aspect = aspect;
+      this.perspective.fov = aspect < 1 ? 58 : 48;
+      const distance = Math.max(9, this.world.width / (2 * Math.tan(this.perspective.fov * Math.PI / 360) * aspect) + 2);
+      this.perspective.position.set(0, 4.1 + (distance - 9) * .65, distance);
+      this.perspective.lookAt(0, 1, -18);
+    }
     this.camera.updateProjectionMatrix();
   }
   material(color: number | string, emissive = 0) {
@@ -312,6 +337,9 @@ export class Stage {
     this.observer?.disconnect();
     this.releaseGPU();
     this.content.clear();
+    this.content.position.set(0, 0, 0);
+    this.content.rotation.set(0, 0, 0);
+    this.content.scale.setScalar(1);
     this.geometry.clear();
     this.materials.clear();
     this.tweens = [];

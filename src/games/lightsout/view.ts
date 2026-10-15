@@ -14,25 +14,29 @@ export function createView(stage: Stage, model: LightsModel) {
     const stem = stage.box(.055, .18, .03, 0x8099ac, .01);
     stem.position.set(p.x, p.y + .19, .29);
     stage.content.add(stem);
-    return { base, glass, ring, stem };
+    const halo = stage.shape('ring', .46, 0x96d5b5);
+    halo.position.set(p.x, p.y, .34);
+    halo.visible = false;
+    return { base, glass, ring, stem, halo };
   });
-  let signature = '', moves = -1;
+  let signature = '', moves = -1, previous = [...model.board];
   return (dt: number) => {
     void dt;
     const next = model.board.join('') + ':' + model.hinted + ':' + model.epoch;
     if (signature === next)
       return;
     signature = next;
-    lamps.forEach(({ base, glass, ring, stem }, cell) => {
+    lamps.forEach(({ base, glass, ring, stem, halo }, cell) => {
       const lit = !!model.board[cell], hinted = model.hinted === cell;
       color(base, hinted ? 0x96d5b5 : 0x334c61);
-      glass.material = stage.material(lit ? 0xf2cd83 : 0x294053, lit ? 0xdb8e1d : 0);
+      glass.material = stage.material(lit ? 0xf2cd83 : 0x1b3042, lit ? 0xdb8e1d : 0);
       const line = stage.material(lit ? 0xfff1c0 : 0x708ba1);
       ring.material = line;
       stem.material = line;
-      if (moves >= 0 && model.moves !== moves) {
-        glass.scale.set(1.08, 1.08, .55);
-        stage.tween(glass, { scale: 1 }, 'score');
+      halo.visible = hinted;
+      if (moves >= 0 && model.moves !== moves && previous[cell] !== model.board[cell]) {
+        base.scale.setScalar(1.045);
+        stage.tween(base, { scale: 1 }, 'score');
       }
     });
     if (model.hinted >= 0) {
@@ -42,6 +46,7 @@ export function createView(stage: Stage, model: LightsModel) {
     if (moves !== model.moves && model.mode === 'won')
       stage.effect(0, 0, 0xf2cd83, 'settle');
     moves = model.moves;
+    previous = [...model.board];
   };
   function color(mesh: typeof lamps[number]['base'], value: number) { mesh.material = stage.material(value); }
 }

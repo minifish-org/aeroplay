@@ -6,7 +6,7 @@ const paths: Record<string, string> = {
   ai: 'M7 7h10v11H7zM12 3v4M9 11h.1M15 11h.1M9 15h6M3 10v5M21 10v5',
   sound: 'm3 9 4 0 5-4v14l-5-4H3zM16 8a6 6 0 0 1 0 8', notes: 'm5 16 10-10 3 3-10 10-4 1z',
   next: 'm8 5 7 7-7 7M15 12H4M20 5v14', erase: 'm4 14 8-10 8 7-7 10H9zM9 21h12',
-  left: 'm15 5-7 7 7 7', right: 'm9 5 7 7-7 7', up: 'm5 15 7-7 7 7', down: 'm5 9 7 7 7-7', boost: 'm13 2-8 12h6l-1 8 9-13h-6z', close: 'm6 6 12 12M18 6 6 18'
+  left: 'm15 5-7 7 7 7', right: 'm9 5 7 7-7 7', up: 'm5 15 7-7 7 7', down: 'm5 9 7 7 7-7', boost: 'm13 2-8 12h6l-1 8 9-13h-6z', close: 'm6 6 12 12M18 6 6 18', more: 'M5 12h.01M12 12h.01M19 12h.01'
 };
 export function icon(name: string) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -24,16 +24,22 @@ export class HUD {
   private status: HTMLElement;
   private panelArea: HTMLElement;
   private selectionArea: HTMLElement;
+  private more: HTMLDetailsElement;
+  private menu: HTMLElement;
   private fields = new Map<string, HTMLElement>();
   private lastPanel = '';
   private gameNotice = '';
   private playerNotice = '';
   private graphicsLost = false;
+  private introNotice = '';
+  private introTimer = 0;
   private disabledBeforeLoss = new Map<HTMLButtonElement | HTMLSelectElement, boolean>();
   helpOpen = false;
   onChange = () => { };
+  onMenuChange = (_open: boolean) => { };
+  private keyDown = (event: KeyboardEvent) => { this.dismissIntro(); if (event.key === 'Escape') this.more.open = false; };
   constructor(root: HTMLElement, name: string, back: () => void) {
-    root.innerHTML = '<section class="game-stage"><div class="hud"><div class="hud-top"><div class="hud-nav"></div><div class="hud-stats"></div><div class="hud-actions"></div></div><div class="play-area"><div class="hud-notice" role="status" aria-live="polite"></div><div id="game-selection" class="hud-selection" role="status" aria-live="polite" aria-atomic="true"></div><div class="hud-panel" hidden></div></div><div class="hud-inputs"></div></div></section>';
+    root.innerHTML = '<section class="game-stage"><div class="hud"><div class="hud-top"><div class="hud-nav"></div><div class="hud-stats"></div><div class="hud-actions"><details class="hud-more"><summary aria-label="More options" title="More options"></summary><div class="hud-menu"></div></details></div></div><div class="play-area"><div class="hud-notice" role="status" aria-live="polite" hidden></div><div id="game-selection" class="hud-selection" role="status" aria-live="polite" aria-atomic="true"></div></div><div class="hud-inputs"></div><div class="hud-panel" hidden></div></div></section>';
     this.element = root.querySelector('.game-stage')!;
     this.playArea = root.querySelector('.play-area')!;
     this.inputs = root.querySelector('.hud-inputs')!;
@@ -42,6 +48,18 @@ export class HUD {
     this.status = root.querySelector('.hud-notice')!;
     this.panelArea = root.querySelector('.hud-panel')!;
     this.selectionArea = root.querySelector('.hud-selection')!;
+    this.more = root.querySelector('.hud-more')!;
+    this.menu = root.querySelector('.hud-menu')!;
+    this.more.querySelector('summary')!.append(icon('more'));
+    this.more.addEventListener('toggle', () => { this.onMenuChange(this.more.open); this.onChange(); });
+    this.element.addEventListener('pointerdown', event => {
+      if (this.more.open && !(event.target instanceof Element && event.target.closest('.hud-more'))) {
+        this.more.open = false;
+        event.stopPropagation();
+      }
+      this.dismissIntro();
+    }, true);
+    window.addEventListener('keydown', this.keyDown);
     const nav = root.querySelector('.hud-nav')!;
     const button = this.button('back', 'Back', 'back', back);
     nav.append(button);
@@ -58,18 +76,42 @@ export class HUD {
     button.type = 'button';
     button.className = 'hud-button';
     button.dataset.action = id;
+    button.dataset.symbol = symbol;
     button.setAttribute('aria-label', label);
+    button.title = label;
     button.append(icon(symbol));
     const text = document.createElement('span');
     text.textContent = label;
     button.append(text);
     button.addEventListener('click', event => { event.preventDefault(); if (this.graphicsLost && id !== 'back')
-      return; press(); this.onChange(); });
-    parent.append(button);
+      return; const fromMenu = !!button.closest('.hud-menu'); press(); if (fromMenu) this.more.open = false; this.onChange(); });
+    if (parent === this.actions && ['sound', 'restart', 'new', 'next', 'reset', 'mode', 'personal'].includes(id))
+      this.menu.append(button);
+    else if (parent === this.actions)
+      parent.insertBefore(button, this.more);
+    else parent.append(button);
     return button;
   }
-  label(button: HTMLButtonElement, text: string, accessible = text) { button.querySelector('span')!.textContent = text; button.setAttribute('aria-label', accessible); }
+  label(button: HTMLButtonElement, text: string, accessible = text) {
+    button.querySelector('span')!.textContent = text;
+    button.setAttribute('aria-label', accessible);
+    button.title = accessible;
+    const symbol = ({ Resume: 'play', Pause: 'pause', 'Take over': 'human', Watch: 'ai' } as Record<string, string>)[text];
+    if (symbol && button.dataset.symbol !== symbol) { button.querySelector('svg')?.replaceWith(icon(symbol)); button.dataset.symbol = symbol; }
+  }
+  primary(button: HTMLButtonElement, primary: boolean) {
+    const parent = primary ? this.actions : this.menu;
+    if (button.parentElement !== parent) {
+      if (primary) parent.insertBefore(button, this.more);
+      else parent.append(button);
+    }
+  }
+  resultControls(buttons: HTMLButtonElement[]) {
+    const group = this.panelArea.querySelector('.panel-actions');
+    if (!this.panelArea.hidden && group) for (const button of buttons) group.append(button);
+  }
   stats(values: Record<string, string | number>) {
+    for (const [key, field] of this.fields) field.hidden = !(key in values);
     for (const [key, value] of Object.entries(values)) {
       let field = this.fields.get(key);
       if (!field) {
@@ -80,6 +122,7 @@ export class HUD {
         this.statsArea.append(field);
         this.fields.set(key, field);
       }
+      field.hidden = false;
       const text = String(value);
       if (field.querySelector('strong')!.textContent !== text)
         field.querySelector('strong')!.textContent = text;
@@ -87,7 +130,7 @@ export class HUD {
   }
   notice(text: string) { this.gameNotice = text; this.showNotice(); }
   controllerNotice(text: string) { this.playerNotice = text; this.showNotice(); }
-  private showNotice() { const text = this.graphicsLost ? 'Graphics interrupted · Waiting for recovery.' : this.playerNotice || this.gameNotice; if (this.status.textContent !== text)
+  private showNotice() { const text = this.graphicsLost ? 'Graphics interrupted · Waiting for recovery.' : this.playerNotice || this.gameNotice || this.introNotice; if (this.status.textContent !== text)
     this.status.textContent = text; this.status.hidden = !text; }
   selection(text: string) { if (this.selectionArea.textContent !== text)
     this.selectionArea.textContent = text; }
@@ -128,6 +171,7 @@ export class HUD {
   }[] = []) {
     if (this.helpOpen)
       return;
+    if (this.more.open) { this.lastPanel = ''; this.panelArea.hidden = true; return; }
     const key = JSON.stringify([title, detail, actions.map(action => action.label)]);
     if (key === this.lastPanel)
       return;
@@ -152,7 +196,12 @@ export class HUD {
   intro(id: string, copy: string) {
     if (load('help-seen', false, id))
       return;
-    this.panel('How to play', copy, [{ label: 'Got it', symbol: 'play', press: () => { this.helpOpen = false; save('help-seen', true, id); this.lastPanel = ''; this.panelArea.hidden = true; this.onChange(); } }]);
-    this.helpOpen = true;
+    save('help-seen', true, id);
+    this.introNotice = copy;
+    this.showNotice();
+    window.clearTimeout(this.introTimer);
+    this.introTimer = window.setTimeout(() => this.dismissIntro(), 5000);
   }
+  private dismissIntro() { if (!this.introNotice) return; this.introNotice = ''; window.clearTimeout(this.introTimer); this.showNotice(); }
+  dispose() { window.clearTimeout(this.introTimer); window.removeEventListener('keydown', this.keyDown); this.onMenuChange = () => { }; }
 }

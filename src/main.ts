@@ -24,6 +24,8 @@ async function route(profile: PlayProfile = 'human') {
   const claim = setPlayProfile(profile);
   const player = new Player(profile === 'ai' ? new TamevPlayer() : new HumanPlayer(), claim);
   const hud = new HUD(root, entry.name, () => { location.hash = 'hub'; });
+  hud.element.dataset.game = entry.id;
+  dispose = () => { player.dispose(); hud.dispose(); };
   hud.element.style.setProperty('--accent', entry.accent);
   try {
     const stage = getStage();
@@ -39,7 +41,7 @@ async function route(profile: PlayProfile = 'human') {
     document.title = entry.name + ' · AeroPlay';
     const teardown = module.default({ entry, stage, hud, store: namespace(entry.id === '2048' ? 'game2048' : entry.id), player,
       returnPersonal: () => { void route('human'); }, watchAgain: () => { void route('ai'); } });
-    dispose = () => { teardown(); player.dispose(); stage.clear(); };
+    dispose = () => { teardown(); player.dispose(); hud.dispose(); stage.clear(); };
     if (profile === 'ai')
       player.start();
   }

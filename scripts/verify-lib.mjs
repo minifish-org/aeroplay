@@ -110,8 +110,20 @@ export async function harness(ctx, url = base, folder = `output/verification-${b
   await mkdir(folder, { recursive: true });
   const state = () => page.evaluate(() => JSON.parse(window.render_game_to_text()));
   const advance = ms => page.evaluate(ms => window.advanceTime(ms), ms);
-  const button = name => page.getByRole('button', { name, exact: true });
-  const action = id => page.locator(`[data-action="${id}"]`);
+  const accessibleControl = locator => new Proxy(locator, { get(target, key) {
+    if (key === 'isVisible') return async () => await target.filter({ visible: true }).count() > 0;
+    if (key === 'click') return async options => {
+      const control = await target.count() > 1 ? target.filter({ visible: true }) : target;
+      if (await control.evaluate(element => !!element.closest('details:not([open])')).catch(() => false))
+        await page.locator('summary[aria-label="More options"]').click();
+      return control.click(options);
+    };
+    const value = Reflect.get(target, key); return typeof value === 'function' ? value.bind(target) : value;
+  }});
+  const button = name => accessibleControl(page.getByRole('button', { name, exact: true, includeHidden: true }));
+  const action = id => accessibleControl(page.locator(`[data-action="${id}"]`));
+  const tapScene = async () => { const box = await page.locator('.play-area').boundingBox(), x = box.x + box.width / 2, y = box.y + box.height / 2; if (await page.evaluate(() => navigator.maxTouchPoints > 0)) await page.touchscreen.tap(x, y); else await page.mouse.click(x, y); };
+  const startFlappy = async () => { if (await button('Resume').isVisible()) await button('Resume').click(); else await tapScene(); };
   async function dismiss() {
     if (await button('Got it').isVisible().catch(() => false)) await button('Got it').click();
   }
@@ -170,7 +182,7 @@ export async function harness(ctx, url = base, folder = `output/verification-${b
     assert.deepEqual(errors, [], 'No browser errors');
     assert.deepEqual(external.filter(request => request.failure()?.errorText !== 'csp').map(request => request.url()), [], 'Zero external network requests');
   };
-  return { page, state, advance, button, action, dismiss, open, pick, swipe, key, shot, pixels, clean, errors, external };
+  return { page, state, advance, button, action, tapScene, startFlappy, dismiss, open, pick, swipe, key, shot, pixels, clean, errors, external };
 }
 export function mechanics(s) {
   const { renderer, motion, picks, coordinates, boardBounds, playBounds, ai, player, visual, ...rest } = s;
@@ -231,10 +243,10 @@ export async function inspectLayout(h, route, vp) {
     };
     const visible = element => {
       const r = element.getBoundingClientRect(), style = getComputedStyle(element);
-      return r.width && r.height && style.visibility !== 'hidden' && style.display !== 'none';
+      return r.width && r.height && style.visibility !== 'hidden' && style.display !== 'none' && !element.closest('details:not([open]) .hud-menu');
     };
     const stage = document.querySelector('.game-stage'), s = window.render_game_to_text ? JSON.parse(window.render_game_to_text()) : null;
-    const controls = [...document.querySelectorAll('button,select,.joystick')].filter(visible).map(element => {
+    const controls = [...document.querySelectorAll('button,summary,select,.joystick')].filter(visible).map(element => {
       const r = rect(element), clipped = [];
       for (let parent = element.parentElement;parent;parent = parent.parentElement) {
         const style = getComputedStyle(parent), p = rect(parent);
@@ -244,7 +256,7 @@ export async function inspectLayout(h, route, vp) {
       const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
       return {
         label: element.getAttribute('aria-label') ?? element.textContent, ...r, clipped, hit: top === element || element.contains(top),
-        panel: !!element.closest('.hud-panel'), textClipped: element.scrollWidth > element.clientWidth + 2 || element.scrollHeight > element.clientHeight + 2
+        panel: !!element.closest('.hud-panel,.hud-menu'), textClipped: element.scrollWidth > element.clientWidth + 2 || element.scrollHeight > element.clientHeight + 2
       };
     });
     return {

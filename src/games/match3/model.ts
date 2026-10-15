@@ -103,7 +103,7 @@ export function createMatch3Model(saved: unknown = null, best = 0, random = Math
     mode: 'playing' as 'playing' | 'paused' | 'won' | 'over',
     phase: 'playing' as 'playing' | 'clearing' | 'falling' | 'won' | 'over',
     grid: [] as GemGrid, selected: null as GemPoint | null, hinted: [] as GemPoint[], matching: [] as GemPoint[],
-    falls: [] as GemFall[], score: 0, moves: 30, level: 1, best: Math.max(0, best),
+    falls: [] as GemFall[], swap: null as { a: GemPoint; b: GemPoint; accepted: boolean; at: number } | null, score: 0, moves: 30, level: 1, best: Math.max(0, best),
     chain: 0, timer: 0, clock: 0, epoch: 0, serial: 0, shuffled: false,
     target() { return 1000 + (model.level - 1) * 350; },
     reset(advance?: boolean) {
@@ -118,6 +118,7 @@ export function createMatch3Model(saved: unknown = null, best = 0, random = Math
       model.hinted = [];
       model.matching = [];
       model.falls = [];
+      model.swap = null;
       model.chain = 0;
       model.timer = 0;
       model.clock = 0;
@@ -182,6 +183,7 @@ export function createMatch3Model(saved: unknown = null, best = 0, random = Math
         exchange(model.grid, previous, point);
         model.matching = findMatches(model.grid);
         model.serial++;
+        model.swap = { a: { ...previous }, b: { ...point }, accepted: !!model.matching.length, at: model.clock };
         if (!model.matching.length)
           exchange(model.grid, previous, point);
         else {

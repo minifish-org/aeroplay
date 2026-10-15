@@ -6,10 +6,10 @@ export function createMatch3HUD(hud: HUD, model: Match3Model, utility: (input: u
   const meter = document.createElement('progress');
   meter.setAttribute('aria-label', 'Level score target');
   meter.style.cssText = 'width:100%;height:3px;accent-color:var(--accent)';
-  hud.intro('match3', 'Tap two neighboring gems to swap. Match three or more; cascades multiply points. Reach the target in 30 moves.');
+  hud.intro('match3', 'Swipe a gem or tap two neighbors. Match three or more; cascades multiply points. Reach the target in 30 moves.');
   return () => {
     const busy = model.phase === 'clearing' || model.phase === 'falling';
-    hud.stats({ Score: `${model.score}/${model.target()}`, Moves: model.moves, Level: model.level, Best: model.best });
+    hud.stats({ Score: `${model.score}/${model.target()}`, Moves: model.moves });
     if (!meter.isConnected)
       hud.element.querySelector('.hud-stat')!.append(meter);
     meter.max = model.target();
@@ -18,11 +18,11 @@ export function createMatch3HUD(hud: HUD, model: Match3Model, utility: (input: u
     restart.disabled = !personal() || busy;
     hud.label(restart, model.mode === 'won' ? 'Next' : 'Restart');
     if (model.mode === 'won')
-      hud.panel('Level cleared', `${'★'.repeat(model.summary().stars)} · ${model.score} points · ${model.moves} moves left`);
+      hud.panel('Level cleared', `${'★'.repeat(model.summary().stars)} · ${model.score} points · ${model.moves} moves left`, personal() ? [{ label: 'Next level', symbol: 'next', press: () => utility('next') }] : []);
     else if (model.mode === 'over')
-      hud.panel('Out of moves', `${model.target() - model.score} points from the target.`);
+      hud.panel('Out of moves', `${model.target() - model.score} points from the target.`, personal() ? [{ label: 'Try again', symbol: 'restart', press: () => utility('retry') }] : []);
     else if (model.mode === 'paused')
-      hud.panel('Paused', '', [{ label: 'Resume', press: () => utility('resume') }]);
+      hud.panel('Paused', '', personal() ? [{ label: 'Resume', press: () => utility('resume') }] : []);
     else
       hud.panel('');
   };

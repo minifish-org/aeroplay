@@ -68,7 +68,7 @@ export class PushballView {
   private robot(color: number) {
     const group = new Group();
     this.box(1.05, .34, 1.03, color, group, 0, .24);
-    this.box(.78, .48, .72, 0xe1e6dc, group, 0, .63);
+    this.box(.78, .48, .72, color, group, 0, .63);
     this.box(.52, .14, .07, 0x274658, group, 0, .68, .37);
     for (const x of [-.43, .43])
       for (const z of [-.33, .33]) {

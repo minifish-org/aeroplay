@@ -10,10 +10,10 @@ export function pushballContext(side: Side) {
 
 export default function mount(context: GameContext) {
   const { stage, hud, store, player: human } = context;
-  stage.mount(hud.element, hud.playArea, 'arena', 16, 24, 0x203d50);
+  stage.mount(hud.element, hud.playArea, 'arena', 14.6, 22.8, 0x203d50);
   const model = new PushballRun(store.load('wins', 0), store.load('matches', 0)), view = new PushballView(stage), audio = new GameAudio(), opponent = new Player(new TamevPlayer());
   let disposed = false, loading = false, modelReady = false, error = '', selectedPlan = 'Waiting for kickoff', goal = 0, storedMatches = model.matches;
-  const controls = pushballHUD(hud, model, () => { void startMatch(); }, togglePause, () => opponent.retry(), audio, () => stage.available);
+  const controls = pushballHUD(hud, model, () => { void startMatch(); }, togglePause, () => opponent.retry(), audio, () => stage.available, (x, y) => stage.groundDirection(x, y));
   const render = (dt = 0) => { view.render(model.state, dt); controls.refresh(loading, error, opponent.error); hud.enforceGraphics(); stage.advance(dt); stage.render(); };
   const loop = new GameLoop(dt => {
     if (hud.helpOpen || document.hidden || model.mode !== 'playing')
@@ -107,6 +107,11 @@ export default function mount(context: GameContext) {
   window.addEventListener('blur', blur);
   hud.element.addEventListener('stage-lost', blur);
   hud.onChange = wake;
+  let menuPaused = false;
+  hud.onMenuChange = open => {
+    if (open && model.mode === 'playing') { menuPaused = true; togglePause(); }
+    else if (!open && menuPaused) { menuPaused = false; if (model.mode === 'paused') togglePause(); }
+  };
   window.render_game_to_text = () => { const local = getLocalDecisionDiagnostics() as {
     info: {
       initializations: number;

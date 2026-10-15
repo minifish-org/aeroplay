@@ -382,6 +382,20 @@ console.log('PASS player authority, clock independence, bounds, failure/retry, a
 
 const browser = await launch();
 try {
+  const cold = await context(browser), coldRun = await harness(cold);
+  let releaseModel, requestedModel;
+  const modelGate = new Promise(resolve => { releaseModel = resolve; }), modelRequest = new Promise(resolve => { requestedModel = resolve; });
+  await cold.route(/\.wasm(?:\?|$)/, async route => { requestedModel(); await modelGate; await route.continue(); });
+  await coldRun.open('sky');
+  await coldRun.button('Watch TAMEV').click();
+  await modelRequest;
+  const loadingRun = mechanics(await coldRun.state());
+  await coldRun.page.waitForTimeout(700);
+  assert.deepEqual(mechanics(await coldRun.state()), loadingRun, 'Cold Watch freezes the action game while its real WASM model loads');
+  releaseModel();
+  await coldRun.page.waitForFunction(() => JSON.parse(window.render_game_to_text()).ai.info?.initializations === 1 && JSON.parse(window.render_game_to_text()).distance > 0, null, { timeout: 120000 });
+  await coldRun.action('ai-pause').click();
+  coldRun.clean(); await cold.close();
   const ctx = await context(browser, { audit: true }), h = await harness(ctx), requests = [];
   h.page.on('request', r => requests.push(r.url()));
   await ctx.addInitScript(() => {
@@ -424,6 +438,8 @@ try {
   await h.page.waitForFunction(() => JSON.parse(window.render_game_to_text()).player.type === 'human');
   assert.deepEqual((await h.state()).board, human.board);
   await h.open('sky');
+  await h.button('Start flight').click(); await h.action('left').click(); await h.button('Pause').click();
+  const personalFlight = mechanics(await h.state());
   await h.button('Watch TAMEV').click();
   await h.page.waitForFunction(() => JSON.parse(window.render_game_to_text()).player.decisions >= 3, null, { timeout: 20000 });
   const live = await h.state();
@@ -432,6 +448,14 @@ try {
   assert.equal(live.player.error, '');
   await h.button('Take over').click();
   assert.equal((await h.state()).player.type, 'human');
+  await h.button('Your run').click();
+  await h.page.waitForFunction(() => JSON.parse(window.render_game_to_text()).player.type === 'human' && JSON.parse(window.render_game_to_text()).mode === 'paused');
+  assert.deepEqual(mechanics(await h.state()), personalFlight, 'Watch and takeover do not replace the saved personal flight');
+  await h.open('flappy'); await h.button('Watch TAMEV').click(); await h.advance(6000);
+  assert.equal((await h.state()).mode, 'over');
+  await h.button('Watch again').click();
+  await h.page.waitForFunction(() => JSON.parse(window.render_game_to_text()).player.type === 'ai' && JSON.parse(window.render_game_to_text()).mode === 'playing');
+  assert.equal((await h.state()).score, 0, 'Watch again starts a fresh flight instead of restoring the prior AI terminal save');
   await h.open('lightsout');
   const workerRoute = /\/src\/ai\/planner\.worker\.ts(?:\?|$)/;
   await ctx.route(workerRoute, route => route.fulfill({ status: 200, contentType: 'text/javascript', body: 'self.close();' }));

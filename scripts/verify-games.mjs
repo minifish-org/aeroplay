@@ -153,9 +153,13 @@ try {
   await advance(100);
   assert.notEqual(await h.pixels(), beforePixels, 'Native swipe produces visible animation');
   await advance(400);
+  await page.reload();
+  await page.waitForFunction(() => window.render_game_to_text);
+  assert.equal((await state()).undoCount, 1, '2048 keeps its native move history after reload');
   await button('Undo').click();
   assert.deepEqual((await state()).grid, fixture.grid);
   assert.equal((await state()).score, 0);
+  assert.equal((await state()).moves, fixture.moves);
   await h.key('ArrowDown');
   await advance(400);
   const saved = await state();
@@ -172,7 +176,7 @@ try {
   }, s => s.mode === 'over', 1500, '2048 full played round reaches settlement');
   assert((await state()).score > 0);
   await h.shot('2048-result');
-  await h.action('restart').click();
+  await button('New game').click();
   assert.equal((await state()).mode, 'playing');
   assert.equal((await state()).score, 0);
   console.log('PASS 2048 native swipe, single merge, score, undo, legacy save/reload, full round and restart');
@@ -184,8 +188,12 @@ try {
   const expected = [...lights.board];
   m.glightsout.applyToggle(expected, 2, 2);
   assert.deepEqual((await state()).board, expected);
+  await page.reload();
+  await page.waitForFunction(() => window.render_game_to_text);
+  assert.deepEqual((await state()).board, expected, 'Lights preserves the moved board before Undo');
   await button('Undo').click();
   assert.deepEqual((await state()).board, lights.board);
+  assert.equal((await state()).moves, lights.moves);
   await until(state, async () => {
     await button('Hint').click();
     const s = await state();
@@ -198,8 +206,11 @@ try {
   const won = mechanics(await state());
   await advance(2000);
   assert.deepEqual(mechanics(await state()), won);
-  await h.action('next').click();
+  await page.reload(); await page.waitForFunction(() => window.render_game_to_text);
+  await button('Next puzzle').click();
   assert.equal((await state()).level, lights.level + 1);
+  await button('Pause').click(); assert.equal((await state()).mode, 'paused', 'Next puzzle restores contextual Pause after loading a completed run');
+  await button('Resume').click(); assert.equal((await state()).mode, 'playing');
   await h.pick(0);
   await h.action('restart').click();
   assert.equal((await state()).moves, 0);
@@ -215,7 +226,7 @@ try {
   await until(state, async s => {
     assert.equal(s.mode, 'playing');
     const pipe = s.pipes.find(p => p.x + 58 >= s.bird.x - 12) ?? s.pipes.at(-1), target = pipe ? pipe.gapY + pipe.gap / 2 : 240;
-    if (s.bird.y > target + 6 && s.bird.velocity > 0) await button('Flap').click();
+    if (s.bird.y > target + 6 && s.bird.velocity > 0) await h.tapScene();
     await advance(25);
   }, s => s.passed >= 6, 1500, 'Flappy six scored gates');
   assert((await state()).score >= 6);
@@ -224,12 +235,15 @@ try {
   const paused = mechanics(await state());
   await advance(3000);
   assert.deepEqual(mechanics(await state()), paused);
-  await h.action('pause').click();
+  await page.reload(); await page.waitForFunction(() => window.render_game_to_text);
+  const reloadedFlight = mechanics(await state());
+  for (const field of ['mode', 'bird', 'pipes', 'score', 'passed', 'distance', 'time']) assert.deepEqual(reloadedFlight[field], paused[field], 'Flappy reload preserves ' + field);
+  await button('Resume').click();
   await advance(4000);
   assert.equal((await state()).mode, 'over');
   await h.shot('flappy-result');
-  await h.action('flap').click();
-  assert.equal((await state()).mode, 'ready');
+  await button('Try again').click();
+  assert.equal((await state()).mode, 'playing', 'One native retry immediately starts a fresh flight');
   assert.equal((await state()).score, 0);
   const best = (await state()).best;
   await page.reload();
@@ -246,9 +260,14 @@ try {
   await h.action('notes').click();
   await button('1').click();
   assert.equal((await state()).mistakes, 1);
+  await page.reload();
+  await page.waitForFunction(() => window.render_game_to_text);
+  assert.equal((await state()).mistakes, 1, 'Sudoku persists the mistake before Undo');
   await button('Undo').click();
   assert.equal((await state()).board[2], 0);
   assert.deepEqual((await state()).notes[2], [2]);
+  assert.equal((await state()).mistakes, 1, 'Undo restores the cell while retaining the mistake penalty');
+  assert.equal((await state()).hints, 3);
   await h.action('hint').click();
   assert.equal((await state()).board[2], 4);
   assert.equal((await state()).hints, 2);
@@ -271,7 +290,7 @@ try {
   await advance(3000);
   assert.equal((await state()).elapsedSeconds, time);
   await h.shot('sudoku-result');
-  await h.action('next').click();
+  await button('Next puzzle').click();
   assert.equal((await state()).puzzleIndex, 1);
   assert.equal((await state()).hints, 3);
   console.log('PASS Sudoku notes, mistakes, undo, hints, erase, old save/reload, full solve, frozen timer and next');
@@ -315,12 +334,17 @@ try {
   console.log('PASS Match valid/invalid native swaps, hints, move costs, cascades, full settlement, progression and save');
 
   await h.open('cargo');
+  const cargoBeforeMove = await state();
   await button('Right').click();
   await advance(400);
   assert.equal((await state()).pushes, 1);
+  await page.reload();
+  await page.waitForFunction(() => window.render_game_to_text);
+  assert.equal((await state()).pushes, 1, 'Cargo persists the native push before Undo');
   await button('Undo').click();
   assert.equal((await state()).pushes, 0);
   assert.equal((await state()).moves, 0);
+  assert.deepEqual((await state()).state, cargoBeforeMove.state);
   await button('Hint').click();
   await page.waitForFunction(() => JSON.parse(window.render_game_to_text()).hintDirection !== null);
   assert.equal((await state()).hintDirection, 'right');
@@ -363,7 +387,13 @@ try {
       const distance = (await state()).distance;
       await advance(3000);
       assert.equal((await state()).distance, distance);
-      await h.action('pause').click();
+      const savedFlight = mechanics(await state());
+      await page.reload(); await page.waitForFunction(() => window.render_game_to_text);
+      const { message: oldMessage, messageTime: oldMessageTime, ...savedSector } = savedFlight;
+      const { message: restoredMessage, messageTime: restoredMessageTime, ...restoredSector } = mechanics(await state());
+      assert.deepEqual(restoredSector, savedSector, 'Sky reload preserves the full paused sector and obstacle queue');
+      assert.equal(restoredMessage, ''); assert.equal(restoredMessageTime, 0, 'Transient boost feedback expires on re-entry');
+      await button('Resume').click();
     }
   }, s => s.mode !== 'playing', 1500, 'Sky full sector');
   s = await state();

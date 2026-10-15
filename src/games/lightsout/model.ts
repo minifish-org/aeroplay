@@ -60,6 +60,7 @@ export type LightsSave = {
   moves: number;
   level: number;
   hintsUsed: number;
+  history?: number[][];
 };
 export function validLightsSave(value: unknown): value is LightsSave {
   if (!value || typeof value !== 'object')
@@ -137,6 +138,8 @@ export function createLightsOutModel(saved: unknown = null, random = Math.random
       if (model.mode !== 'playing' || typeof input !== 'number' || !Number.isInteger(input) || input < 0 || input >= 25)
         return false;
       history.push([...model.board]);
+      if (history.length > 20)
+        history.shift();
       model.moves++;
       model.hinted = -1;
       applyToggle(model.board, input % 5, Math.floor(input / 5));
@@ -152,10 +155,11 @@ export function createLightsOutModel(saved: unknown = null, random = Math.random
       model.mode = 'playing'; },
     saved(): LightsSave {
       return { board: [...model.board], initial: [...model.initial], moves: model.moves,
-        level: model.level, hintsUsed: model.hintsUsed };
+        level: model.level, hintsUsed: model.hintsUsed, history: history.map(board => [...board]) };
     },
     snapshot() {
-      return { game: 'lightsout', mode: model.mode, ...model.saved(), hinted: model.hinted, par: model.par,
+      return { game: 'lightsout', mode: model.mode, board: [...model.board], initial: [...model.initial], moves: model.moves,
+        level: model.level, hintsUsed: model.hintsUsed, hinted: model.hinted, par: model.par,
         undoCount: history.length, stars: model.mode === 'won' ? model.stars() : 0, epoch: model.epoch };
     },
     stars() { return model.moves <= model.par && !model.hintsUsed ? 3 : model.moves <= model.par + 3 ? 2 : 1; },
@@ -175,6 +179,9 @@ export function createLightsOutModel(saved: unknown = null, random = Math.random
     model.level = saved.level;
     model.hintsUsed = saved.hintsUsed;
     model.par = solveLights(model.initial).length;
+    if (Array.isArray(saved.history) && saved.history.length <= Math.min(20, saved.moves) && saved.history.every(board =>
+      Array.isArray(board) && board.length === 25 && board.every(cell => cell === 0 || cell === 1)))
+      history.push(...saved.history.map(board => [...board]));
     if (isSolved(model.board))
       model.mode = 'won';
   }

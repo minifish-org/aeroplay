@@ -6,11 +6,16 @@ import { createFlappyHUD } from './hud';
 export default function mount(context: GameContext) {
   const { stage, hud, store, player } = context;
   const model = createFlappyModel(store.load('best', 0)), audio = new GameAudio();
+  if (player.type === 'human')
+    model.restore(store.load('run', null));
   const view = createFlappyView(stage, model);
-  let best = model.best, serial = model.serial;
-  const persist = () => { if (best !== model.best) {
+  let best = store.load('best', 0), serial = model.serial, savedRun = '';
+  const persist = () => { audio.unlock(); if (best !== model.best) {
     best = model.best;
     store.save('best', best);
+  } const run = model.savedRun(), value = JSON.stringify(run); if (value !== savedRun) {
+    savedRun = value;
+    store.save('run', run);
   } };
   const utility = (input: unknown) => { if (player.type !== 'human')
     return; if (input === 'pause') {
@@ -32,8 +37,10 @@ export default function mount(context: GameContext) {
         audio.play('collect');
       else if (model.event === 'hit')
         audio.play('hit');
+      if (model.event === 'score' || model.event === 'hit')
+        persist();
     } },
-    refresh: () => { updateHUD(); sound.setAttribute('aria-pressed', String(audio.enabled)); persist(); }, persist,
+    refresh: () => { updateHUD(); sound.setAttribute('aria-pressed', String(audio.enabled)); }, persist,
     keys: (key, repeat) => { if (repeat && (key === ' ' || key.toLowerCase() === 'p'))
       return undefined; if (key.toLowerCase() === 'p') {
       if (player.type === 'ai') {

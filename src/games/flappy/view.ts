@@ -5,8 +5,8 @@ const unit = 50;
 const worldX = (x: number) => (x - FLIGHT.width / 2) / unit;
 const worldY = (y: number) => (FLIGHT.height / 2 - y) / unit;
 export function createFlappyView(stage: Stage, model: FlappyModel) {
-  stage.framing('board', 7.8, 10);
-  stage.board(7.7, 9.9, 0x213d58);
+  stage.framing('board', 5.2, 10, { x: worldX(FLIGHT.birdX), screen: .25 });
+  const sky = stage.board(7.7, 9.9, 0x213d58);
   const moon = stage.shape('sphere', .75, 0xf2cd83);
   moon.position.set(2.2, 3.3, -.16);
   moon.scale.z = .25;
@@ -16,10 +16,11 @@ export function createFlappyView(stage: Stage, model: FlappyModel) {
     cloud.position.set(-3 + index * 1.2, 2 - index % 3 * 1.7, -.12);
     return { cloud, x: cloud.position.x };
   });
-  for (let index = 0; index < 18; index++) {
+  const stars = Array.from({ length: 18 }, (_, index) => {
     const star = stage.shape('sphere', .035, 0xa6bde8);
     star.position.set(-3.4 + index % 6 * 1.3, 4.2 - Math.floor(index / 6) * 2.7, -.1);
-  }
+    return star;
+  });
   const ground = stage.tile(0, -4.58, 7.5, .65, 0x96d5b5, .3);
   const ridge = stage.tile(0, -4.25, 7.5, .12, 0xf2cd83, .28);
   ground.position.z = .1;
@@ -42,7 +43,7 @@ export function createFlappyView(stage: Stage, model: FlappyModel) {
   const beak = stage.box(.2, .1, .1, 0xf2cd83);
   bird.add(beak);
   beak.position.set(.3, -.03, .1);
-  const pipes = Array.from({ length: 5 }, () => {
+  const pipes = Array.from({ length: 12 }, () => {
     const parts = Array.from({ length: 4 }, (_, index) => {
       const mesh = stage.box(index % 2 ? 1.2 : 1.02, 1, .45, index % 2 ? 0x96d5b5 : 0x5cae91);
       stage.content.add(mesh);
@@ -53,7 +54,7 @@ export function createFlappyView(stage: Stage, model: FlappyModel) {
   });
   const popup = stage.label('', 2.2, '#f2cd83', .5);
   popup.visible = false;
-  let serial = -1;
+  let serial = -1, flapAt = -1, epoch = model.epoch;
   bird.scale.setScalar(.2);
   stage.tween(bird, { scale: 1 }, 'entry');
   function pipePart(mesh: Mesh, x: number, y: number, height: number) {
@@ -62,9 +63,22 @@ export function createFlappyView(stage: Stage, model: FlappyModel) {
   }
   return {
     draw() {
+      const bounds = stage.bounds(), center = (bounds.left + bounds.right) / 2;
+      sky.position.x = center;
+      sky.scale.x = bounds.width / 7.7;
+      ground.position.x = ridge.position.x = center;
+      ground.scale.x = ridge.scale.x = bounds.width / 7.5;
+      moon.position.x = bounds.right - 1.6;
+      model.setVisibleWidth(bounds.right * unit + FLIGHT.width / 2);
+      stars.forEach((star, index) => { star.position.x = bounds.left + .4 + index % 6 * (bounds.width - .8) / 5; });
+      if (epoch !== model.epoch) {
+        epoch = model.epoch;
+        bird.scale.setScalar(1);
+      }
       bird.position.set(worldX(FLIGHT.birdX), worldY(model.y), .38);
       bird.rotation.z = Math.max(-.7, Math.min(.4, -model.velocity / 550));
-      clouds.forEach(({ cloud, x }) => { cloud.position.x = stage.reducedMotion ? x : ((x - model.distance * .08 / unit + 15) % 9) - 4.5; });
+      wing.rotation.z = stage.reducedMotion ? 0 : -.7 * Math.sin(Math.min(1, Math.max(0, (model.time - flapAt) / .24)) * Math.PI);
+      clouds.forEach(({ cloud, x }) => { cloud.position.x = bounds.left + ((x + 4.5 - (stage.reducedMotion ? 0 : model.distance * .08 / unit) + bounds.width * 100) % bounds.width); });
       pipes.forEach(({ parts, dots }, index) => {
         const pipe = model.pipes[index];
         parts.forEach(part => { part.visible = !!pipe; });
@@ -80,10 +94,8 @@ export function createFlappyView(stage: Stage, model: FlappyModel) {
       });
       if (serial !== model.serial) {
         serial = model.serial;
-        if (model.event === 'flap') {
-          wing.scale.y = .9;
-          stage.tween(wing, { scale: 1 }, 'settle');
-        }
+        if (model.event === 'flap')
+          flapAt = model.time;
         if (model.event === 'score') {
           stage.effect(bird.position.x, bird.position.y, model.perfect ? 0xf2cd83 : 0x96d5b5);
           stage.text(popup, model.perfect ? 'Perfect +2' : '+1');

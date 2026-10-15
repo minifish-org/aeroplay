@@ -44,5 +44,5 @@ export default function mount(context: GameContext) {
       lastMoves = model.moves;
       lastPushes = model.pushes;
     } view.render(model); }, refresh: () => refresh(thinking, message), persist, swipe: true,
-    keys: key => ({ ArrowUp: 'up', ArrowRight: 'right', ArrowDown: 'down', ArrowLeft: 'left', w: 'up', d: 'right', s: 'down', a: 'left', z: 'undo', Z: 'undo' } as Record<string, string>)[key], dispose: () => { job?.abort(); audio.dispose(); } });
+    keys: key => ({ ArrowUp: 'up', ArrowRight: 'right', ArrowDown: 'down', ArrowLeft: 'left', w: 'up', d: 'right', s: 'down', a: 'left', z: 'undo', Z: 'undo' } as Record<string, string>)[key], rejected: input => { view.bump(input, model); audio.play('hit'); }, dispose: () => { job?.abort(); audio.dispose(); } });
 }

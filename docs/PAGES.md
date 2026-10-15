@@ -2,6 +2,8 @@
 
 Review updated: 2026-10-15 (Asia/Singapore). **Approved decisions implemented in the Three.js rewrite.**
 
+The subsequent [player experience review](PLAYER-EXPERIENCE.md) refines these presentation decisions: full-screen scenes, contextual result controls, occasional actions in More, brief nonblocking tips, screen-aligned Cargo/Pushball input, and persistent recovery. The historical inventories below preserve the rewrite audit; current after images show the later player-focused polish.
+
 The baseline inventory and screenshots were delivered before implementation. All historical source paths and line numbers in the inventory below refer to preserved commit **`2ee86c887447a3f495e8175adb9c4e9e91ae9688`**; they do not describe current file locations. The implemented-page table links the current code and tracked before/after captures. Phase and release evidence are recorded in [progress.md](../progress.md) and [DELIVERY.md](DELIVERY.md).
 
 ## Scope and decision meanings

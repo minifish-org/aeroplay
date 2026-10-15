@@ -105,12 +105,12 @@ export function stepFlight(state: FlightState, dt: number, random = Math.random)
         if (state.shield > 0) {
           state.shield = 0;
           state.invincible = 1.7;
-          state.message = 'Shield saved you! Find the open lane.';
+          state.message = 'Shield broken';
           state.messageTime = 2;
         }
         else {
           state.mode = 'over';
-          state.message = 'Flight complete';
+          state.message = '';
           return events;
         }
       }
@@ -159,6 +159,33 @@ export class SkyRun {
     this.state.mode = 'paused'; }
   resume() { if (this.mode === 'paused')
     this.start(); }
+  savedRun() {
+    if (this.mode === 'ready')
+      return null;
+    const { mode, lane, x, distance, score, rings, combo, maxCombo, charge, boost, shield, invincible, sector, rows } = this.state;
+    return { version: 1, state: { mode, lane, x, distance, score, rings, combo, maxCombo, charge, boost, shield, invincible, sector, rows: rows.map(row => ({ ...row, obstacles: [...row.obstacles] })) } };
+  }
+  restore(raw: unknown) {
+    if (!raw || typeof raw !== 'object')
+      return false;
+    const saved = raw as { version: number; state: FlightState }, state = saved.state;
+    const finite = (value: number, low: number, high: number) => Number.isFinite(value) && value >= low && value <= high;
+    const integer = (value: number, low: number, high: number) => Number.isInteger(value) && finite(value, low, high);
+    if (saved.version !== 1 || !state || !['playing', 'paused', 'over', 'won'].includes(state.mode) ||
+      !integer(state.lane, 0, 2) || !finite(state.x, -LANE_WIDTH, LANE_WIDTH) || !finite(state.distance, 0, SECTOR_LENGTH) ||
+      !integer(state.score, 0, 1e12) || !integer(state.rings, 0, 1e10) || !integer(state.combo, 0, state.rings) || !integer(state.maxCombo, state.combo, state.rings) ||
+      !finite(state.charge, 0, 100) || !finite(state.boost, 0, 3) || !integer(state.shield, 0, 1) || !finite(state.invincible, 0, 1.7) || !integer(state.sector, 1, 1e6) ||
+      !Array.isArray(state.rows) || state.rows.length !== 14 || !state.rows.every(row => row && typeof row === 'object' &&
+        finite(row.distance, -20, 400) && integer(row.safeLane, 0, 2) && integer(row.index, 0, 1e9) && typeof row.passed === 'boolean' &&
+        Array.isArray(row.obstacles) && row.obstacles.length <= 3 && new Set(row.obstacles).size === row.obstacles.length && row.obstacles.every(lane => integer(lane, 0, 2))))
+      return false;
+    const restored = structuredClone(state);
+    this.state = { ...restored, mode: state.mode === 'playing' ? 'paused' : state.mode, message: '', messageTime: 0 };
+    this.best = Math.max(this.best, state.score);
+    this.events = [];
+    this.epoch++;
+    return true;
+  }
   act(input: unknown) {
     if (input === 'start') {
       this.start();

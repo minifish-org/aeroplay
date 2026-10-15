@@ -12,6 +12,7 @@ try {
       await h.page.waitForTimeout(450);
       try {
         await inspect(h, route, vp);
+        if (route !== 'hub') { await h.page.getByLabel('More options', { exact: true }).click(); await inspect(h, route + '-menu', vp); await h.page.getByLabel('More options', { exact: true }).click(); }
       } catch (error) {
         failures.push(`${route} ${vp.name}: ${error.message}`);
       }
@@ -58,9 +59,9 @@ try {
     await ah.open('sudoku',{'aeroplay:sudoku:state-v2':{puzzleIndex:0,board:[...m.gsudoku.PUZZLES[0].solution].map(Number),elapsedSeconds:64,mistakes:1,bestSeconds:64}});await inspect(ah,'sudoku-result',vp);
     await ah.open('match3',{'aeroplay:match3:run':{grid:m.gmatch3.createMatchBoard(),score:0,moves:0,level:1}});await inspect(ah,'match3-result',vp);
     await ah.open('cargo',{'aeroplay:cargo:run':{level:0,state:{player:18,crates:[19]},moves:2,pushes:2,usedHint:false}});await inspect(ah,'cargo-result',vp);
-    await ah.open('flappy');await ah.button('Take flight').click();await ah.advance(6000);assert.equal((await ah.state()).mode,'over');await inspect(ah,'flappy-result',vp);
+    await ah.open('flappy');await ah.startFlappy();await ah.advance(6000);assert.equal((await ah.state()).mode,'over');await inspect(ah,'flappy-result',vp);
     await ah.open('sky');await ah.button('Start flight').click();
-    for(let i=0;i<30&&(await ah.state()).mode==='playing';i++){const s=await ah.state(),row=s.rows.filter(row=>!row.passed).sort((a,b)=>a.distance-b.distance)[0],lane=row.obstacles[0];while((await ah.state()).lane!==lane)await ah.action((await ah.state()).lane<lane?'right':'left').click();await ah.advance(2000);}
+    for(let i=0;i<30&&(await ah.state()).mode==='playing';i++){const s=await ah.state(),row=s.rows.filter(row=>!row.passed).sort((a,b)=>a.distance-b.distance)[0],lane=row.obstacles[0];while((await ah.state()).lane!==lane){const direction=(await ah.state()).lane<lane?'right':'left';if(await ah.action(direction).isVisible())await ah.action(direction).click();else await ah.key(direction==='right'?'ArrowRight':'ArrowLeft');}await ah.advance(2000);}
     assert.equal((await ah.state()).mode,'over');await inspect(ah,'sky-result',vp);ah.clean();await ac.close();
   }
   const pc=await context(browser),ph=await harness(pc);await ph.open('pushball');await fullMatch(ph);
@@ -84,14 +85,24 @@ try {
   for (let i = 0;i < 20;i++) await h.page.evaluate(game => {
     location.hash = game;
   }, games[i % games.length]);
+  await h.open('lightsout'); await h.page.waitForTimeout(400);
+  const unscaled = (await h.state()).picks;
+  await h.open('pushball'); await h.open('lightsout'); await h.page.waitForTimeout(400);
+  assert.deepEqual((await h.state()).picks, unscaled, 'Leaving an entry animation cannot shrink the next scene');
   await h.open('2048');
   await h.page.waitForTimeout(500);
   const drawCount = await h.page.evaluate(() => window.__gpuAudit.draws);
   await h.page.waitForTimeout(200);
   assert.equal(await h.page.evaluate(() => window.__gpuAudit.draws), drawCount, 'Idle board stops rendering');
   await h.open('flappy');
-  await h.button('Take flight').click();
-  await h.page.waitForTimeout(100);
+  await h.startFlappy();
+  await h.advance(550);
+  await h.page.getByLabel('More options', { exact: true }).click();
+  await h.page.waitForFunction(() => JSON.parse(window.render_game_to_text()).mode === 'paused');
+  const scene = (await h.state()).playBounds;
+  await h.page.mouse.move(scene.x + scene.width / 2, scene.y + scene.height / 2); await h.page.mouse.down();
+  await h.page.waitForTimeout(180); await h.page.mouse.up();
+  assert((await h.state()).bird.velocity > 0, 'The gesture that dismisses More does not also flap');
   await h.button('Pause').click();
   await h.page.waitForTimeout(450);
   const paused = mechanics(await h.state()), draws = await h.page.evaluate(() => window.__gpuAudit.draws);
@@ -112,7 +123,7 @@ try {
   await h.page.waitForTimeout(100);
   await h.page.evaluate(() => window.__lose.restoreContext());
   await h.page.waitForFunction(() => !document.querySelector('canvas').getContext('webgl2').isContextLost());
-  await h.action('pause').click();
+  await h.button('Resume').click();
   assert.equal((await h.state()).mode, 'playing');
   await h.open('hub');
   h.clean();
