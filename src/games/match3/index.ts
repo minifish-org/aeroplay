@@ -57,8 +57,8 @@ export default function mount(context: GameContext) {
   hud.element.addEventListener('pointerdown', down);
   hud.element.addEventListener('pointerup', up);
   hud.element.addEventListener('pointercancel', cancelDrag);
-  const dispose = mountRun(context, { model, clearInput: cancelDrag, active: () => model.mode === 'playing' && ['clearing', 'falling'].includes(model.phase),
-    render: () => { view.draw(); if (score !== model.score) {
+  const dispose = mountRun(context, { model, clearInput: cancelDrag, active: () => model.mode === 'playing' && ['clearing', 'falling'].includes(model.phase) || view.active(), inspect: () => ({ visual: view.inspect() }),
+    render: dt => { view.draw(dt); if (score !== model.score) {
       score = model.score;
       audio.play('collect');
     } if (mode !== model.mode) {
