@@ -26,9 +26,9 @@ export default function mount(context: GameContext) {
   };
   return mountRun(context, { model, continuous: true, start: () => model.start(), render: dt => { view.render(model, dt); if (model.state.boost > 0 && !lastBoost)
       audio.play('boost'); lastBoost = model.state.boost > 0; for (const event of model.events.splice(0))
-      audio.play(event); if (model.best !== savedBest) {
+      audio.play(event === 'sector' ? 'win' : event); if (model.best !== savedBest) {
       persist();
     } }, refresh,
-    keys: (key, repeat = false) => repeat ? undefined : ({ ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: model.mode === 'ready' ? 'start' : 'boost', ' ': model.mode === 'ready' ? 'start' : 'boost', a: 'left', d: 'right', p: 'pause', Enter: model.mode === 'ready' ? 'start' : model.mode === 'paused' ? 'pause' : model.mode === 'won' ? 'next' : model.mode === 'over' ? 'restart' : undefined } as Record<string, string | undefined>)[key],
+    keys: (key, repeat = false) => repeat ? undefined : ({ ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: model.mode === 'ready' ? 'start' : 'boost', ' ': model.mode === 'ready' ? 'start' : 'boost', a: 'left', d: 'right', p: 'pause', Enter: model.mode === 'ready' ? 'start' : model.mode === 'paused' ? 'pause' : model.mode === 'over' ? 'restart' : undefined } as Record<string, string | undefined>)[key],
     swipe: true, pick: () => model.mode === 'ready' ? 'start' : undefined, persist, dispose: () => audio.dispose() });
 }

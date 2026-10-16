@@ -1,4 +1,5 @@
-export type FlightMode = 'ready' | 'playing' | 'paused' | 'over' | 'won';
+export type FlightMode = 'ready' | 'playing' | 'paused' | 'over';
+export type FlightEvent = 'collect' | 'hit' | 'sector';
 export type FlightRow = {
   distance: number;
   safeLane: number;
@@ -11,6 +12,7 @@ export type FlightState = {
   lane: number;
   x: number;
   distance: number;
+  total: number;
   score: number;
   rings: number;
   combo: number;
@@ -32,6 +34,7 @@ export function createFlight(random = Math.random, sector = 1): FlightState {
     lane: 1,
     x: 0,
     distance: 0,
+    total: 0,
     score: 0,
     rings: 0,
     combo: 0,
@@ -81,8 +84,8 @@ export function boostFlight(state: FlightState) {
   state.messageTime = 1.5;
   return true;
 }
-export function stepFlight(state: FlightState, dt: number, random = Math.random): ('collect' | 'hit' | 'win')[] {
-  const events: ('collect' | 'hit' | 'win')[] = [];
+export function stepFlight(state: FlightState, dt: number, random = Math.random): FlightEvent[] {
+  const events: FlightEvent[] = [];
   if (state.mode !== 'playing')
     return events;
   state.x +=
@@ -93,6 +96,7 @@ export function stepFlight(state: FlightState, dt: number, random = Math.random)
   const speed = Math.min(42, 24 + state.sector * 2 + state.distance / 180) *
     (state.boost > 0 ? 1.55 : 1);
   state.distance += speed * dt;
+  state.total += speed * dt;
   for (const row of state.rows) {
     const previous = row.distance;
     row.distance -= speed * dt;
@@ -138,9 +142,12 @@ export function stepFlight(state: FlightState, dt: number, random = Math.random)
       Object.assign(row, makeRow(last.index + 1, last.distance + 21, nextLane(last.safeLane, random)));
     }
   if (state.distance >= SECTOR_LENGTH) {
-    state.distance = SECTOR_LENGTH;
-    state.mode = 'won';
-    events.push('win');
+    // The flight never lands: the sector mark opens the next sector and keeps going.
+    state.distance -= SECTOR_LENGTH;
+    state.sector++;
+    state.message = 'Sector ' + state.sector + ' · keep flying';
+    state.messageTime = 2;
+    events.push('sector');
   }
   return events;
 }
@@ -148,13 +155,12 @@ export class SkyRun {
   state: FlightState;
   epoch = 0;
   best: number;
-  events: ('collect' | 'hit' | 'win')[] = [];
+  events: FlightEvent[] = [];
   constructor(best = 0) { this.best = best; this.state = createFlight(); }
   get mode() { return this.state.mode; }
   start() { if (this.state.mode === 'ready' || this.state.mode === 'paused')
     this.state.mode = 'playing'; }
   reset() { this.state = createFlight(); this.epoch++; this.events = []; }
-  nextSector() { const previous = this.state; this.state = createFlight(Math.random, previous.sector + 1); this.state.score = previous.score; this.state.rings = previous.rings; this.state.maxCombo = previous.maxCombo; this.epoch++; this.start(); }
   pause() { if (this.mode === 'playing')
     this.state.mode = 'paused'; }
   resume() { if (this.mode === 'paused')
@@ -162,8 +168,8 @@ export class SkyRun {
   savedRun() {
     if (this.mode === 'ready')
       return null;
-    const { mode, lane, x, distance, score, rings, combo, maxCombo, charge, boost, shield, invincible, sector, rows } = this.state;
-    return { version: 1, state: { mode, lane, x, distance, score, rings, combo, maxCombo, charge, boost, shield, invincible, sector, rows: rows.map(row => ({ ...row, obstacles: [...row.obstacles] })) } };
+    const { mode, lane, x, distance, total, score, rings, combo, maxCombo, charge, boost, shield, invincible, sector, rows } = this.state;
+    return { version: 1, state: { mode, lane, x, distance, total, score, rings, combo, maxCombo, charge, boost, shield, invincible, sector, rows: rows.map(row => ({ ...row, obstacles: [...row.obstacles] })) } };
   }
   restore(raw: unknown) {
     if (!raw || typeof raw !== 'object')
@@ -171,7 +177,7 @@ export class SkyRun {
     const saved = raw as { version: number; state: FlightState }, state = saved.state;
     const finite = (value: number, low: number, high: number) => Number.isFinite(value) && value >= low && value <= high;
     const integer = (value: number, low: number, high: number) => Number.isInteger(value) && finite(value, low, high);
-    if (saved.version !== 1 || !state || !['playing', 'paused', 'over', 'won'].includes(state.mode) ||
+    if (saved.version !== 1 || !state || !['playing', 'paused', 'over'].includes(state.mode) ||
       !integer(state.lane, 0, 2) || !finite(state.x, -LANE_WIDTH, LANE_WIDTH) || !finite(state.distance, 0, SECTOR_LENGTH) ||
       !integer(state.score, 0, 1e12) || !integer(state.rings, 0, 1e10) || !integer(state.combo, 0, state.rings) || !integer(state.maxCombo, state.combo, state.rings) ||
       !finite(state.charge, 0, 100) || !finite(state.boost, 0, 3) || !integer(state.shield, 0, 1) || !finite(state.invincible, 0, 1.7) || !integer(state.sector, 1, 1e6) ||
@@ -179,7 +185,11 @@ export class SkyRun {
         finite(row.distance, -20, 400) && integer(row.safeLane, 0, 2) && integer(row.index, 0, 1e9) && typeof row.passed === 'boolean' &&
         Array.isArray(row.obstacles) && row.obstacles.length <= 3 && new Set(row.obstacles).size === row.obstacles.length && row.obstacles.every(lane => integer(lane, 0, 2))))
       return false;
-    const restored = structuredClone(state);
+    // Older endless saves predate the running total; their flown distance is still known.
+    const total = Number.isFinite(state.total) ? state.total : (state.sector - 1) * SECTOR_LENGTH + state.distance;
+    if (!finite(total, 0, 1e9))
+      return false;
+    const restored = structuredClone({ ...state, total });
     this.state = { ...restored, mode: state.mode === 'playing' ? 'paused' : state.mode, message: '', messageTime: 0 };
     this.best = Math.max(this.best, state.score);
     this.events = [];
@@ -194,10 +204,6 @@ export class SkyRun {
     if (input === 'restart') {
       this.reset();
       this.start();
-      return true;
-    }
-    if (input === 'next' && this.mode === 'won') {
-      this.nextSector();
       return true;
     }
     if (input === 'pause') {

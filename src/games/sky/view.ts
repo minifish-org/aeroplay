@@ -27,6 +27,7 @@ export class SkyView {
   private rings = 0;
   private lastShield = 1;
   private shieldBreak = 0;
+  private sectorTime = 0;
   private collectionTime = 0;
   private boostBlend = 0;
   private ready = false;
@@ -247,13 +248,17 @@ export class SkyView {
       this.mode = state.mode;
       this.shieldBreak = this.collectionTime = 0;
       this.boostBlend = state.boost > 0 ? 1 : 0;
-      this.ship.position.y = state.mode === 'over' ? -.35 : state.mode === 'won' ? .25 : 0;
-      this.ship.rotation.x = state.mode === 'over' ? .3 : state.mode === 'won' ? -.12 : .04;
+      this.ship.position.y = state.mode === 'over' ? -.35 : 0;
+      this.ship.rotation.x = state.mode === 'over' ? .3 : .04;
       this.ship.scale.setScalar(1);
       if (this.ready) this.stage.tween(this.ship, { y: this.ship.position.y, rx: this.ship.rotation.x, scale: 1 }, 'settle', 0);
       this.ready = true;
     }
-    if (this.sector !== state.sector) this.chapter(state.sector);
+    if (this.sector !== state.sector) {
+      this.chapter(state.sector);
+      // A new sector lifts the ship: the flight itself never stops.
+      this.sectorTime = this.stage.reducedMotion ? 0 : .5;
+    }
     if (!fresh && state.rings > this.rings && !this.stage.reducedMotion) {
       this.collectionTime = .24;
       this.collection.position.set(state.x, 1.22, ENCOUNTER_Z);
@@ -268,8 +273,10 @@ export class SkyView {
     this.boostBlend = this.stage.reducedMotion ? boost : this.boostBlend + (boost - this.boostBlend) * (1 - Math.exp(-visualDt * 24));
     this.collectionTime = Math.max(0, this.collectionTime - visualDt);
     this.shieldBreak = Math.max(0, this.shieldBreak - visualDt);
+    this.sectorTime = Math.max(0, this.sectorTime - visualDt);
     this.collection.visible = this.collectionTime > 0;
-    const travel = this.stage.reducedMotion ? 0 : state.distance;
+    // Parallax follows the whole endless run, not the current sector.
+    const travel = this.stage.reducedMotion ? 0 : state.total;
     this.clouds.forEach(({ group, z }) => { group.position.z = ((z + travel * .19 + 130) % 130) - 130; });
     this.reliefs.forEach(({ group, z, index }) => { group.position.z = index === 0 ? z : ((z + travel * .12 + 120) % 128) - 120; });
     state.rows.forEach((row, index) => {
@@ -281,7 +288,7 @@ export class SkyView {
         barrier.position.set((lane - 1) * LANE_WIDTH, 1.22, ENCOUNTER_Z - row.distance);
       });
     });
-    this.pose.position.set(state.x, 1.2, ENCOUNTER_Z);
+    this.pose.position.set(state.x, 1.2 + Math.sin(Math.PI * (1 - this.sectorTime / .5)) * .3, ENCOUNTER_Z);
     const bank = this.stage.reducedMotion ? 0 : Math.max(-1, Math.min(1, state.lane - 1 - state.x / LANE_WIDTH));
     this.pose.rotation.z = -bank * .4;
     this.pose.rotation.y = -bank * .1;
@@ -298,7 +305,6 @@ export class SkyView {
     if (this.mode !== state.mode) {
       this.mode = state.mode;
       if (state.mode === 'over') this.stage.tween(this.ship, { y: -.35, rx: .3 }, 'failure', .24);
-      if (state.mode === 'won') this.stage.tween(this.ship, { y: .25, rx: -.12 }, 'score', .24);
       if (state.mode === 'playing') this.stage.tween(this.ship, { y: 0, rx: .04 }, 'settle', .23);
     }
   }
