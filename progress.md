@@ -342,3 +342,30 @@ Original prompt: Revisit all games in this project and make them more fun to pla
 - Source/runtime/test fingerprint stayed 7934a700fe4d402fa55e2019f62d685331f425cd418e41d8c6986e5951d86628 across all 73 tracked verification inputs. Current measurements are 6498 TypeScript, 402 CSS and 2079 script lines. Service-worker cache is aeroplay-75051500bd73. Evidence is in output/print-review, with fresh full-page screenshots in output/layout-*.
 - Required web-game client passed all eight games with nine inspected screenshots/state captures and no browser-error files. Manual in-app browser play opened the hub and all eight games, verified a 2048 merge, Lights cross toggle, Sudoku pencil notes, a 30-point Match-3 swap, a two-push Cargo delivery, a Sky ring/boost/pause and Pushball local model loading/dash/pause/goal. Phone portrait/landscape and MacBook framing were visually inspected. Physical iPhone Safari, native Safari and Home Screen remain unverified.
 - The completed local preview is http://127.0.0.1:4186/#hub. Work is committed on local main; no push or deployment was performed.
+
+## Approved volume, light and motion implementation (2026-10-16)
+- User approved all eight interactive spatial sketches, choosing the original recessed round Lights Out caps. Implement the complete collection and refresh the hub, retaining all gameplay, save formats, local TAMEV and offline behavior; deliver a local browser preview.
+- Shared work uses readable board relief, camera-consistent ray picking and four projected bounds corners, short receiving shadows, distinct paint/paper/ceramic/metal finishes, and the approved print palette. Three independent game groups implement the approved presentation without touching pure models or AI.
+
+- Completed all eight approved volume/motion presentations and regenerated the hub's eight real Three scene previews. Kept the original rounded Lights Out caps; added native-loop activity ownership so non-continuous board movement reaches its settled pose without a second input.
+- Native and deterministic checks cover weighted merge/undo, Lights transitions, Sudoku notes/digit/undo, lifted Match-3 exchanges, Cargo push/receipt/undo/reject, folded Flappy wings, banked Sky flight, and wheeled Pushball dash/contact/rolling. Flappy's ornamental anchors and wing phase now remain frozen through pause and saved-run restoration.
+- Twenty-three pure models, per-game HUDs, AI modules, storage, input and runtime files are byte-identical to baseline 1c70fb5. Protected SHA256s are recorded in output/spatial-review/protected-source.json. All three Sudoku puzzles and all twelve Cargo levels remain intact.
+- Each following stage passed the TypeScript/Vite pre-commit build. Counts refer to each committed tree; binary preview bytes are excluded from text deltas.
+
+| Stage | Commit | Added/deleted | Source TS | Styles CSS |
+| --- | --- | --- | --- | --- |
+| Shared relief and lighting | ab5e599 | +81/-71 | 6508 | 402 |
+| 2048 | e043dfe | +132/-69 | 6571 | 402 |
+| Lights Out | a1bcc14 | +85/-56 | 6600 | 402 |
+| Flappy Bird | 820d5fe | +112/-65 | 6647 | 402 |
+| Sudoku | fb983ae | +117/-61 | 6703 | 402 |
+| Match-3 | d7e299d | +90/-68 | 6725 | 402 |
+| Pocket Cargo | ade1387 | +233/-171 | 6787 | 402 |
+| Sky Rush | bcc2bda | +80/-74 | 6793 | 402 |
+| Robot Pushball | 8586782 | +129/-107 | 6815 | 402 |
+| Hub and real previews | 6bf2be9 | +13/-10 | 6815 | 405 |
+
+- Frozen final gates passed: WebKit production layouts (89.84 s, 36 exact route/viewport combinations plus live rotation, active/paused AI, results, GPU teardown, context recovery and reduced motion), WebKit full native gameplay (about 63 s, all twelve Cargo levels at par, three Sudoku puzzles, six Flappy gates, full boosted Sky sector and actual three-goal Pushball match), WebKit AI diagnostics on the development graph (28.31 s), Chromium cold offline/cache upgrade (70.92 s, 33 resources), and WebKit motion regressions including real native-loop intermediate frames (10.31 s). No assertion was weakened; the shadow renderer assertion now checks the supported PCFShadowMap because Three 0.186 removed PCFSoftShadowMap.
+- All 72 frozen runtime/source/test input hashes remained unchanged through these gates. Aggregate SHA256 22f59d9d78e8c7f14fdc2b495e04cd436b50a8bdd531732fdcb225c2c3d0ae43 hashes the sorted Python JSON map of path to individual SHA256. Logs and the manifest are in output/spatial-review. Source is 6815 TypeScript lines and styles 405 CSS lines; these are measurements, not budgets.
+- The in-app browser opened the hub and all eight games, exercised 2048 slide, Lights toggle/undo, Cargo push/undo, real Pushball TAMEV loading/movement/pause, Flappy start/retry/pause and Sky steering/pause. No browser console errors were recorded. All 24 fresh game screenshots and three hub viewport shots were visually reviewed. These are automated WebKit/Chromium checks, not physical Safari device acceptance.
+- Local user preview is http://127.0.0.1:4194/?motion=full#hub. The opt-in DEV-only motion parameter displays complete game movement for the current reduced-motion browser preference, without changing the OS or production defaults. Production validation uses http://127.0.0.1:4196. No push or deployment was requested or performed for this pass.

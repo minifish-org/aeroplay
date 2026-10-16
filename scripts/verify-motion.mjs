@@ -127,6 +127,47 @@ try {
   });
   h.clean();
   await ctx.close();
+  const live = await context(browser, { reducedMotion: 'no-preference' });
+  const moving = await harness(live, undefined, 'output/spatial-review/motion');
+  const canvasPixels = () => moving.page.locator('canvas').evaluate(canvas => canvas.toDataURL());
+  async function completesVisibleMotion(name, input) {
+    const before = await canvasPixels();
+    await input();
+    const early = await canvasPixels(), start = await moving.state();
+    await moving.page.waitForTimeout(65);
+    const middle = await canvasPixels(), during = await moving.state();
+    assert(during.renderer.frames > start.renderer.frames, name + ': the native loop advances presentation frames');
+    assert.notEqual(middle, early, name + ': the movement has visible intermediate frames');
+    await moving.page.waitForTimeout(450);
+    const final = await canvasPixels();
+    assert.notEqual(final, before, name + ': the resulting board is visible');
+    await moving.shot(name + '-settled');
+    return { early, final };
+  }
+  await check('Native puzzle motion finishes without advanceTime or a second input', async () => {
+    await moving.open('2048', { 'aeroplay:game2048:state': { grid: [[32, 32, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], score: 0, moves: 0 } });
+    await moving.page.waitForTimeout(400);
+    const merge = await completesVisibleMotion('2048', () => moving.key('ArrowRight'));
+    assert.notEqual(merge.early, merge.final, '2048 finishes its slide and impression after the logical merge');
+    const settled = await moving.state();
+    assert.equal(settled.grid[0][3], 64);
+    await moving.page.waitForTimeout(150);
+    assert.equal((await moving.state()).renderer.frames, settled.renderer.frames, 'A finished board returns to an idle renderer');
+
+    await moving.open('lightsout');
+    await moving.page.waitForTimeout(400);
+    const original = (await moving.state()).board;
+    await completesVisibleMotion('lightsout', () => moving.pick(12));
+    assert.equal((await moving.state()).board[12], 1 - original[12], 'The projected curved lamp still accepts the normal input');
+
+    await moving.open('sudoku');
+    await moving.pick({ type: 'select', index: 2 });
+    await moving.page.waitForTimeout(400);
+    await completesVisibleMotion('sudoku', () => moving.button('4').click());
+    assert.equal((await moving.state()).board[2], 4, 'The printed digit retains its original model meaning');
+  });
+  moving.clean();
+  await live.close();
 } finally {
   await browser.close();
 }
