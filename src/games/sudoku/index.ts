@@ -46,6 +46,6 @@ export default function mount(context: GameContext) {
     hud.selection(`Row ${Math.floor(index / 9) + 1}, column ${index % 9 + 1}. ${value ? 'Digit ' + value : 'Empty'}. ${model.givens.includes(index) ? 'Given; cannot edit' : 'Editable'}.${notes.length ? ' Pencil notes ' + notes.join(', ') + '.' : ''}${model.invalid(index) ? ' Incorrect digit.' : ''}`);
   };
   stage.renderer.domElement.setAttribute('aria-describedby', 'game-selection');
-  const dispose = mountRun(context, { model, timer: true, render: () => view.draw(), refresh: () => { updateHUD(); selection(); persist(); }, persist, keys });
+  const dispose = mountRun(context, { model, timer: true, render: dt => view.draw(dt), active: view.active, inspect: () => ({ visual: view.inspect() }), refresh: () => { updateHUD(); selection(); persist(); }, persist, keys });
   return () => { dispose(); stage.renderer.domElement.removeAttribute('aria-describedby'); };
 }
