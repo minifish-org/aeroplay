@@ -63,16 +63,7 @@ export function createMatch3View(stage: Stage, model: Match3Model) {
   popupPlate.position.z = -.018;
   popup.add(popupPlate);
   popup.visible = false;
-  const result = new Group();
-  for (const [x, y, w, h] of [[0, 4.10, 8.20, .025], [0, -4.10, 8.20, .025], [-4.10, 0, .025, 8.20], [4.10, 0, .025, 8.20]]) {
-    const edge = stage.box(w, h, .025, INK.yellow, .003);
-    edge.material = stage.material(INK.yellow, 0, 'metal');
-    edge.position.set(x, y, .025);
-    result.add(edge);
-  }
-  result.visible = model.mode === 'won';
-  stage.content.add(result);
-  let score = model.score, popupUntil = 0, popupAt = 0, popupY = 0, time = 0, epoch = model.epoch, won = model.mode === 'won';
+  let score = model.score, popupUntil = 0, popupAt = 0, popupY = 0, time = 0, epoch = model.epoch;
   let swap: Match3Model['swap'] = null;
 
   return {
@@ -149,12 +140,6 @@ export function createMatch3View(stage: Stage, model: Match3Model) {
           }
         }
       });
-      result.visible = model.mode === 'won';
-      if (result.visible && !won) {
-        result.scale.setScalar(.98);
-        stage.tween(result, { scale: 1 }, 'entry', .22);
-      }
-      won = result.visible;
     },
     active: () => !stage.reducedMotion && (time < popupUntil || !!model.swap && model.clock - model.swap.at < (model.swap.accepted ? .16 : .28) || cells.some(cell => cell.age < .12)),
     inspect: () => ({ time, popup: popup.visible, swapAge: model.swap ? model.clock - model.swap.at : null })

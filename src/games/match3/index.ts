@@ -7,7 +7,7 @@ export default function mount(context: GameContext) {
   const { stage, hud, store, player } = context;
   const model = createMatch3Model(store.load('run', null), store.load('best', 0)), audio = new GameAudio();
   const view = createMatch3View(stage, model);
-  let saved = '', best = model.best, score = model.score, mode = model.mode;
+  let saved = '', best = model.best, score = model.score;
   const persist = () => {
     if (model.phase !== 'clearing' && model.phase !== 'falling') {
       const state = model.saved(), key = JSON.stringify(state);
@@ -61,10 +61,6 @@ export default function mount(context: GameContext) {
     render: dt => { view.draw(dt); if (score !== model.score) {
       score = model.score;
       audio.play('collect');
-    } if (mode !== model.mode) {
-      mode = model.mode;
-      if (mode === 'won')
-        audio.play('win');
     } },
     refresh: () => { updateHUD(); sound.setAttribute('aria-pressed', String(audio.enabled)); persist(); }, persist,
     pick: (x, y) => { audio.unlock(); return stage.pick(x, y); }, dispose: () => audio.dispose() });

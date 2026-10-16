@@ -5,9 +5,6 @@ export type GemPoint = {
 export type GemGrid = number[][];
 export const GEM_SIZE = 8;
 export const GEM_COLORS = 5;
-/** The run never ends: a level only clears on its target, so moves are unlimited. */
-export const STARS_TIGHT = 22;
-export const STARS_LOOSE = 38;
 const copyGrid = (grid: GemGrid) => grid.map(row => [...row]);
 const same = (a: GemPoint, b: GemPoint) => a.x === b.x && a.y === b.y;
 const neighbors = (a: GemPoint, b: GemPoint) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1;
@@ -91,7 +88,6 @@ export type MatchSave = {
   grid: GemGrid;
   score: number;
   moves: number;
-  level: number;
 };
 export function validMatchSave(value: unknown): value is MatchSave {
   if (!value || typeof value !== 'object')
@@ -99,19 +95,21 @@ export function validMatchSave(value: unknown): value is MatchSave {
   const save = value as MatchSave;
   return Array.isArray(save.grid) && save.grid.length === GEM_SIZE && save.grid.every(row => Array.isArray(row) && row.length === GEM_SIZE && row.every(cell => Number.isInteger(cell) && cell >= 0 && cell < GEM_COLORS)) &&
     Number.isFinite(save.score) && save.score >= 0 && Number.isInteger(save.moves) && save.moves >= 0 && save.moves <= 1e6 &&
-    Number.isInteger(save.level) && save.level >= 1 && !findMatches(save.grid).length;
+    !findMatches(save.grid).length;
 }
+/**
+ * One endless run: there is no level, no target and no settlement that could end it.
+ * Score only ever rises, an exhausted board reshuffles itself, and the saved best is
+ * the record a run chases.
+ */
 export function createMatch3Model(saved: unknown = null, best = 0, random = Math.random) {
   const model = {
-    mode: 'playing' as 'playing' | 'paused' | 'won',
-    phase: 'playing' as 'playing' | 'clearing' | 'falling' | 'won',
+    mode: 'playing' as 'playing' | 'paused',
+    phase: 'playing' as 'playing' | 'clearing' | 'falling',
     grid: [] as GemGrid, selected: null as GemPoint | null, hinted: [] as GemPoint[], matching: [] as GemPoint[],
-    falls: [] as GemFall[], swap: null as { a: GemPoint; b: GemPoint; accepted: boolean; at: number } | null, score: 0, moves: 0, level: 1, best: Math.max(0, best),
-    chain: 0, timer: 0, clock: 0, epoch: 0, serial: 0, shuffled: false, reshuffles: 0,
-    target() { return 1000 + (model.level - 1) * 350; },
-    reset(advance?: boolean) {
-      if (advance ?? model.phase === 'won')
-        model.level++;
+    falls: [] as GemFall[], swap: null as { a: GemPoint; b: GemPoint; accepted: boolean; at: number } | null, score: 0, moves: 0, best: Math.max(0, best),
+    chain: 0, chains: 0, timer: 0, clock: 0, epoch: 0, serial: 0, shuffled: false, reshuffles: 0,
+    reset() {
       model.grid = createMatchBoard(random);
       model.score = 0;
       model.moves = 0;
@@ -123,6 +121,7 @@ export function createMatch3Model(saved: unknown = null, best = 0, random = Math
       model.falls = [];
       model.swap = null;
       model.chain = 0;
+      model.chains = 0;
       model.timer = 0;
       model.clock = 0;
       model.epoch++;
@@ -130,16 +129,12 @@ export function createMatch3Model(saved: unknown = null, best = 0, random = Math
       model.shuffled = false;
       model.reshuffles = 0;
     },
-    /** Endless settlement: only the target clears a level, an exhausted board reshuffles. */
-    finish() {
+    /** Cascades settle back into play; a board without a swap reshuffles instead of ending. */
+    settle() {
       model.shuffled = false;
-      if (model.score >= model.target()) {
-        model.mode = 'won';
-        model.phase = 'won';
-        return;
-      }
       model.mode = 'playing';
       model.phase = 'playing';
+      model.chain = 0;
       if (!match3Moves(model.grid).length) {
         model.grid = createMatchBoard(random);
         model.shuffled = true;
@@ -219,23 +214,24 @@ export function createMatch3Model(saved: unknown = null, best = 0, random = Math
         model.matching = findMatches(model.grid);
         if (model.matching.length) {
           model.chain++;
+          model.chains++;
           model.phase = 'clearing';
           model.timer = 0.18;
           model.serial++;
         }
         else
-          model.finish();
+          model.settle();
       }
     },
     pause() { if (model.mode === 'playing')
       model.mode = 'paused'; },
     resume() { if (model.mode === 'paused')
       model.mode = 'playing'; },
-    saved(): MatchSave { return { grid: copyGrid(model.grid), score: model.score, moves: model.moves, level: model.level }; },
+    saved(): MatchSave { return { grid: copyGrid(model.grid), score: model.score, moves: model.moves }; },
     snapshot() {
       return { game: 'match3', mode: model.mode === 'paused' ? 'paused' : model.phase, ...model.saved(), best: model.best,
         selected: model.selected ? { ...model.selected } : null, hinted: model.hinted.map(point => ({ ...point })),
-        matching: model.matching.map(point => ({ ...point })), target: model.target(), chain: model.chain,
+        matching: model.matching.map(point => ({ ...point })), chain: model.chain, chains: model.chains,
         reshuffles: model.reshuffles, epoch: model.epoch };
     },
     planning() {
@@ -243,21 +239,19 @@ export function createMatch3Model(saved: unknown = null, best = 0, random = Math
         board: copyGrid(model.grid), selected: model.selected ? { ...model.selected } : null } : null;
     },
     summary() {
-      return { score: model.score, best: model.best, moves: model.moves, level: model.level,
-        target: model.target(), chain: model.chain, shuffled: model.shuffled, reshuffles: model.reshuffles,
-        stars: model.mode === 'won' ? model.moves <= STARS_TIGHT ? 3 : model.moves <= STARS_LOOSE ? 2 : 1 : 0 };
+      return { score: model.score, best: model.best, moves: model.moves, chain: model.chain, chains: model.chains,
+        pace: model.moves ? Math.round(model.score / model.moves) : 0, reshuffles: model.reshuffles, shuffled: model.shuffled };
     }
   };
   if (validMatchSave(saved)) {
     model.grid = copyGrid(saved.grid);
     model.score = saved.score;
     model.moves = saved.moves;
-    model.level = saved.level;
     model.best = Math.max(model.best, model.score);
-    model.finish();
+    model.settle();
   }
   else
-    model.reset(false);
+    model.reset();
   return model;
 }
 export type Match3Model = ReturnType<typeof createMatch3Model>;
