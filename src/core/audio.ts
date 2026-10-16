@@ -1,14 +1,20 @@
 import { load, save } from './storage';
 export class GameAudio {
   private context: AudioContext | null = null;
+  private live = new Set<{ oscillator: OscillatorNode; gain: GainNode }>();
   enabled = load('sound-enabled', false);
   toggle() { this.enabled = !this.enabled; save('sound-enabled', this.enabled); if (this.enabled) {
     this.unlock();
     this.play('collect');
   } }
-  unlock() { if (!this.enabled)
-    return; this.context ??= new AudioContext(); if (this.context.state === 'suspended')
-    void this.context.resume(); }
+  /** A context closed mid-teardown rejects this promise; a silent game must not report it. */
+  unlock() {
+    if (!this.enabled)
+      return;
+    this.context ??= new AudioContext();
+    if (this.context.state === 'suspended')
+      void this.context.resume().catch(() => { });
+  }
   play(cue: 'collect' | 'boost' | 'hit' | 'move' | 'win') {
     if (!this.enabled || this.context?.state !== 'running')
       return;
@@ -26,8 +32,35 @@ export class GameAudio {
       gain.connect(audio.destination);
       oscillator.start(at);
       oscillator.stop(at + .2);
-      oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+      const voice = { oscillator, gain };
+      this.live.add(voice);
+      // A voice that ends after its context closed must not throw from this handler.
+      oscillator.onended = () => {
+        this.live.delete(voice);
+        try {
+          oscillator.disconnect();
+          gain.disconnect();
+        }
+        catch {
+          return;
+        }
+      };
     });
   }
-  dispose() { void this.context?.close(); this.context = null; }
+  /** Silent teardown: every voice stops and leaves the graph before its context closes. */
+  dispose() {
+    for (const { oscillator, gain } of this.live)
+      try {
+        oscillator.stop();
+        oscillator.disconnect();
+        gain.disconnect();
+      }
+      catch {
+        continue;
+      }
+    this.live.clear();
+    const context = this.context;
+    this.context = null;
+    void context?.close();
+  }
 }
