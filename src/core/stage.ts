@@ -1,5 +1,6 @@
 import { ACESFilmicToneMapping, CanvasTexture, Color, DirectionalLight, Fog, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, OrthographicCamera, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, Raycaster, Scene, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector2, Vector3, WebGLRenderer, BufferGeometry, Material } from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { paperTexture } from './print';
 export type Preset = 'board' | 'island' | 'flight' | 'arena';
 export type Easing = 'entry' | 'score' | 'failure' | 'settle';
 type Target = {
@@ -7,15 +8,16 @@ type Target = {
   y?: number;
   z?: number;
   scale?: number;
+  sx?: number;
+  sy?: number;
+  sz?: number;
+  rx?: number;
+  ry?: number;
+  rz?: number;
 };
 type Tween = {
   object: Object3D;
-  from: {
-    x: number;
-    y: number;
-    z: number;
-    scale: number;
-  };
+  from: Target;
   target: Target;
   time: number;
   easing: Easing;
@@ -37,6 +39,7 @@ export class Stage {
   private observer: ResizeObserver;
   private geometry = new Map<string, BufferGeometry>();
   private materials = new Map<string, MeshStandardMaterial>();
+  private paper: CanvasTexture | null = null;
   private tweens: Tween[] = [];
   private particles: {
     mesh: Mesh;
@@ -63,13 +66,13 @@ export class Stage {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = .94;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFSoftShadowMap;
     this.renderer.domElement.dataset.renderer = 'three';
     this.renderer.domElement.setAttribute('aria-label', 'Game scene');
     this.renderer.domElement.tabIndex = 0;
-    for (const [color, intensity, x, y, z] of [[0xfff0db, 3.1, 5, 9, 12], [0xd0e9ff, 1.6, -7, 4, 8], [0xcdf6eb, 2.1, 0, -5, 6]]) {
+    for (const [color, intensity, x, y, z] of [[0xfff5e2, 2.8, -6, 9, 12], [0xdce8ff, .7, 7, 4, 8], [0xffe7c6, .6, 0, -5, 6]]) {
       const light = new DirectionalLight(color, intensity);
       light.position.set(x, y, z);
       if (!this.lights.children.length) {
@@ -79,8 +82,8 @@ export class Stage {
         light.shadow.camera.right = 20;
         light.shadow.camera.top = 20;
         light.shadow.camera.bottom = -20;
-        light.shadow.bias = -.0004;
-        light.shadow.normalBias = .04;
+        light.shadow.bias = -.00015;
+        light.shadow.normalBias = .02;
       }
       this.lights.add(light);
     }
@@ -113,7 +116,16 @@ export class Stage {
     this.observer.observe(play);
     this.resize();
   }
-  framing(preset: Preset, width: number, height: number, anchor?: { x: number; screen: number }) { this.preset = preset; this.world = { width, height }; this.anchor = anchor; this.resize(); }
+  framing(preset: Preset, width: number, height: number, anchor?: { x: number; screen: number }) {
+    this.preset = preset;
+    this.world = { width, height };
+    this.anchor = anchor;
+    const key = this.lights.children[0] as DirectionalLight;
+    const span = preset === 'flight' ? 20 : Math.max(width, height) * .72 + 1.5;
+    Object.assign(key.shadow.camera, { left: -span, right: span, top: span, bottom: -span });
+    key.shadow.camera.updateProjectionMatrix();
+    this.resize();
+  }
   bounds() {
     const { left, right, top, bottom } = this.ortho, x = this.ortho.position.x;
     return { left: left + x, right: right + x, top, bottom, width: right - left, height: top - bottom };
@@ -163,10 +175,10 @@ export class Stage {
   material(color: number | string, emissive = 0) {
     const key = String(color) + ':' + emissive;
     if (!this.materials.has(key))
-      this.materials.set(key, new MeshStandardMaterial({ color, roughness: .48, metalness: .12, emissive, emissiveIntensity: .35 }));
+      this.materials.set(key, new MeshStandardMaterial({ color, map: this.paper ??= paperTexture(), roughness: .96, metalness: 0, emissive, emissiveIntensity: .55 }));
     return this.materials.get(key)!;
   }
-  box(width: number, height: number, depth: number, color: number | string, radius = Math.min(width, height, depth) * .22) {
+  box(width: number, height: number, depth: number, color: number | string, radius = Math.min(width, height, depth) * .04) {
     const key = [width, height, depth, radius].join(':');
     if (!this.geometry.has(key))
       this.geometry.set(key, new RoundedBoxGeometry(width, height, depth, 3, radius));
@@ -176,7 +188,7 @@ export class Stage {
     return mesh;
   }
   tile(x: number, y: number, width: number, height: number, color: number | string, depth = .24, input?: unknown) {
-    const mesh = this.box(width, height, depth, color, .11 * Math.min(width, height));
+    const mesh = this.box(width, height, depth, color, .025 * Math.min(width, height));
     mesh.position.set(x, y, 0);
     if (input !== undefined)
       mesh.userData.input = input;
@@ -184,7 +196,7 @@ export class Stage {
     return mesh;
   }
   board(width: number, height: number, color: number | string = 0x243b50) {
-    const mesh = this.box(width, height, .26, color, .18);
+    const mesh = this.box(width, height, .26, color, .035);
     mesh.position.z = -.32;
     this.content.add(mesh);
     return mesh;
@@ -250,8 +262,17 @@ export class Stage {
     return undefined;
   }
   tween(object: Object3D, target: Target, easing: Easing = 'settle') {
-    this.tweens = this.tweens.filter(tween => tween.object !== object);
-    const tween = { object, from: { x: object.position.x, y: object.position.y, z: object.position.z, scale: object.scale.x }, target, time: 0, easing };
+    const { scale, ...channels } = target;
+    const resolved: Target = scale === undefined ? channels : { sx: scale, sy: scale, sz: scale, ...channels };
+    const keys = Object.keys(resolved) as (keyof Target)[];
+    for (const tween of this.tweens) if (tween.object === object) for (const key of keys) {
+      delete tween.target[key];
+      delete tween.from[key];
+    }
+    this.tweens = this.tweens.filter(tween => Object.keys(tween.target).length > 0);
+    const from: Target = {};
+    for (const key of keys) from[key] = key === 'scale' ? object.scale.x : key[0] === 'r' ? object.rotation[key[1] as 'x' | 'y' | 'z'] : key[0] === 's' ? object.scale[key[1] as 'x' | 'y' | 'z'] : object.position[key as 'x' | 'y' | 'z'];
+    const tween = { object, from, target: resolved, time: 0, easing };
     if (this.reducedMotion)
       this.applyTween(tween, 1);
     else
@@ -259,11 +280,13 @@ export class Stage {
   }
   private applyTween(tween: Tween, t: number) {
     const value = ease(t, tween.easing), { object, from, target } = tween;
-    for (const axis of ['x', 'y', 'z'] as const)
-      if (target[axis] !== undefined)
-        object.position[axis] = from[axis] + (target[axis]! - from[axis]) * value;
-    if (target.scale !== undefined)
-      object.scale.setScalar(from.scale + (target.scale - from.scale) * value);
+    for (const key of Object.keys(target) as (keyof Target)[]) {
+      const next = from[key]! + (target[key]! - from[key]!) * value;
+      if (key === 'scale') object.scale.setScalar(next);
+      else if (key[0] === 'r') object.rotation[key[1] as 'x' | 'y' | 'z'] = next;
+      else if (key[0] === 's') object.scale[key[1] as 'x' | 'y' | 'z'] = next;
+      else object.position[key as 'x' | 'y' | 'z'] = next;
+    }
   }
   effect(x: number, y: number, color: number | string, type: Easing = 'score') {
     if (this.reducedMotion)
@@ -342,6 +365,7 @@ export class Stage {
     this.content.scale.setScalar(1);
     this.geometry.clear();
     this.materials.clear();
+    this.paper = null;
     this.tweens = [];
     this.particles = [];
     this.grid = null;

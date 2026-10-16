@@ -8,7 +8,7 @@
   margin:auto;
   position:relative;
   overflow:hidden;
-  background:var(--panel);
+  background:var(--paper);
 }
 .game-stage>canvas {
   position:absolute;
@@ -33,12 +33,16 @@
 .hud-top {
   flex-wrap:wrap;
   pointer-events:auto;
+  background:var(--paper);
+  border-bottom:2px solid var(--ink);
+  padding-bottom:6px;
 }
 .hud-nav { min-width:0; }
 .hud-nav h1 {
   margin:0;
   font-size:var(--text-md);
   white-space:nowrap;
+  font-family:Georgia,'Times New Roman',serif;
 }
 .hud-stats {
   flex:1 1 auto;
@@ -68,16 +72,16 @@
   gap:var(--space-sm);
   padding:var(--space-sm);
   border-radius:var(--radius-sm);
-  border:0;
-  background:var(--panel);
-  color:var(--paper);
+  border:1px solid var(--ink);
+  background:var(--paper);
+  color:var(--ink);
   font-size:var(--text-sm);
   touch-action:manipulation;
 }
 .hud-button svg,.hud-more svg { width:20px; height:20px; flex-shrink:0; }
 .hud-nav .hud-button span,.hud-actions>.hud-button span { display:none; }
-.hud-button:active { background:var(--accent); color:var(--ink); }
-.hud-button[aria-pressed=true] { background:var(--accent); color:var(--ink); }
+.hud-button:active { background:var(--accent); color:var(--paper); }
+.hud-button[aria-pressed=true] { background:var(--accent); color:var(--paper); }
 .hud-button[hidden] { display:none; }
 .hud-more { position:relative; }
 .hud-more summary { cursor:pointer; list-style:none; }
@@ -90,9 +94,9 @@
   z-index:5;
   min-width:172px;
   padding:var(--space-sm);
-  border:1px solid var(--muted);
+  border:1px solid var(--ink);
   border-radius:var(--radius-md);
-  background:var(--ink);
+  background:var(--paper);
   box-shadow:var(--shadow-lg);
 }
 .hud-menu .hud-button { width:100%; justify-content:flex-start; }
@@ -107,6 +111,7 @@
   padding:var(--space-sm) var(--space-md);
   border-radius:var(--radius-sm);
   background:var(--ink);
+  color:var(--paper);
   font-size:var(--text-sm);
   line-height:1.45;
   text-align:center;
@@ -130,13 +135,15 @@
   overflow:auto;
   padding:var(--space-md);
   border-radius:var(--radius-md);
-  background:var(--panel);
+  background:var(--paper);
+  border:1px solid var(--ink);
+  box-shadow:var(--shadow-lg);
 }
 .hud-panel[hidden] { display:none; }
 .hud-panel h2 { font-size:var(--text-lg); margin:0 0 var(--space-xs); }
 .hud-panel p { font-size:var(--text-sm); line-height:1.5; margin:0 0 var(--space-sm); color:var(--muted); }
 .panel-actions { display:flex; gap:var(--space-sm); flex-wrap:wrap; }
-.panel-actions .hud-button:first-child { background:var(--accent); color:var(--ink); }
+.panel-actions .hud-button:first-child { background:var(--accent); color:var(--paper); }
 .hud-inputs {
   grid-row:3;
   display:flex;
@@ -169,15 +176,15 @@
   max-width:170px;
   height:44px;
   min-height:44px;
-  border:0;
+  border:1px solid var(--ink);
   border-radius:var(--radius-sm);
-  color:var(--paper);
-  background:var(--panel);
+  color:var(--ink);
+  background:var(--paper);
   padding:var(--space-xs) var(--space-sm);
   font-size:var(--text-sm);
 }
-.joystick { width:96px; height:96px; position:relative; border-radius:50%; border:1px solid var(--cyan); background:var(--panel); touch-action:none; }
-.joystick span { position:absolute; left:calc(50% - 17px); top:calc(50% - 17px); width:34px; height:34px; border-radius:50%; border:1px solid var(--paper); background:var(--cyan); box-shadow:var(--shadow-sm); }
+.joystick { width:96px; height:96px; position:relative; border-radius:50%; border:2px solid var(--ink); background:var(--paper); touch-action:none; }
+.joystick span { position:absolute; left:calc(50% - 17px); top:calc(50% - 17px); width:34px; height:34px; border-radius:50%; border:1px solid var(--ink); background:var(--cyan); box-shadow:var(--shadow-sm); }
 .game-stage[data-preset=arena] .hud-inputs { justify-content:space-between; }
 @media (max-width:700px), (max-height:700px) {
   :root { --text-sm:13px; --text-md:15px; --text-lg:22px; }

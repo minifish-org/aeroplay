@@ -71,11 +71,12 @@ export function mountRun(context: GameContext, options: RunOptions) {
   const finished = () => ['won', 'over'].includes(model.mode);
   const waitingForModel = () => player.type === 'ai' && ['loading', 'error'].includes(getAIModelState().status);
   const persist = () => options.persist?.();
-  const draw = (dt = 0) => { options.render(dt); options.refresh();
+  const visualTime = (dt: number) => model.mode === 'paused' || hud.helpOpen || waitingForModel() ? 0 : dt;
+  const draw = (dt = 0) => { const elapsed = visualTime(dt); options.render(elapsed); options.refresh();
     if (model.mode === 'paused' && player.type === 'human' && !options.continuous)
       hud.panel('Paused', '', [{ label: 'Resume', press: () => player.resume() }]);
-    resultControls(); hud.enforceGraphics(); stage.advance(dt); stage.render(); };
-  const active = () => !document.hidden && !hud.helpOpen && ((!waitingForModel() && ((options.continuous && model.mode === 'playing') || options.active?.())) || stage.animating);
+    resultControls(); hud.enforceGraphics(); stage.advance(elapsed); stage.render(); };
+  const active = () => !document.hidden && !hud.helpOpen && model.mode !== 'paused' && ((!waitingForModel() && ((options.continuous && model.mode === 'playing') || options.active?.())) || !waitingForModel() && stage.animating);
   const tick = (dt: number) => { if (!waitingForModel()) runtimeTime += dt; if (!waitingForModel() && !options.timer && !hud.helpOpen && model.mode !== 'paused')
     model.step(dt); draw(dt); };
   const animate = (now: number) => { frame = 0; if (disposed)
@@ -175,9 +176,10 @@ export function mountRun(context: GameContext, options: RunOptions) {
     if (!waitingForModel()) runtimeTime += dt;
     if (!waitingForModel() && !hud.helpOpen && model.mode !== 'paused')
       model.step(dt);
-    options.render(dt);
+    const elapsed = visualTime(dt);
+    options.render(elapsed);
     options.refresh();
-    stage.advance(dt);
+    stage.advance(elapsed);
     remaining -= dt;
   } draw(); last = 0; };
   const timer = options.timer ? window.setInterval(() => { if (!waitingForModel() && !document.hidden && !hud.helpOpen && model.mode === 'playing') {
