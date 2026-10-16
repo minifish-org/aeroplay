@@ -15,7 +15,7 @@ export default function mount(context: GameContext) {
   let disposed = false, loading = false, modelReady = false, error = '', selectedPlan = 'Waiting for kickoff', goal = 0, storedMatches = model.matches;
   const controls = pushballHUD(hud, model, () => { void startMatch(); }, togglePause, () => opponent.retry(), audio, () => stage.available, (x, y) => stage.groundDirection(x, y));
   const render = (dt = 0) => { const elapsed = model.mode === 'paused' || hud.helpOpen || loading ? 0 : dt; view.render(model.state, elapsed); controls.refresh(loading, error, opponent.error); hud.enforceGraphics(); stage.advance(elapsed); stage.render(); };
-  const active = () => !disposed && !document.hidden && !hud.helpOpen && model.mode !== 'paused' && (model.mode === 'playing' || stage.animating);
+  const active = () => !disposed && !document.hidden && !hud.helpOpen && !loading && model.mode !== 'paused' && (model.mode === 'playing' || stage.animating || view.animating);
   const loop = new GameLoop(dt => {
     if (hud.helpOpen || document.hidden || model.mode !== 'playing')
       return;
