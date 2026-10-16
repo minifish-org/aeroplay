@@ -1,4 +1,4 @@
-import { CircleGeometry, Color, CurvePath, ExtrudeGeometry, Fog, Group, Mesh, QuadraticBezierCurve3, Shape, TorusGeometry, TubeGeometry, Vector3 } from 'three';
+import { BufferGeometry, CircleGeometry, Color, CurvePath, ExtrudeGeometry, Float32BufferAttribute, Fog, Group, Mesh, PlaneGeometry, QuadraticBezierCurve3, Shape, TorusGeometry, TubeGeometry, Vector3 } from 'three';
 import type { Stage } from '../../core/stage';
 import { INK, printBackdrop } from '../../core/print';
 import { LANE_WIDTH, type SkyRun } from './model';
@@ -10,16 +10,16 @@ const ENCOUNTER_Z = 2;
 export class SkyView {
   private pose = new Group();
   private ship = new Group();
-  private wings = new Group();
+  private wings: Group[] = [];
   private flame: Mesh;
   private tails = new Group();
   private shield = new Group();
   private shieldPieces: Mesh[] = [];
   private collection = new Group();
   private sun: Mesh;
+  private sea: Mesh;
   private reliefs: Relief[] = [];
   private clouds: Cloud[] = [];
-  private laneMarks: { mesh: Mesh; z: number }[] = [];
   private rows: { ring: Group; barriers: Group[] }[] = [];
   private epoch = -1;
   private sector = 0;
@@ -28,19 +28,24 @@ export class SkyView {
   private lastShield = 1;
   private shieldBreak = 0;
   private collectionTime = 0;
+  private boostBlend = 0;
   private ready = false;
 
   constructor(private stage: Stage) {
     stage.framing('flight', 10.5, 10);
     printBackdrop(stage, 'air');
-    const sunMaterial = stage.material(INK.red).clone();
+    this.sea = new Mesh(new PlaneGeometry(220, 260), stage.material(0x244d70, 0, 'paper'));
+    this.sea.rotation.x = -Math.PI / 2;
+    this.sea.position.set(0, -1.3, -95);
+    this.sea.receiveShadow = true;
+    stage.content.add(this.sea);
+    const sunMaterial = stage.material(INK.red, 0, 'paper').clone();
     sunMaterial.fog = false;
     this.sun = new Mesh(new CircleGeometry(17, 64), sunMaterial);
     this.sun.position.set(26, 37, -110);
     stage.content.add(this.sun);
     this.buildClouds();
     this.buildRelief();
-    this.buildLanes();
     this.buildShip();
     this.flame = this.plate([[0, -.02], [.14, .3], [0, .68], [-.14, .3]], INK.red, .025, this.ship, 0, .035, .65);
     for (const x of [-.48, .48]) {
@@ -60,16 +65,16 @@ export class SkyView {
       this.shieldPieces.push(piece);
     }
     this.shield.position.y = .055;
-    const flash = new Mesh(new TorusGeometry(.94, .045, 6, 48), stage.material(INK.yellow));
+    const flash = new Mesh(new TorusGeometry(.94, .035, 6, 48), stage.material(INK.yellow, 0, 'metal'));
     this.collection.add(flash);
     this.collection.visible = false;
     stage.content.add(this.collection);
     for (let index = 0; index < 14; index++) {
       const ring = new Group();
       for (const [radius, stroke, color, z] of [[.97, .105, INK.black, 0], [.95, .09, INK.yellow, .055]]) {
-        const hoop = new Mesh(new TorusGeometry(radius, stroke, 8, 48), stage.material(color, color === INK.yellow ? INK.yellow : 0));
+        const hoop = new Mesh(new TorusGeometry(radius, stroke, 8, 48), stage.material(color, color === INK.yellow ? INK.yellow : 0, 'metal'));
         hoop.position.z = z;
-        hoop.castShadow = false;
+        hoop.castShadow = hoop.receiveShadow = true;
         ring.add(hoop);
       }
       for (const x of [-1.14, 1.14]) {
@@ -81,11 +86,11 @@ export class SkyView {
       const barriers: Group[] = [];
       for (let lane = 0; lane < 3; lane++) {
         const barrier = new Group();
-        const backing = stage.box(2.36, 2.36, .18, INK.black, .015);
+        const backing = stage.box(2.36, 2.36, .26, INK.black, .025);
         barrier.add(backing);
         for (const angle of [-Math.PI / 4, Math.PI / 4]) {
-          const cross = stage.box(2.6, .38, .2, INK.red, .015);
-          cross.position.z = .16;
+          const cross = stage.box(2.6, .38, .3, INK.red, .025);
+          cross.position.z = .22;
           cross.rotation.z = angle;
           barrier.add(cross);
         }
@@ -102,7 +107,8 @@ export class SkyView {
     const shape = new Shape();
     points.forEach(([px, pz], index) => index ? shape.lineTo(px, pz) : shape.moveTo(px, pz));
     shape.closePath();
-    const mesh = new Mesh(new ExtrudeGeometry(shape, { depth, bevelEnabled: false }), [this.stage.material(color), this.stage.material(INK.black)]);
+    const bevel = Math.min(.012, depth / 5);
+    const mesh = new Mesh(new ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 1 }), [this.stage.material(color, 0, 'paint'), this.stage.material(INK.black, 0, 'paint')]);
     mesh.rotation.x = Math.PI / 2;
     mesh.position.set(x, y, z);
     mesh.castShadow = true;
@@ -111,17 +117,36 @@ export class SkyView {
     return mesh;
   }
 
-  private buildShip() {
-    this.plate([[0, -1.06], [.14, -.25], [.17, .6], [0, .48], [-.17, .6], [-.14, -.25]], INK.paper, .12, this.ship, 0, .1);
-    this.plate([[0, -.82], [.86, .76], [.2, .37], [0, .47]], INK.paper, .055, this.wings, 0, .06);
-    this.plate([[0, -.82], [-.86, .76], [-.2, .37], [0, .47]], INK.paper, .055, this.wings, 0, .06);
-    this.plate([[.36, .19], [.71, .63], [.54, .54]], INK.red, .008, this.wings, 0, .075);
-    this.plate([[-.36, .19], [-.71, .63], [-.54, .54]], INK.red, .008, this.wings, 0, .075);
-    this.plate([[0, -.52], [.09, -.03], [0, .2], [-.09, -.03]], INK.black, .065, this.ship, 0, .17);
-    this.ship.add(this.wings);
+  private folded(vertices: number[][], faces: number[][], colors: number[], parent: Group) {
+    const positions: number[] = [], inks: number[] = [];
+    faces.forEach((face, index) => {
+      const color = new Color(colors[index % colors.length]);
+      face.forEach(vertex => { positions.push(...vertices[vertex]); inks.push(color.r, color.g, color.b); });
+    });
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new Float32BufferAttribute(inks, 3));
+    geometry.computeVertexNormals();
+    const material = this.stage.material(0xffffff, 0, 'paint').clone();
+    material.vertexColors = true;
+    const mesh = new Mesh(geometry, material);
+    mesh.castShadow = mesh.receiveShadow = true;
+    parent.add(mesh);
   }
 
-  private cloudShape(width: number, height: number, color: number) {
+  private buildShip() {
+    this.folded([[0, .11, -1.15], [0, .07, .75], [-.18, .08, .36], [.18, .08, .36], [0, .32, .08], [0, -.12, .18]], [[0, 2, 4], [0, 4, 3], [4, 2, 1], [4, 1, 3], [0, 5, 2], [0, 3, 5], [1, 2, 5], [1, 5, 3]], [INK.white, INK.paper, 0xc9c4af, INK.white], this.ship);
+    for (const side of [-1, 1]) {
+      const wing = new Group();
+      this.plate([[0, -.98], [side * .96, .82], [side * .22, .39], [0, .47]], INK.white, .105, wing, 0, .055);
+      this.plate([[side * .36, .24], [side * .79, .68], [side * .55, .51]], INK.red, .014, wing, 0, .079);
+      this.ship.add(wing);
+      this.wings.push(wing);
+    }
+    this.plate([[0, -.48], [.09, .025], [0, .24], [-.09, .025]], INK.black, .075, this.ship, 0, .2);
+  }
+
+  private cloudShape(width: number, height: number, color: number, depth = .85) {
     const shape = new Shape();
     shape.moveTo(-width / 2, 0);
     shape.quadraticCurveTo(-width * .48, height * .64, -width * .31, height * .46);
@@ -129,22 +154,22 @@ export class SkyView {
     shape.quadraticCurveTo(width * .06, height * 1.36, width * .2, height * .64);
     shape.quadraticCurveTo(width * .43, height * .94, width / 2, 0);
     shape.closePath();
-    const cloud = new Mesh(new ExtrudeGeometry(shape, { depth: .08, bevelEnabled: false, curveSegments: 9 }), this.stage.material(color));
-    cloud.castShadow = false;
+    const cloud = new Mesh(new ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelSize: .025, bevelThickness: .025, bevelSegments: 1, curveSegments: 15 }), [this.stage.material(color, 0, 'paper'), this.stage.material(0xa8b8bd, 0, 'paper')]);
+    cloud.castShadow = cloud.receiveShadow = true;
     return cloud;
   }
 
-  private cloudEngraving(width: number, height: number) {
+  private cloudEngraving(width: number, height: number, depth: number) {
     const group = new Group();
-    for (const scale of [.91, .76, .61]) {
+    for (const scale of [.86, .67]) {
       const w = width * scale, h = height * scale, path = new CurvePath<Vector3>();
       const points = [
         [-w / 2, 0], [-w * .48, h * .64], [-w * .31, h * .46],
         [-w * .28, h * 1.18], [-w * .08, h * .82],
         [w * .06, h * 1.36], [w * .2, h * .64], [w * .43, h * .94], [w / 2, 0],
-      ].map(([x, y]) => new Vector3(x, y + height * .03, .2));
+      ].map(([x, y]) => new Vector3(x, y + height * .03, depth + .04));
       for (let index = 0; index < 4; index++) path.add(new QuadraticBezierCurve3(points[index * 2], points[index * 2 + 1], points[index * 2 + 2]));
-      const stroke = new Mesh(new TubeGeometry(path, 40, .026, 3, false), this.stage.material(0x285680));
+      const stroke = new Mesh(new TubeGeometry(path, 40, .023, 4, false), this.stage.material(0x728eaa, 0, 'paper'));
       stroke.castShadow = false;
       group.add(stroke);
     }
@@ -152,22 +177,18 @@ export class SkyView {
   }
 
   private buildClouds() {
-    for (let index = 0; index < 16; index++) {
+    for (let index = 0; index < 12; index++) {
       const group = new Group(), side = index % 2 ? 1 : -1, distance = Math.floor(index / 2);
-      const width = 11.2 + distance * .65, height = 2.4 + distance * .23;
-      const back = this.cloudShape(width * 1.13, height * 1.18, INK.paper);
-      back.position.set(side * .65, -.55, -.5);
-      const cloud = this.cloudShape(width, height, INK.paper);
-      const lower = this.cloudShape(width * .94, height * .62, 0x45749b);
-      lower.position.set(-side * .15, -.48, .12);
-      group.add(back, cloud, lower);
-      if (distance < 5) group.add(this.cloudEngraving(width, height));
-      group.position.set(side * (11.4 + distance * .7), -2.1 - distance * .12 + index % 3 * .25, -distance * 16 - (side < 0 ? 3 : 11));
+      const width = 5.5 + distance * .8, height = 1.5 + distance * .14, depth = 1.05 + distance * .12;
+      group.add(this.cloudShape(width, height, INK.white, depth));
+      group.add(this.cloudEngraving(width, height, depth));
+      group.position.set(side * (8 + distance * .9), -1.25 - distance * .14, -distance * 20 - (side < 0 ? 6 : 14));
+      group.rotation.y = side * .13;
       group.rotation.z = side * (index % 3 - 1) * .055;
       this.stage.content.add(group);
       this.clouds.push({ group, z: group.position.z });
     }
-    const horizon = this.cloudShape(85, 6, INK.paper);
+    const horizon = this.cloudShape(85, 6, INK.paper, 1.5);
     horizon.position.set(0, -4, -114);
     this.stage.content.add(horizon);
   }
@@ -187,8 +208,8 @@ export class SkyView {
       shape.lineTo(-width * .5, height * .73);
       shape.closePath();
       const group = new Group();
-      const face = new Mesh(new ExtrudeGeometry(shape, { depth: 3.5, bevelEnabled: false }), [this.stage.material(INK.paper), this.stage.material(INK.black)]);
-      face.receiveShadow = true;
+      const face = new Mesh(new ExtrudeGeometry(shape, { depth: 3.5, bevelEnabled: true, bevelSize: .035, bevelThickness: .035, bevelSegments: 1 }), [this.stage.material(INK.paper, 0, 'paper'), this.stage.material(INK.black, 0, 'paper')]);
+      face.castShadow = face.receiveShadow = true;
       group.add(face);
       group.position.set(x, -3.5, z);
       group.rotation.y = side * -.2;
@@ -197,26 +218,10 @@ export class SkyView {
     });
   }
 
-  private buildLanes() {
-    for (const x of [-4.8, -1.6, 1.6, 4.8]) {
-      const rail = this.stage.box(Math.abs(x) > 4 ? .07 : .052, .018, 122, INK.paper, .003);
-      rail.position.set(x, -.3, -53);
-      rail.castShadow = false;
-      rail.receiveShadow = false;
-      this.stage.content.add(rail);
-      for (let index = 0; index < 13; index++) {
-        const mark = this.stage.box(.075, .025, 1.9, INK.paper, .003);
-        mark.position.set(x, -.26, -index * 9.6);
-        mark.castShadow = false;
-        this.stage.content.add(mark);
-        this.laneMarks.push({ mesh: mark, z: mark.position.z });
-      }
-    }
-  }
-
   private chapter(sector: number) {
     const chapter = (sector - 1) % 3, color = [0x164f88, 0x254367, 0x102d51][chapter];
     (this.stage.scene.background as Color).setHex(color);
+    this.sea.material = this.stage.material([0x244d70, 0x354f63, 0x173956][chapter], 0, 'paper');
     if (this.stage.scene.fog instanceof Fog) {
       this.stage.scene.fog.color.setHex(color);
       this.stage.scene.fog.near = 45;
@@ -228,7 +233,7 @@ export class SkyView {
       group.position.x = x;
       group.scale.set([1, .72, 1.12][chapter], [1, 1.32, .88][chapter], 1);
       group.rotation.y = Math.sign(x) * [-.2, .1, -.4][chapter];
-      face.material = [this.stage.material(chapter === 1 && index % 3 ? INK.yellow : INK.paper), this.stage.material(INK.black)];
+      face.material = [this.stage.material(chapter === 1 && index % 3 ? INK.yellow : INK.paper, 0, 'paper'), this.stage.material(INK.black, 0, 'paper')];
     });
     this.sector = sector;
   }
@@ -241,14 +246,11 @@ export class SkyView {
       this.lastShield = state.shield;
       this.mode = state.mode;
       this.shieldBreak = this.collectionTime = 0;
-      this.ship.position.y = state.mode === 'over' ? -.35 : 0;
-      this.ship.rotation.x = state.mode === 'over' ? .3 : 0;
+      this.boostBlend = state.boost > 0 ? 1 : 0;
+      this.ship.position.y = state.mode === 'over' ? -.35 : state.mode === 'won' ? .25 : 0;
+      this.ship.rotation.x = state.mode === 'over' ? .3 : state.mode === 'won' ? -.12 : .04;
       this.ship.scale.setScalar(1);
-      this.stage.tween(this.ship, { y: this.ship.position.y, rx: this.ship.rotation.x, scale: 1 }, 'entry');
-      if (!this.ready && state.mode === 'ready') {
-        this.ship.scale.setScalar(.92);
-        this.stage.tween(this.ship, { scale: 1 }, 'entry');
-      }
+      if (this.ready) this.stage.tween(this.ship, { y: this.ship.position.y, rx: this.ship.rotation.x, scale: 1 }, 'settle', 0);
       this.ready = true;
     }
     if (this.sector !== state.sector) this.chapter(state.sector);
@@ -256,19 +258,20 @@ export class SkyView {
       this.collectionTime = .24;
       this.collection.position.set(state.x, 1.22, ENCOUNTER_Z);
       this.collection.scale.setScalar(1);
-      this.stage.tween(this.collection, { scale: 1.25 }, 'score');
+      this.stage.tween(this.collection, { scale: 1.25 }, 'score', .24);
     }
     if (!fresh && state.shield < this.lastShield && !this.stage.reducedMotion) this.shieldBreak = .24;
     this.rings = state.rings;
     this.lastShield = state.shield;
     const visualDt = state.mode === 'paused' ? 0 : dt;
+    const boost = Number(state.boost > 0);
+    this.boostBlend = this.stage.reducedMotion ? boost : this.boostBlend + (boost - this.boostBlend) * (1 - Math.exp(-visualDt * 24));
     this.collectionTime = Math.max(0, this.collectionTime - visualDt);
     this.shieldBreak = Math.max(0, this.shieldBreak - visualDt);
     this.collection.visible = this.collectionTime > 0;
-    const travel = state.distance;
+    const travel = this.stage.reducedMotion ? 0 : state.distance;
     this.clouds.forEach(({ group, z }) => { group.position.z = ((z + travel * .19 + 130) % 130) - 130; });
     this.reliefs.forEach(({ group, z, index }) => { group.position.z = index === 0 ? z : ((z + travel * .12 + 120) % 128) - 120; });
-    this.laneMarks.forEach(({ mesh, z }) => { mesh.position.z = ((z + travel + 124.8) % 124.8) - 122.8; });
     state.rows.forEach((row, index) => {
       const view = this.rows[index];
       view.ring.position.set((row.safeLane - 1) * LANE_WIDTH, 1.22, ENCOUNTER_Z - row.distance);
@@ -279,10 +282,13 @@ export class SkyView {
       });
     });
     this.pose.position.set(state.x, 1.2, ENCOUNTER_Z);
-    this.pose.rotation.z = this.stage.reducedMotion ? 0 : -(state.lane - 1 - state.x / LANE_WIDTH) * .32;
-    this.wings.scale.x = state.boost > 0 ? .88 : 1;
-    this.flame.scale.z = state.boost > 0 ? 1.9 : 1;
-    this.tails.visible = state.boost > 0 && (state.mode === 'playing' || state.mode === 'paused') && !this.stage.reducedMotion;
+    const bank = this.stage.reducedMotion ? 0 : Math.max(-1, Math.min(1, state.lane - 1 - state.x / LANE_WIDTH));
+    this.pose.rotation.z = -bank * .4;
+    this.pose.rotation.y = -bank * .1;
+    this.wings.forEach((wing, index) => { wing.rotation.z = (index ? 1 : -1) * (.035 + this.boostBlend * .07); });
+    this.flame.scale.z = 1 + this.boostBlend * .9;
+    this.tails.scale.z = .15 + this.boostBlend * .85;
+    this.tails.visible = this.boostBlend > .01 && (state.mode === 'playing' || state.mode === 'paused') && !this.stage.reducedMotion;
     this.shield.visible = state.shield > 0 || this.shieldBreak > 0;
     this.shieldPieces.forEach((piece, index) => {
       const distance = this.shieldBreak > 0 ? (1 - this.shieldBreak / .24) * .55 : 0, angle = index * Math.PI / 4;
@@ -291,9 +297,9 @@ export class SkyView {
     });
     if (this.mode !== state.mode) {
       this.mode = state.mode;
-      if (state.mode === 'over') this.stage.tween(this.ship, { y: -.35, rx: .3 }, 'failure');
-      if (state.mode === 'won') this.stage.tween(this.ship, { y: .25, rx: -.12 }, 'score');
-      if (state.mode === 'playing') this.stage.tween(this.ship, { y: 0, rx: 0 }, 'settle');
+      if (state.mode === 'over') this.stage.tween(this.ship, { y: -.35, rx: .3 }, 'failure', .24);
+      if (state.mode === 'won') this.stage.tween(this.ship, { y: .25, rx: -.12 }, 'score', .24);
+      if (state.mode === 'playing') this.stage.tween(this.ship, { y: 0, rx: .04 }, 'settle', .23);
     }
   }
 }
