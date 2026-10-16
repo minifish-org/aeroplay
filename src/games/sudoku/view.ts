@@ -87,11 +87,11 @@ export function createSudokuView(stage: Stage, model: SudokuModel) {
   completion.visible = model.mode === 'won';
   stage.content.add(completion);
   let won = model.mode === 'won', initialized = false, selected: number | null = null, selectAge = 1;
-  let fromX = 0, fromY = 0, epoch = model.epoch, puzzle = model.puzzleIndex;
+  let fromX = 0, fromY = 0, epoch = model.epoch, puzzle = model.number;
 
   return {
     draw(dt = 0) {
-      const reset = initialized && epoch !== model.epoch && (puzzle !== model.puzzleIndex || model.selected === null);
+      const reset = initialized && epoch !== model.epoch && (puzzle !== model.number || model.selected === null);
       const instant = stage.reducedMotion || !initialized || reset;
       if (selected !== model.selected) {
         const hadSelection = selected !== null;
@@ -180,7 +180,7 @@ export function createSudokuView(stage: Stage, model: SudokuModel) {
       won = completion.visible;
       initialized = true;
       epoch = model.epoch;
-      puzzle = model.puzzleIndex;
+      puzzle = model.number;
     },
     active: () => selectAge < .12 || cells.some(cell => cell.colorAge < .12 || cell.printAge < (cell.erasing ? .08 : .14) || cell.noteAge < .12),
     inspect: () => ({ selectAge, printing: cells.filter(cell => cell.printAge < .14).length })

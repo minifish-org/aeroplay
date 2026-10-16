@@ -9,10 +9,10 @@ export function createSudokuHUD(hud: HUD, model: SudokuModel, human: (input: unk
   const bank = hud.bank('digits', 190);
   const digits = Array.from({ length: 9 }, (_, index) => hud.button('digit-' + (index + 1), String(index + 1), 'notes', () => human({ type: 'value', value: index + 1 }), bank));
   digits.push(hud.button('erase', 'Erase', 'erase', () => human({ type: 'value', value: 0 }), bank));
-  hud.intro('sudoku', 'Choose a cell, then a digit. Notes pencil in possibilities; Hint reveals one cell.');
+  hud.intro('sudoku', 'Choose a cell, then a digit. Notes pencil in possibilities; Hint reveals one cell. Solving a puzzle generates the next, harder one.');
   return () => {
     const stats = model.summary();
-    hud.stats({ Puzzle: `${stats.puzzle}/${stats.total}`, Time: time(stats.elapsedSeconds) });
+    hud.stats({ Puzzle: stats.number + ' · ' + stats.difficulty, Time: time(stats.elapsedSeconds) });
     notes.setAttribute('aria-pressed', String(model.noteMode));
     notes.disabled = !personal() || model.mode !== 'playing';
     undo.disabled = !personal() || !stats.undoCount || model.mode === 'won';
@@ -21,7 +21,7 @@ export function createSudokuHUD(hud: HUD, model: SudokuModel, human: (input: unk
     hud.label(hint, 'Hint · ' + model.hints);
     digits.forEach(button => { button.disabled = !personal() || model.mode !== 'playing' || model.selected === null || model.givens.includes(model.selected); });
     if (model.mode === 'won')
-      hud.panel('Puzzle solved', `${time(stats.elapsedSeconds)} · ${model.mistakes} mistakes${model.bestSeconds !== null ? ' · Best ' + time(model.bestSeconds) : ''}`, personal() ? [{ label: stats.puzzle === stats.total ? 'Play again' : 'Next puzzle', symbol: 'next', press: () => utility('next') }] : []);
+      hud.panel('Puzzle solved', `${time(stats.elapsedSeconds)} · ${model.mistakes} mistakes${model.bestSeconds !== null ? ' · Best ' + time(model.bestSeconds) : ''}`, personal() ? [{ label: 'Next puzzle', symbol: 'next', press: () => utility('next') }] : []);
     else if (model.mode === 'paused')
       hud.panel('Paused', '', personal() ? [{ label: 'Resume', press: () => utility('resume') }] : []);
     else

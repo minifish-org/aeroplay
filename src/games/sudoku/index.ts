@@ -6,7 +6,28 @@ export default function mount(context: GameContext) {
   const { stage, hud, store, player } = context;
   const model = createSudokuModel(store.load('state-v2', null), store.load<number | null>('bestSeconds', null));
   const view = createSudokuView(stage, model);
-  let saved = '', best = model.bestSeconds;
+  let saved = '', best = model.bestSeconds, autoNext = 0, lastMode = model.mode;
+  // A puzzle solved in this session hands the next generated one over by itself.
+  const autoAdvance = () => {
+    const mode = model.mode;
+    if (mode !== 'won') {
+      if (autoNext)
+        window.clearTimeout(autoNext), autoNext = 0;
+      lastMode = mode;
+      return;
+    }
+    if (lastMode === 'won' || autoNext || player.type !== 'human' || hud.helpOpen)
+      return;
+    lastMode = mode;
+    autoNext = window.setTimeout(() => {
+      autoNext = 0;
+      if (model.mode !== 'won' || player.type !== 'human' || hud.helpOpen)
+        return;
+      model.next();
+      persist();
+      hud.onChange();
+    }, 2600);
+  };
   const persist = () => { const state = model.saved(), key = JSON.stringify(state); if (key !== saved) {
     store.save('state-v2', state);
     saved = key;
@@ -46,6 +67,6 @@ export default function mount(context: GameContext) {
     hud.selection(`Row ${Math.floor(index / 9) + 1}, column ${index % 9 + 1}. ${value ? 'Digit ' + value : 'Empty'}. ${model.givens.includes(index) ? 'Given; cannot edit' : 'Editable'}.${notes.length ? ' Pencil notes ' + notes.join(', ') + '.' : ''}${model.invalid(index) ? ' Incorrect digit.' : ''}`);
   };
   stage.renderer.domElement.setAttribute('aria-describedby', 'game-selection');
-  const dispose = mountRun(context, { model, timer: true, render: dt => view.draw(dt), active: view.active, inspect: () => ({ visual: view.inspect() }), refresh: () => { updateHUD(); selection(); persist(); }, persist, keys });
-  return () => { dispose(); stage.renderer.domElement.removeAttribute('aria-describedby'); };
+  const dispose = mountRun(context, { model, timer: true, render: dt => view.draw(dt), active: view.active, inspect: () => ({ visual: view.inspect() }), refresh: () => { updateHUD(); selection(); persist(); autoAdvance(); }, persist, keys });
+  return () => { window.clearTimeout(autoNext); dispose(); stage.renderer.domElement.removeAttribute('aria-describedby'); };
 }
