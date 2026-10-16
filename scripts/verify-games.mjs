@@ -52,6 +52,41 @@ for (const number of [1, 2, 3, 4, 6, 10, 16, 24]) {
   previousGivens = level.givens;
 }
 assert(previousGivens <= 33, 'Later puzzles drop to a sharp given count');
+// Lights Out grows its board and its minimum tap count instead of capping both.
+let previousBoard = 0, previousTaps = 0;
+for (const level of [1, 4, 5, 8, 9, 14, 15, 24, 42]) {
+  const puzzle = m.glightsout.lightsPuzzle(level), size = m.glightsout.lightsBoardSize(level), target = m.glightsout.lightsParTarget(level);
+  assert.equal(puzzle.size, size, `Puzzle ${level}: the board grows with the puzzle number`);
+  assert.equal(puzzle.board.length, size * size);
+  assert(!m.glightsout.isSolved(puzzle.board), `Puzzle ${level}: the generated puzzle starts lit`);
+  const solution = m.glightsout.solveLights(puzzle.board, puzzle.size);
+  assert.equal(solution.length, puzzle.par, `Puzzle ${level}: par is the minimum tap count`);
+  assert(puzzle.par >= target || size === 5, `Puzzle ${level}: a unique solution always meets the par target`);
+  assert(puzzle.par >= previousTaps && size >= previousBoard, `Puzzle ${level}: difficulty never eases off`);
+  previousBoard = size;
+  previousTaps = puzzle.par;
+  const board = [...puzzle.board];
+  for (const tap of solution) m.glightsout.applyToggle(board, tap % size, Math.floor(tap / size), size);
+  assert(m.glightsout.isSolved(board), `Puzzle ${level}: the minimum solution clears the board`);
+}
+{
+  // Playing six puzzles in a row must walk sizes 5, 5, 5, 5, 6, 6 with no cap anywhere.
+  const model = m.glightsout.createLightsOutModel(null, () => .25), seen = [];
+  for (let puzzle = 0;puzzle < 6;puzzle++) {
+    seen.push(model.size);
+    const target = m.glightsout.lightsParTarget(model.level);
+    if (model.size > 5)
+      assert.equal(model.summary().par, target, `Puzzle ${model.level}: a unique solution matches the par target exactly`);
+    else
+      assert(model.summary().par >= 3, `Puzzle ${model.level}: the smallest board keeps a real minimum`);
+    for (const tap of m.glightsout.solveLights(model.board, model.size)) assert(model.act(tap));
+    assert.equal(model.mode, 'won');
+    assert(model.next());
+  }
+  assert.deepEqual(seen, [5, 5, 5, 5, 6, 6], 'The board grows after the fourth puzzle');
+  assert.equal(model.level, 7);
+  assert(model.par > 5, 'Later puzzles ask for more minimum taps');
+}
 let seed = 314; const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
 const flight = m.gsky.createFlight(random); flight.mode = 'playing';
 let sectorEvents = 0, firstSector = null;
@@ -214,10 +249,13 @@ try {
 
   await h.open('lightsout');
   const lights = await state();
+  assert.equal(lights.size, 5, 'The first puzzle keeps the smallest board');
+  assert(lights.par >= 3, 'The first puzzle already asks for three minimum taps');
+  assert((await page.locator('.hud-stats').innerText()).includes('5×5'), 'The stage HUD reports the growing board');
   await h.pick(12);
   assert.equal((await state()).moves, 1);
   const expected = [...lights.board];
-  m.glightsout.applyToggle(expected, 2, 2);
+  m.glightsout.applyToggle(expected, 2, 2, lights.size);
   assert.deepEqual((await state()).board, expected);
   await page.reload();
   await page.waitForFunction(() => window.render_game_to_text);
@@ -240,6 +278,7 @@ try {
   await page.reload(); await page.waitForFunction(() => window.render_game_to_text);
   await button('Next puzzle').click();
   assert.equal((await state()).level, lights.level + 1);
+  assert.equal((await state()).size, 5, 'Puzzle two still fits the smallest board');
   await button('Pause').click(); assert.equal((await state()).mode, 'paused', 'Next puzzle restores contextual Pause after loading a completed run');
   await button('Resume').click(); assert.equal((await state()).mode, 'playing');
   await h.pick(0);

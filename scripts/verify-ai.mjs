@@ -30,7 +30,7 @@ function fixture(ai = true, planned = false) {
   const replies = [], calls = [], state = { revision: 0, value: 0, paused: false, finished: false, pauses: 0 };
   const controller = ai ? { type: 'ai', choose: (observation, signal) => new Promise((resolve, reject) => replies.push({ observation, signal, resolve, reject })) } : new HumanPlayer();
   const player = new Player(controller), port = player.connect({
-    game: 'fixture', planning: planned ? () => ({ game: 'lightsout', epoch: 'fixture', board: [state.value] }) : undefined,
+    game: 'fixture', planning: planned ? () => ({ game: 'lightsout', epoch: 'fixture', board: [state.value], size: 5 }) : undefined,
     observe: () => ({ key: String(state.revision), context: 'Visible value', question: 'Choose a control', choices: { go: 'Increase' }, inputs: { go: { amount: 1 } } }), isCurrent: key => key === String(state.revision),
     apply: input => {
       if (state.paused || state.finished) return false;
@@ -121,7 +121,7 @@ function fixture(ai = true, planned = false) {
     f.player.dispose();
     env.document.hidden = false;
   }
-  const expected = value => planningSignature({ game: 'lightsout', epoch: 'fixture', board: [value] });
+  const expected = value => planningSignature({ game: 'lightsout', epoch: 'fixture', board: [value], size: 5 });
   const paced = fixture(true, true);
   paced.replies[0].resolve({ label: 'Two ordinary controls', steps: [{ input: { amount: 1 }, expected: expected(0) }, { input: { amount: 1 }, expected: expected(1) }] });
   await flush();
@@ -227,7 +227,7 @@ for (const [game, create, input] of builders) {
 }
 assert.equal(timers.size, 0); assert.equal(listeners.size, 0);
 const planner = await import(`data:text/javascript;base64,${Buffer.from(await bundle("export * from './src/ai/planner.worker.ts';")).toString('base64')}`);
-const lights = Array(25).fill(0); m.glightsout.applyToggle(lights, 0, 0); m.glightsout.applyToggle(lights, 2, 2);
+const lights = Array(25).fill(0); m.glightsout.applyToggle(lights, 0, 0, 5); m.glightsout.applyToggle(lights, 2, 2, 5);
 const cargo = m.gcargo.parseCargo(m.gcargo.cargoLevel(1).map), sudoku = [...m.gsudoku.sudokuPuzzle(1).puzzle].map(Number), match = m.gmatch3.createMatchBoard();
 const humanHint={game:'cargo',epoch:'hint',board:cargo,state:cargo.initial};
 const generatedHints=planner.createHintPlans(humanHint);
@@ -240,7 +240,7 @@ const trappedHint={...humanHint,state:{player:cargo.initial.player,crates:[cargo
 const untouchedHint=structuredClone(trappedHint);assert.deepEqual(planner.createHintPlans(trappedHint),[],'A trapped human crate yields no fabricated AI fallback hint');assert.deepEqual(trappedHint,untouchedHint);
 const fixtures = [
   { game: 'flappy', epoch: '0', time: 0, y: 220, velocity: -100, pipes: [{ x: 300, gapY: 155, gap: 145, scored: false }], passed: 0 },
-  { game: 'cargo', epoch: '1', board: cargo, state: cargo.initial }, { game: 'lightsout', epoch: '1', board: lights },
+  { game: 'cargo', epoch: '1', board: cargo, state: cargo.initial }, { game: 'lightsout', epoch: '1', board: lights, size: 5 },
   { game: 'sudoku', epoch: '1', board: sudoku, givens: sudoku.flatMap((v, i) => v ? [i] : []), selected: null, notes: true },
   { game: '2048', epoch: '1', board: [[2, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]] },
   { game: 'match3', epoch: '1', board: match, selected: null }, { game: 'sky', epoch: '1', row: 0, lane: 0, target: 2, obstacles: [0, 1] },
@@ -261,7 +261,7 @@ for (const original of fixtures) {
       assert(move);
       state.state = move.state;
     }
-    if (state.game === 'lightsout') m.glightsout.applyToggle(state.board, input.input % 5, Math.floor(input.input / 5));
+    if (state.game === 'lightsout') m.glightsout.applyToggle(state.board, input.input % state.size, Math.floor(input.input / state.size), state.size);
     if (state.game === 'sudoku') {
       if (input.input.type === 'notes') state.notes = !state.notes;
       if (input.input.type === 'select') state.selected = input.input.index;

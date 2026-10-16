@@ -58,7 +58,7 @@ await check('Reduced motion settles only requested channels without a queue', ()
 
 const m = await models();
 const lights = m.glightsout.createLightsOutModel(null, () => .25);
-for (const cell of m.glightsout.solveLights(lights.board)) assert(lights.act(cell));
+for (const cell of m.glightsout.solveLights(lights.board, lights.size)) assert(lights.act(cell));
 assert.equal(lights.mode, 'won', 'Lights fixture is a genuinely completed puzzle');
 const sudoku = m.gsudoku.createSudokuModel();
 sudoku.elapsedSeconds = 123;
