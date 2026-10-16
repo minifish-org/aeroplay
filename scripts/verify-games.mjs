@@ -54,13 +54,23 @@ for (const number of [1, 2, 3, 4, 6, 10, 16, 24]) {
 assert(previousGivens <= 33, 'Later puzzles drop to a sharp given count');
 let seed = 314; const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
 const flight = m.gsky.createFlight(random); flight.mode = 'playing';
-for (let i = 0;i < 5000 && flight.mode === 'playing';i++) {
+let sectorEvents = 0, firstSector = null;
+for (let i = 0;i < 60000 && flight.mode === 'playing' && flight.sector < 4;i++) {
   const row = flight.rows.filter(r => !r.passed).sort((a, b) => a.distance - b.distance)[0];
   if (flight.lane !== row.safeLane) m.gsky.steerFlight(flight, Math.sign(row.safeLane - flight.lane));
   if (flight.charge === 100) m.gsky.boostFlight(flight);
-  m.gsky.stepFlight(flight, 1 / 60, random);
+  const events = m.gsky.stepFlight(flight, 1 / 60, random);
+  if (events.includes('sector')) {
+    sectorEvents++;
+    firstSector ??= { rings: flight.rings, combo: flight.combo, score: flight.score, shield: flight.shield };
+  }
 }
-assert.equal(flight.mode, 'won'); assert(flight.rings >= 40 && flight.combo >= 40 && flight.score > 10000); assert.equal(flight.shield, 1);
+assert.equal(flight.mode, 'playing', 'Sky never settles: the flight keeps running past every sector mark');
+assert.equal(flight.sector, 4, 'Three sector marks opened three faster sectors without a settlement');
+assert.equal(sectorEvents, 3);
+assert(flight.distance < m.gsky.SECTOR_LENGTH, 'The sector meter wraps at its own mark');
+assert(flight.total >= 3 * m.gsky.SECTOR_LENGTH, 'The flown total keeps counting across sectors');
+assert(firstSector.rings >= 40 && firstSector.combo >= 40 && firstSector.score > 10000 && firstSector.shield === 1, 'A boosted autopilot still clears a full sector untouched');
 const death = m.gsky.createFlight(() => 0); death.mode = 'playing'; death.shield = 0; death.rows[0].distance = .01; death.rows[0].obstacles = [1]; m.gsky.stepFlight(death, 1 / 60, () => 0); assert.equal(death.mode, 'over');
 const p = m.gpushball, idle = p.idleAction;
 const playing = () => {
@@ -157,7 +167,7 @@ for (const side of [0, 1]) for (const sx of [-1, 1]) for (const sy of [-1, 1]) f
   assert.notEqual(s.robots[0].x, 99);
   assert.notEqual(s.score[0], 99);
 }
-console.log('PASS pure rules: generated Cargo islands inside the hint budget, generated unique singles-solvable Sudoku puzzles, full boosted Sky sector and Pushball physics/scoring/corners');
+console.log('PASS pure rules: generated Cargo islands inside the hint budget, generated unique singles-solvable Sudoku puzzles, endless boosted Sky sectors and Pushball physics/scoring/corners');
 
 const browser = await launch();
 try {
@@ -438,19 +448,20 @@ try {
       assert.equal(restoredMessage, ''); assert.equal(restoredMessageTime, 0, 'Transient boost feedback expires on re-entry');
       await button('Resume').click();
     }
-  }, s => s.mode !== 'playing', 1500, 'Sky full sector');
+  }, s => s.sector >= 2, 1500, 'Sky full sector');
   s = await state();
-  assert.equal(s.mode, 'won');
+  assert.equal(s.mode, 'playing', 'Crossing the sector mark never settles the flight');
+  assert.equal(s.sector, 2);
+  assert(s.distance < 1000, 'The sector meter restarts at every mark');
+  assert(s.total >= 1000, 'The flown total keeps counting');
   assert(s.rings >= 40 && s.score > 5000);
   await h.shot('sky-result');
-  await button('Next sector').click();
-  assert.equal((await state()).sector, 2);
-  assert.equal((await state()).score, s.score);
-  await advance(35000);
+  await advance(40000);
   assert.equal((await state()).mode, 'over');
   await button('Fly again').click();
   assert.equal((await state()).score, 0);
   assert.equal((await state()).mode, 'playing');
+  assert.equal((await state()).total, 0, 'A fresh flight restarts the flown total');
   await h.action('sound').click();
   assert.equal(await h.action('sound').getAttribute('aria-pressed'), 'true');
   await h.open('cargo');
@@ -459,7 +470,7 @@ try {
   assert.equal(await page.evaluate(() => typeof window.render_game_to_text), 'undefined');
   h.clean();
   await ctx.close();
-  console.log('PASS Sky boost, pause, full sector, next sector, collision/retry and shared sound persistence');
+  console.log('PASS Sky boost, endless sector marks, pause, collision/retry, flown total and shared sound persistence');
 
   const live = await context(browser, { audit: true }), ph = await harness(live);
   await ph.open('pushball');
