@@ -103,7 +103,7 @@ const server = createServer(async (request, response) => {
     response.setHeader('Content-Type', mime['.' + file.split('.').at(-1)] ?? 'application/octet-stream');
     if (pathname === '/service-worker.js') response.setHeader('Cache-Control', 'no-store');
     if (pathname.startsWith('/assets/previews/')) {
-      response.setHeader('Cache-Control', 'public, max-age=14400');
+      response.setHeader('Cache-Control', 'public, max-age=14400, must-revalidate');
       previewRequests.push({ path: pathname, bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), requestCacheControl: request.headers['cache-control'] ?? null });
     }
     response.end(bytes);
