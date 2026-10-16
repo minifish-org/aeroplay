@@ -10,14 +10,15 @@ export function mountHub(root: HTMLElement) {
   function record(id: string) {
     const store = namespace(id === '2048' ? 'game2048' : id);
     if (id === 'cargo')
-      return Object.keys(store.load<Record<string, number>>('stars', {})).length + '/12 delivered';
+      return Object.keys(store.load<Record<string, number>>('stars', {})).length + ' islands delivered';
     if (id === 'pushball')
       return store.load('wins', 0) + ' wins';
     if (id === 'lightsout')
       return 'Puzzle ' + store.load('state-v2', { level: 1 }).level;
     if (id === 'sudoku') {
       const best = store.load<number | null>('bestSeconds', null);
-      return best === null ? 'No record yet' : Math.floor(best / 60) + ':' + String(Math.floor(best % 60)).padStart(2, '0') + ' best';
+      const puzzle = store.load<{ number?: number }>('state-v2', {}).number ?? 1;
+      return (best === null ? 'No record yet' : Math.floor(best / 60) + ':' + String(Math.floor(best % 60)).padStart(2, '0') + ' best') + ' · #' + puzzle;
     }
     const best = store.load<number>('best', 0);
     return best ? 'Best ' + best.toLocaleString() : 'No record yet';

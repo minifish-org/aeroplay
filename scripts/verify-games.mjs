@@ -3,11 +3,20 @@ import { assert, games, launch, context, harness, mechanics, until, models, bund
 const m = await models();
 const planner = await import(`data:text/javascript;base64,${Buffer.from(await bundle("export * from './src/ai/planner.worker.ts';")).toString('base64')}`);
 const solutions = [];
-assert.equal(m.gcargo.CARGO_LEVELS.length, 12);
-for (const level of m.gcargo.CARGO_LEVELS) {
-  const board = m.gcargo.parseCargo(level.map), answer = planner.solveCargo(board, board.initial);
-  assert(answer, `${level.name}: solvable`);
-  assert.equal(answer.pushes, level.par);
+// Cargo ships generated islands: every one must be deliverable inside the hint's own budget.
+let previousCrates = 0, previousPar = 0;
+for (let island = 1;island <= 12;island++) {
+  const level = m.gcargo.cargoLevel(island);
+  assert.equal(level.number, island);
+  assert.deepEqual(m.gcargo.cargoLevel(island).map, level.map, `Island ${island}: generation is deterministic for its number`);
+  assert(level.map.every(row => row.length === level.map[0].length && row.startsWith('#') && row.endsWith('#')), `Island ${island}: rectangular walled map`);
+  assert.equal(level.crates, level.map.join('').split('').filter(cell => cell === '$' || cell === '*').length);
+  assert(level.crates >= previousCrates, `Island ${island}: crate count never drops below the previous island`);
+  previousCrates = level.crates;
+  assert(level.par >= 2, `Island ${island}: par is a real delivery`);
+  const board = m.gcargo.parseCargo(level.map), answer = planner.solveCargo(board, board.initial, 20000);
+  assert(answer, `Island ${island}: solvable inside the hint budget`);
+  assert.equal(answer.pushes, level.par, `Island ${island}: par is the minimum push count`);
   let state = board.initial, pushes = 0;
   for (const direction of answer.moves) {
     const result = m.gcargo.moveCargo(board, state, direction);
@@ -18,19 +27,31 @@ for (const level of m.gcargo.CARGO_LEVELS) {
   assert(m.gcargo.cargoSolved(board, state));
   assert.equal(pushes, level.par);
   solutions.push(answer.moves);
+  previousPar = level.par;
 }
-assert.equal(m.gsudoku.PUZZLES.length, 3);
-for (const { puzzle, solution } of m.gsudoku.PUZZLES) {
-  assert.equal(puzzle.length, 81);
-  assert.equal(solution.length, 81);
-  for (let i = 0;i < 81;i++)assert(puzzle[i] === '0' || puzzle[i] === solution[i]);
+assert(previousPar >= 6, 'Later islands are real deliveries, not a crate beside its dock');
+// Sudoku ships generated puzzles: unique, singles-solvable and inside the planner's budget.
+let previousGivens = 82;
+for (const number of [1, 2, 3, 4, 6, 10, 16, 24]) {
+  const level = m.gsudoku.sudokuPuzzle(number);
+  assert.deepEqual(m.gsudoku.sudokuPuzzle(number).puzzle, level.puzzle, `Puzzle ${number}: generation is deterministic for its number`);
+  assert.equal(level.puzzle.length, 81);
+  assert.equal(level.solution.length, 81);
+  const puzzle = [...level.puzzle].map(Number), solution = [...level.solution].map(Number);
+  for (let i = 0;i < 81;i++)assert(puzzle[i] === 0 || puzzle[i] === solution[i], `Puzzle ${number}: givens match the solution`);
   for (let row = 0;row < 9;row++) {
     assert.equal(new Set(solution.slice(row * 9, row * 9 + 9)).size, 9);
     assert.equal(new Set(Array.from({ length: 9 }, (_, y) => solution[y * 9 + row])).size, 9);
   }
   for (let y = 0;y < 9;y += 3)for (let x = 0;x < 9;x += 3)assert.equal(new Set(Array.from({ length: 9 }, (_, i) => solution[(y + Math.floor(i / 3)) * 9 + x + i % 3])).size, 9);
-  assert.deepEqual(m.gsudoku.solveVisibleSudoku([...puzzle].map(Number)), [...solution].map(Number));
+  assert.equal(level.givens, puzzle.filter(Boolean).length);
+  assert.equal(m.gsudoku.countSudokuSolutions(puzzle, 2), 1, `Puzzle ${number}: exactly one completion`);
+  assert(m.gsudoku.solveSudokuSingles(puzzle), `Puzzle ${number}: naked and hidden singles finish it`);
+  assert.deepEqual(m.gsudoku.solveVisibleSudoku(puzzle, 50000), solution, `Puzzle ${number}: the planner's search finds the same completion`);
+  assert(level.givens <= previousGivens, `Puzzle ${number}: difficulty never eases off`);
+  previousGivens = level.givens;
 }
+assert(previousGivens <= 33, 'Later puzzles drop to a sharp given count');
 let seed = 314; const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
 const flight = m.gsky.createFlight(random); flight.mode = 'playing';
 for (let i = 0;i < 5000 && flight.mode === 'playing';i++) {
@@ -136,7 +157,7 @@ for (const side of [0, 1]) for (const sx of [-1, 1]) for (const sy of [-1, 1]) f
   assert.notEqual(s.robots[0].x, 99);
   assert.notEqual(s.score[0], 99);
 }
-console.log('PASS pure rules: 12 minimum-push Cargo solutions, 3 valid Sudoku puzzles, full boosted Sky sector and Pushball physics/scoring/corners');
+console.log('PASS pure rules: generated Cargo islands inside the hint budget, generated unique singles-solvable Sudoku puzzles, full boosted Sky sector and Pushball physics/scoring/corners');
 
 const browser = await launch();
 try {
@@ -252,37 +273,43 @@ try {
   console.log('PASS Flappy tap, six gates, score, pause, actual collision, retry and best save');
 
   await h.open('sudoku');
-  await h.pick({ type: 'select', index: 2 });
+  const opened = await state();
+  assert.equal(opened.number, 1, 'Sudoku starts on a freshly generated puzzle');
+  const generated = m.gsudoku.sudokuPuzzle(opened.number).solution;
+  assert(opened.board.every((value, index) => value === 0 || value === Number(generated[index])), 'The generated puzzle matches its own solution');
+  const cell = opened.board.findIndex((value, index) => !value && !opened.givens.includes(index) && generated[index] !== '1');
+  assert(cell >= 0, 'The generated puzzle offers an editable empty cell');
+  await h.pick({ type: 'select', index: cell });
   await h.action('notes').click();
   await button('2').click();
-  assert.deepEqual((await state()).notes[2], [2]);
-  assert.equal((await state()).board[2], 0);
+  assert.deepEqual((await state()).notes[cell], [2]);
+  assert.equal((await state()).board[cell], 0);
   await h.action('notes').click();
   await button('1').click();
   assert.equal((await state()).mistakes, 1);
   await page.reload();
   await page.waitForFunction(() => window.render_game_to_text);
   assert.equal((await state()).mistakes, 1, 'Sudoku persists the mistake before Undo');
+  assert.equal((await state()).number, 1, 'Sudoku regenerates the same puzzle from its number');
   await button('Undo').click();
-  assert.equal((await state()).board[2], 0);
-  assert.deepEqual((await state()).notes[2], [2]);
+  assert.equal((await state()).board[cell], 0);
+  assert.deepEqual((await state()).notes[cell], [2]);
   assert.equal((await state()).mistakes, 1, 'Undo restores the cell while retaining the mistake penalty');
   assert.equal((await state()).hints, 3);
   await h.action('hint').click();
-  assert.equal((await state()).board[2], 4);
+  assert.equal((await state()).board[cell], Number(generated[cell]));
   assert.equal((await state()).hints, 2);
   await button('Erase').click();
-  assert.equal((await state()).board[2], 0);
+  assert.equal((await state()).board[cell], 0);
   await button('Undo').click();
-  assert.equal((await state()).board[2], 4);
+  assert.equal((await state()).board[cell], Number(generated[cell]));
   await page.reload();
   await page.waitForFunction(() => window.render_game_to_text);
-  assert.equal((await state()).board[2], 4);
+  assert.equal((await state()).board[cell], Number(generated[cell]));
   assert.equal((await state()).hints, 2);
-  const solution = m.gsudoku.PUZZLES[(await state()).puzzleIndex].solution;
-  for (let i = 0;i < 81;i++)if ((await state()).board[i] !== Number(solution[i])) {
+  for (let i = 0;i < 81;i++)if ((await state()).board[i] !== Number(generated[i])) {
     await h.pick({ type: 'select', index: i });
-    await button(solution[i]).click();
+    await button(generated[i]).click();
     await advance(400);
   }
   assert.equal((await state()).mode, 'won');
@@ -290,10 +317,14 @@ try {
   await advance(3000);
   assert.equal((await state()).elapsedSeconds, time);
   await h.shot('sudoku-result');
-  await button('Next puzzle').click();
-  assert.equal((await state()).puzzleIndex, 1);
+  await h.page.waitForTimeout(3400);
+  assert.equal((await state()).number, 2, 'Sudoku generates and opens the next puzzle by itself');
+  assert.equal((await state()).mode, 'playing');
   assert.equal((await state()).hints, 3);
-  console.log('PASS Sudoku notes, mistakes, undo, hints, erase, old save/reload, full solve, frozen timer and next');
+  assert.notEqual((await state()).board.join(''), opened.board.join(''));
+  assert(m.gsudoku.sudokuPuzzle(2).givens <= m.gsudoku.sudokuPuzzle(1).givens, 'The next puzzle is at least as hard');
+  assert((await page.locator('.hud-stats').innerText()).includes('2 ·'), 'The stage HUD reports the generated puzzle number and difficulty');
+  console.log('PASS Sudoku notes, mistakes, undo, hints, erase, generated save/reload, full solve, frozen timer and automatic next puzzle');
 
   await h.open('match3');
   let s = await state(), invalid;
@@ -313,65 +344,77 @@ try {
     assert.equal(hinted.length, 2);
     assert.equal(Math.abs(hinted[0].x - hinted[1].x) + Math.abs(hinted[0].y - hinted[1].y), 1);
     for (const point of hinted) await h.pick(point);
-    assert.equal((await state()).moves, before.moves - 1);
-    await until(state, () => advance(400), s => !['clearing', 'falling'].includes(s.mode), 100, 'Match cascades settle');
+    assert.equal((await state()).moves, before.moves + 1, 'Unlimited moves only ever count up');
+    await until(state, () => advance(1200), s => !['clearing', 'falling'].includes(s.mode), 40, 'Match cascades settle');
     assert((await state()).score > before.score);
+    assert(['playing', 'won'].includes((await state()).mode), 'A level never falls into a failed settlement');
     if (i === 2) await h.shot('match3-cascades');
-  }, s => ['won', 'over'].includes(s.mode), 30, 'Match full played round');
+  }, s => s.mode === 'won', 60, 'Match full played round');
   await h.shot('match3-result');
   s = await state();
-  if (s.mode === 'won') {
-    await h.action('restart').click();
-    assert.equal((await state()).level, s.level + 1);
-  } else {
-    await h.action('restart').click();
-    assert.equal((await state()).moves, 30);
-  }
+  assert.equal(s.mode, 'won', 'Only the score target clears a level');
+  await h.action('restart').click();
+  assert.equal((await state()).level, s.level + 1, 'The next level takes over with a higher target');
+  assert.equal((await state()).moves, 0, 'The next level starts from a fresh move count');
+  assert((await state()).target > s.target);
   s = await state();
   await page.reload();
   await page.waitForFunction(() => window.render_game_to_text);
   assert.deepEqual((await state()).grid, s.grid);
-  console.log('PASS Match valid/invalid native swaps, hints, move costs, cascades, full settlement, progression and save');
+  console.log('PASS Match valid/invalid native swaps, hints, counted-but-unlimited moves, cascades, full settlement, endless progression and save');
 
   await h.open('cargo');
   const cargoBeforeMove = await state();
-  await button('Right').click();
-  await advance(400);
-  assert.equal((await state()).pushes, 1);
+  assert.equal(cargoBeforeMove.level, 1, 'Cargo starts on a freshly generated island');
+  assert(cargoBeforeMove.par >= 2 && cargoBeforeMove.crates >= 1);
+  const island = await state();
+  const board = m.gcargo.parseCargo(island.map);
+  const route = planner.solveCargo(board, { player: island.state.player, crates: island.state.crates }, 20000);
+  assert(route, 'Island 1 has a deliverable route');
+  assert.equal(route.pushes, island.par, 'The island par is the minimum push count');
+  let walked = 0;
+  for (const direction of route.moves) {
+    await button(direction[0].toUpperCase() + direction.slice(1)).click();
+    await advance(300);
+    walked++;
+    if ((await state()).pushes)
+      break;
+  }
+  assert.equal((await state()).pushes, 1, 'Walking to the first crate and pushing it is native input');
+  assert.equal((await state()).moves, walked);
   await page.reload();
   await page.waitForFunction(() => window.render_game_to_text);
   assert.equal((await state()).pushes, 1, 'Cargo persists the native push before Undo');
+  assert.equal((await state()).moves, walked, 'Cargo persists every native step');
+  assert.deepEqual((await state()).map, island.map, 'Cargo regenerates the same island map from its number');
   await button('Undo').click();
-  assert.equal((await state()).pushes, 0);
-  assert.equal((await state()).moves, 0);
-  assert.deepEqual((await state()).state, cargoBeforeMove.state);
+  assert.equal((await state()).pushes, 0, 'Undo takes the push back');
+  assert.equal((await state()).moves, walked - 1);
+  assert.deepEqual((await state()).state.crates, island.state.crates, 'The crate returns to its starting cell');
   await button('Hint').click();
   await page.waitForFunction(() => JSON.parse(window.render_game_to_text()).hintDirection !== null);
-  assert.equal((await state()).hintDirection, 'right');
-  for (let level = 0;level < 12;level++) {
-    await page.getByLabel('Choose cargo puzzle').selectOption(String(level));
-    await h.dismiss();
-    for (const direction of solutions[level]) {
-      await button(direction[0].toUpperCase() + direction.slice(1)).click();
-      await advance(400);
-    }
-    assert.equal((await state()).mode, 'won');
-    assert.equal((await state()).pushes, m.gcargo.CARGO_LEVELS[level].par);
-    await button('Undo').click();
-    assert.equal((await state()).mode, 'playing');
-    const last = solutions[level].at(-1);
-    await button(last[0].toUpperCase() + last.slice(1)).click();
-    await advance(400);
-    assert.equal((await state()).mode, 'won');
+  assert(['up', 'down', 'left', 'right'].includes((await state()).hintDirection));
+  assert.equal((await state()).usedHint, true);
+  await button('Restart').click();
+  await advance(300);
+  assert.equal((await state()).moves, 0, 'Restart replays the same island');
+  for (const direction of route.moves) {
+    await button(direction[0].toUpperCase() + direction.slice(1)).click();
+    await advance(300);
   }
+  assert.equal((await state()).mode, 'won');
+  assert.equal((await state()).pushes, island.par);
   await h.shot('cargo-result');
+  await h.page.waitForTimeout(3400);
+  assert.equal((await state()).level, 2, 'Cargo opens the next generated island by itself');
+  assert.equal((await state()).mode, 'playing');
+  assert.notDeepEqual((await state()).map, island.map);
+  assert((await state()).stars[String(island.level - 1)] >= 1, 'The delivered island keeps its stars');
   await page.reload();
   await page.waitForFunction(() => window.render_game_to_text);
-  assert.equal((await state()).mode, 'won');
-  assert.equal(Object.keys((await state()).stars).length, 12);
-  await button('First island').click();
-  assert.equal((await state()).level, 1);
-  console.log('PASS Cargo native Dpad, worker hint, undo, all12 completed at par, stars, old save and replay');
+  assert.equal((await state()).level, 2);
+  assert.equal((await state()).mode, 'playing');
+  console.log('PASS Cargo native Dpad, worker hint, undo, generated island delivered at par, stars, automatic next island and save');
 
   await h.open('sky');
   await button('Start flight').click();

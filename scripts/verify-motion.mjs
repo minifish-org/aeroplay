@@ -62,7 +62,7 @@ for (const cell of m.glightsout.solveLights(lights.board)) assert(lights.act(cel
 assert.equal(lights.mode, 'won', 'Lights fixture is a genuinely completed puzzle');
 const sudoku = m.gsudoku.createSudokuModel();
 sudoku.elapsedSeconds = 123;
-const solution = [...m.gsudoku.PUZZLES[0].solution].map(Number);
+const solution = [...m.gsudoku.sudokuPuzzle(1).solution].map(Number);
 for (let index = 0; index < solution.length; index++) if (!sudoku.board[index]) {
   assert(sudoku.act({ type: 'select', index }));
   assert(sudoku.act({ type: 'value', value: solution[index] }));

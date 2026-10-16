@@ -56,7 +56,7 @@ try {
       if(await ah.action('ai-pause').isVisible()){await ah.action('ai-pause').click();await inspect(ah,game+'-ai-paused',vp);}
     }
     await ah.open('2048',{'aeroplay:game2048:state':{grid:[[2,4,2,4],[4,2,4,2],[2,4,2,4],[4,2,4,2]],score:100,moves:20}});await inspect(ah,'2048-result',vp);
-    await ah.open('sudoku',{'aeroplay:sudoku:state-v2':{puzzleIndex:0,board:[...m.gsudoku.PUZZLES[0].solution].map(Number),elapsedSeconds:64,mistakes:1,bestSeconds:64}});await inspect(ah,'sudoku-result',vp);
+    await ah.open('sudoku',{'aeroplay:sudoku:state-v2':{number:1,board:[...m.gsudoku.sudokuPuzzle(1).solution].map(Number),elapsedSeconds:64,mistakes:1,bestSeconds:64}});await inspect(ah,'sudoku-result',vp);
     await ah.open('match3',{'aeroplay:match3:run':{grid:m.gmatch3.createMatchBoard(),score:0,moves:0,level:1}});await inspect(ah,'match3-result',vp);
     await ah.open('cargo',{'aeroplay:cargo:run':{level:0,state:{player:18,crates:[19]},moves:2,pushes:2,usedHint:false}});await inspect(ah,'cargo-result',vp);
     await ah.open('flappy');await ah.startFlappy();await ah.advance(6000);assert.equal((await ah.state()).mode,'over');await inspect(ah,'flappy-result',vp);

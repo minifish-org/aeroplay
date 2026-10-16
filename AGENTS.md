@@ -14,7 +14,9 @@ Exactly eight games: 2048, Lights Out, Flappy Bird, Sudoku, Match-3, Pocket Carg
 - `src/games/<game>/`: index.ts assembles; model.ts is pure logic with no Three/DOM/storage; view.ts presents; hud.ts defines in-stage controls. Registry changes by one line per new game.
 - `styles/`: tokens.css, hub.css, game.css only.
 
-Allowed old logic reuse: mergeLogic, flappyFlight, lightsLogic, puzzleSolvers, skyState, Cargo model/solver, Pushball model/policy. Preserve all three Sudoku puzzles and twelve Cargo level data records. Never reuse old view/assembly code.
+Allowed old logic reuse: mergeLogic, flappyFlight, lightsLogic, puzzleSolvers, skyState, Cargo model/solver, Pushball model/policy. Never reuse old view/assembly code.
+
+Sudoku and Pocket Cargo generate their content on device instead of shipping level tables. Both derive everything from the level number as a deterministic seed, so a saved game always regenerates exactly the same board: Sudoku digs a unique puzzle that naked and hidden singles finish, and Cargo scrambles a delivered island and accepts it only when the shipped solver proves it deliverable inside the in-stage hint budget. No fixed puzzle list, no fixed level list, and every level autoplays into the next generated one after a solve. Match-3 keeps rising score targets with no move budget at all, so an endless run can never settle into a failed state.
 
 ## Presentation and input
 
@@ -26,7 +28,7 @@ The mode control combines Human/Watch/takeover. Remove settings/dialog/preload U
 
 ## Storage and offline
 
-Keep existing key names and saved shapes readable, including `aeroplay:game2048:*`. Human and AI runs stay separate; takeover never makes AI records personal. Preserve global sound/last-game values. No runtime external resources: model, WASM, assets, and scripts share the origin. Keep build:decision, CSP, SW precache/version updates, and the deployment pipeline.
+Keep existing key names and saved shapes readable, including `aeroplay:game2048:*`. Sudoku saves store their generated puzzle number; older saves carrying `puzzleIndex` are still read and regenerate the puzzle they belong to. Human and AI runs stay separate; takeover never makes AI records personal. Preserve global sound/last-game values. No runtime external resources: model, WASM, assets, and scripts share the origin. Keep build:decision, CSP, SW precache/version updates, and the deployment pipeline.
 
 ## Delivery gates
 

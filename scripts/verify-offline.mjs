@@ -279,9 +279,11 @@ try {
     }
     if (game === 'cargo') {
       await h.button('Hint').click();
-      await h.page.waitForFunction(() => JSON.parse(window.render_game_to_text()).hintDirection === 'right');
-      await h.button('Right').click();
-      assert.equal((await h.state()).pushes, 1);
+      await h.page.waitForFunction(() => JSON.parse(window.render_game_to_text()).hintDirection !== null);
+      const direction = (await h.state()).hintDirection;
+      assert(['up', 'down', 'left', 'right'].includes(direction), 'A cold offline hint names an ordinary direction');
+      await h.button(direction[0].toUpperCase() + direction.slice(1)).click();
+      assert.equal((await h.state()).moves, 1, 'The cold offline hint drives one ordinary step');
     }
     if(game!=='pushball')assert.equal((await h.state()).ai.info,null,'Cold human games and hints do not initialize TAMEV');
     if (game === 'sky') {

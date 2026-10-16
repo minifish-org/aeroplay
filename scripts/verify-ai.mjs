@@ -228,8 +228,14 @@ for (const [game, create, input] of builders) {
 assert.equal(timers.size, 0); assert.equal(listeners.size, 0);
 const planner = await import(`data:text/javascript;base64,${Buffer.from(await bundle("export * from './src/ai/planner.worker.ts';")).toString('base64')}`);
 const lights = Array(25).fill(0); m.glightsout.applyToggle(lights, 0, 0); m.glightsout.applyToggle(lights, 2, 2);
-const cargo = m.gcargo.parseCargo(m.gcargo.CARGO_LEVELS[0].map), sudoku = [...m.gsudoku.PUZZLES[0].puzzle].map(Number), match = m.gmatch3.createMatchBoard();
-const humanHint={game:'cargo',epoch:'hint',board:cargo,state:cargo.initial};assert.equal(planner.createHintPlans(humanHint)[0].steps[0].input,'right');
+const cargo = m.gcargo.parseCargo(m.gcargo.cargoLevel(1).map), sudoku = [...m.gsudoku.sudokuPuzzle(1).puzzle].map(Number), match = m.gmatch3.createMatchBoard();
+const humanHint={game:'cargo',epoch:'hint',board:cargo,state:cargo.initial};
+const generatedHints=planner.createHintPlans(humanHint);
+assert(generatedHints.length,'A generated island yields a real delivery hint');
+assert(['up','down','left','right'].includes(generatedHints[0].steps[0].input),'The first hint step is an ordinary direction');
+let hintedState=cargo.initial;
+for (const step of generatedHints[0].steps) { const next=m.gcargo.moveCargo(cargo,hintedState,step.input); assert(next,'Every hinted step is legal on the generated island'); hintedState=next.state; }
+assert(m.gcargo.cargoSolved(cargo,hintedState),'Following the whole hint delivers every generated crate');
 const trappedHint={...humanHint,state:{player:cargo.initial.player,crates:[cargo.floor.find(cell=>m.gcargo.cargoCorner(cargo,cell))]}};
 const untouchedHint=structuredClone(trappedHint);assert.deepEqual(planner.createHintPlans(trappedHint),[],'A trapped human crate yields no fabricated AI fallback hint');assert.deepEqual(trappedHint,untouchedHint);
 const fixtures = [
