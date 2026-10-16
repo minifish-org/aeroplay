@@ -128,7 +128,11 @@ export async function harness(ctx, url = base, folder = `output/verification-${b
     if (await button('Got it').isVisible().catch(() => false)) await button('Got it').click();
   }
   async function open(game, saves) {
-    if (!page.url().startsWith(url)) await page.goto(`${url}/#hub`);
+    if (!page.url().startsWith(url)) {
+      const hub = new URL(url);
+      hub.hash = 'hub';
+      await page.goto(hub.href);
+    }
     else await page.evaluate(() => {
       location.hash = 'hub';
     });

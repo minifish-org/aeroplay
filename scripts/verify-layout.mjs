@@ -1,4 +1,4 @@
-import { assert, games, viewports, launch, context, harness, mechanics, inspectLayout as inspect, models, fullMatch } from './verify-lib.mjs';
+import { assert, games, viewports, base, launch, context, harness, mechanics, inspectLayout as inspect, models, fullMatch } from './verify-lib.mjs';
 import { readFile } from 'node:fs/promises';
 
 const browser = await launch();
@@ -128,7 +128,9 @@ try {
   await h.open('hub');
   h.clean();
   await ctx.close();
-  const reduced = await context(browser, { reducedMotion: 'reduce', deterministic: true }), rh = await harness(reduced);
+  const reducedURL = new URL(base);
+  reducedURL.searchParams.set('motion', 'reduce');
+  const reduced = await context(browser, { reducedMotion: 'reduce', deterministic: true }), rh = await harness(reduced, reducedURL.href);
   for (const game of games) {
     await rh.open(game);
     const s = await rh.state();

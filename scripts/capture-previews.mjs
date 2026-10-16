@@ -19,7 +19,10 @@ try {
     if (new URL(request.url()).origin !== new URL(origin).origin) errors.push('External request: ' + request.url());
   });
   for (const game of games) {
-    await page.goto(origin + '/#' + game);
+    const route = new URL(origin);
+    route.searchParams.set('motion', 'reduce');
+    route.hash = game;
+    await page.goto(route.href);
     await page.waitForFunction(game => window.render_game_to_text && JSON.parse(window.render_game_to_text()).game === game, game);
     for (let i = 0; i < 5; i++) {
       const help = page.getByRole('button', { name: 'Got it', exact: true });

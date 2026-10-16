@@ -1,4 +1,5 @@
-import { assert, bundle, context, engine, harness, mechanics, models } from './verify-lib.mjs';
+import { assert, bundle, context, engine, games, harness, mechanics, models } from './verify-lib.mjs';
+import { mkdir, writeFile } from 'node:fs/promises';
 
 const { Stage, Group } = await import('data:text/javascript;base64,' + Buffer.from(await bundle("export { Stage } from './src/core/stage'; export { Group } from 'three';")).toString('base64'));
 const failures = [];
@@ -93,6 +94,94 @@ const completed = [
 
 const browser = await (await engine()).launch({ headless: true });
 try {
+  await check('Production and development share explicit motion policy and native 2048 movement', async () => {
+    const targets = [
+      { name: 'production', url: process.env.TEST_PRODUCTION_URL ?? 'http://127.0.0.1:4196' },
+      { name: 'development', url: process.env.TEST_DEVELOPMENT_URL ?? 'http://127.0.0.1:4194' },
+    ];
+    const cases = [
+      { name: 'default', query: '', preference: 'reduce', reduced: false },
+      { name: 'full', query: 'full', preference: 'reduce', reduced: false },
+      { name: 'reduce', query: 'reduce', preference: 'no-preference', reduced: true },
+      { name: 'system-reduced', query: 'system', preference: 'reduce', reduced: true },
+      { name: 'system-full', query: 'system', preference: 'no-preference', reduced: false },
+    ];
+    const fixture = { grid: [[32, 32, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], score: 0, moves: 0 };
+    const records = []; let expected;
+    await mkdir('output/motion-parity', { recursive: true });
+    try {
+      for (const sample of cases) {
+        // Seed spawning only. Native requestAnimationFrame remains untouched.
+        const ctx = await context(browser, { reducedMotion: sample.preference });
+        await ctx.addInitScript(() => {
+          let seed = 314;
+          Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+        });
+        try {
+          for (const target of targets) {
+            const h = await harness(ctx, target.url, `output/motion-parity/${target.name}-${sample.name}`);
+            const record = { target: target.name, url: target.url, policy: sample.name, preference: sample.preference, expectedReduced: sample.reduced };
+            records.push(record);
+            try {
+              const route = new URL(target.url); route.searchParams.delete('motion');
+              if (sample.query) route.searchParams.set('motion', sample.query);
+              route.hash = 'hub';
+              await h.page.goto(route.href);
+              const scripts = await h.page.locator('script[type="module"][src]').evaluateAll(nodes => nodes.map(node => node.getAttribute('src')));
+              if (target.name === 'production') assert(scripts.some(source => /^\/assets\/.*\.js$/.test(source)) && !scripts.includes('/@vite/client'), 'Motion policy is tested on a built production bundle');
+              else assert(scripts.includes('/@vite/client'), 'Development parity is tested on the actual Vite dev server');
+              const css = await h.page.locator('.hub-card').first().evaluate(card => ({ mode: document.documentElement.dataset.motion, transition: getComputedStyle(card).transitionDuration }));
+              record.css = css;
+              await h.open('2048', { 'aeroplay:game2048:state': fixture });
+              await h.page.waitForTimeout(400);
+              const mounted = await h.state(); record.actualReduced = mounted.motion.reduced;
+              assert.equal(await h.page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches), sample.preference === 'reduce', 'The browser OS preference is actually emulated');
+              await h.shot('mounted');
+              assert.equal(mounted.motion.reduced, sample.reduced, `${target.name} ${sample.name}: explicit URL policy is consistent with the approved default`);
+              assert.equal(css.mode, sample.reduced ? 'reduce' : 'full', 'The DOM and Three scene share one motion policy');
+              const cssDurations = css.transition.split(',').map(value => parseFloat(value));
+              assert(sample.reduced ? cssDurations.every(value => value === 0) : cssDurations.some(value => value > 0), 'Computed hub transitions follow the explicit policy independently of OS preference');
+              await h.key('ArrowRight');
+              const early = await h.page.locator('canvas').evaluate(canvas => canvas.toDataURL()), start = await h.state();
+              await h.page.waitForTimeout(65);
+              const middle = await h.page.locator('canvas').evaluate(canvas => canvas.toDataURL()), during = await h.state();
+              record.frames = { early: start.renderer.frames, middle: during.renderer.frames };
+              record.visibleIntermediate = middle !== early;
+              if (sample.reduced) {
+                assert.equal(start.visual.active, false, 'Explicit reduced motion applies the final letterpress pose immediately');
+                assert.equal(start.motion.tweens, 0);
+                assert.equal(middle, early, 'Reduced presentation has no intermediate movement');
+                assert.equal(during.renderer.frames, start.renderer.frames, 'Reduced presentation is already idle');
+              } else {
+                assert.equal(start.visual.active, true, 'Full motion begins its bounded native transition');
+                assert(during.renderer.frames > start.renderer.frames, 'Native RAF continues after the logical move');
+                assert.notEqual(middle, early, 'Full motion renders visible intermediate frames without advanceTime');
+              }
+              await h.page.waitForTimeout(450);
+              const settled = await h.state(); record.frames.final = settled.renderer.frames;
+              assert.equal(settled.grid[0][3], 64); assert.equal(settled.score, 64); assert.equal(settled.moves, 1);
+              assert.equal(settled.visual.active, false, 'The native merge reaches its final pose');
+              assert.equal(settled.motion.tweens, 0);
+              if (expected) assert.deepEqual(mechanics(settled), expected, 'All motion policies/builds preserve the same seeded logical outcome');
+              else expected = mechanics(settled);
+              await h.page.waitForTimeout(150);
+              assert.equal((await h.state()).renderer.frames, settled.renderer.frames, 'A settled native board returns to idle');
+              await h.shot('settled');
+              if (sample.name === 'default') {
+                record.defaultGames = [];
+                for (const game of games) {
+                  await h.open(game);
+                  assert.equal((await h.state()).motion.reduced, false, `${target.name}: ${game} keeps approved full motion on the ordinary URL`);
+                  record.defaultGames.push(game);
+                }
+              }
+              record.passed = true;
+            } finally { h.clean(); }
+          }
+        } finally { await ctx.close(); }
+      }
+    } finally { await writeFile('output/motion-parity/report.json', JSON.stringify(records, null, 2)); }
+  });
   const ctx = await context(browser, { deterministic: true });
   const h = await harness(ctx);
   await check('Paused deterministic replay freezes an unfinished letterpress merge', async () => {
