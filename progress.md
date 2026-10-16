@@ -316,3 +316,29 @@ Original prompt: Revisit all games in this project and make them more fun to pla
 - The user explicitly removed the source, stylesheet, script and per-game code-line limits. AGENTS.md retains the code-readability requirement without a line-count cap.
 - Removed only the corresponding line-count assertions and unused counting helper from the offline verifier. Existing structure, renderer, dependency, offline, input, save and model checks remain in place. PAGES.md and DELIVERY.md retain historical measurements and mark the limits as removed.
 - Validation passed: npm run build, the complete Chromium offline verifier (cold browser restart across all eight games and real service-worker cache update), and git diff --check.
+
+## Local modernist printmaking edition (2026-10-16)
+- Implemented the approved paper, ink, vermilion, ultramarine and ochre direction across all eight Three scenes and the hub. Shared deterministic grain, matte relief, lighting and hard-edged controls support distinct letterpress, night-print, woodcut flight, architectural Sudoku, geometric Match-3, harbor, aviation and sports compositions. Eight hub previews are captured from actual gameplay scenes.
+- Kept all game models, AI modules, storage, input and game HUD logic unchanged. All three Sudoku puzzles, twelve Cargo records, personal/AI ownership, resident local TAMEV and existing offline assets remain intact. The only assembly change freezes Pushball visuals while paused/loading and stops inactive frame scheduling.
+- Committed permanent red regressions before fixes. Corrected overlapping transform channels without cancelling unrelated settling axes, preserved each axis at uniform-scale time zero, froze deterministic visual replay while paused, and prevented restored completed Lights/Sudoku/Match-3 saves from replaying celebrations.
+- Every local stage passed the pre-commit TypeScript and Vite production build. Text deltas and committed source/style measurements follow; binary previews are not counted as text lines.
+
+| Stage | Commit | Added/deleted | Source TS | Styles CSS |
+| --- | --- | --- | --- | --- |
+| Motion regressions | c34383b | +133/-0 | 5586 | 391 |
+| Shared print and motion | 219b516 | +200/-60 | 5719 | 398 |
+| 2048 | 94f703e | +106/-34 | 5791 | 398 |
+| Lights Out | c8fab08 | +73/-36 | 5828 | 398 |
+| Flappy Bird | 42b0f35 | +169/-74 | 5923 | 398 |
+| Sudoku | 9dfe356 | +82/-30 | 5975 | 398 |
+| Match-3 | abd6273 | +76/-37 | 6014 | 398 |
+| Pocket Cargo | 5d47d44 | +199/-49 | 6164 | 398 |
+| Sky Rush | ed81899 | +273/-91 | 6346 | 398 |
+| Robot Pushball | 0869572 | +228/-84 | 6490 | 398 |
+| Hub and real previews | 0fdaaf5 | +70/-55 | 6498 | 402 |
+| Phone title fit | 04ba88c | +1/-1 | 6498 | 402 |
+
+- Frozen final gates passed: WebKit layout (all 36 route/viewport combinations, live rotations, active/paused AI, eight result HUDs, shared GPU teardown/context recovery/reduced motion), WebKit complete gameplay (all twelve Cargo levels at par, Sudoku, Flappy six gates, full Sky sector, real three-goal Pushball match), WebKit AI (23.56 s), Chromium cold offline/cache update (32.22 s, 33 cached resources), and WebKit motion regressions (2.36 s). The unchanged AI diagnostic requires Vite development module URLs for exact-instance API probes and worker fault injection; its initial production-preview target mismatch is preserved separately, and the corrected development-target run passed. Complete production TAMEV play is independently covered by gameplay and offline gates.
+- Source/runtime/test fingerprint stayed 7934a700fe4d402fa55e2019f62d685331f425cd418e41d8c6986e5951d86628 across all 73 tracked verification inputs. Current measurements are 6498 TypeScript, 402 CSS and 2079 script lines. Service-worker cache is aeroplay-75051500bd73. Evidence is in output/print-review, with fresh full-page screenshots in output/layout-*.
+- Required web-game client passed all eight games with nine inspected screenshots/state captures and no browser-error files. Manual in-app browser play opened the hub and all eight games, verified a 2048 merge, Lights cross toggle, Sudoku pencil notes, a 30-point Match-3 swap, a two-push Cargo delivery, a Sky ring/boost/pause and Pushball local model loading/dash/pause/goal. Phone portrait/landscape and MacBook framing were visually inspected. Physical iPhone Safari, native Safari and Home Screen remain unverified.
+- The completed local preview is http://127.0.0.1:4186/#hub. Work is committed on local main; no push or deployment was performed.
