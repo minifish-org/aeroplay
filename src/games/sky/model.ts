@@ -28,6 +28,14 @@ export type FlightState = {
 };
 export const SECTOR_LENGTH = 1000;
 export const LANE_WIDTH = 3.2;
+/** Cruise speed has no ceiling: every sector adds two metres per second forever. */
+export const cruiseSpeed = (sector: number, distance: number) => 24 + sector * 2 + distance / 180;
+/**
+ * Seconds between obstacle rows. The window tightens with the sector until one shared
+ * floor, and the row spacing follows the speed, so a faster flight still reads clearly.
+ */
+export const rowSeconds = (sector: number) => Math.max(0.32, 0.8 - (sector - 1) * 0.05);
+export const rowSpacing = (sector: number, distance: number) => cruiseSpeed(sector, distance) * rowSeconds(sector);
 export function createFlight(random = Math.random, sector = 1): FlightState {
   const state: FlightState = {
     mode: 'ready',
@@ -51,7 +59,7 @@ export function createFlight(random = Math.random, sector = 1): FlightState {
   let lane = 1;
   for (let index = 0; index < 14; index++) {
     lane = nextLane(lane, random);
-    state.rows.push(makeRow(index, 38 + index * 21, lane));
+    state.rows.push(makeRow(index, 38 + index * rowSpacing(sector, 0), lane));
   }
   return state;
 }
@@ -93,7 +101,7 @@ export function stepFlight(state: FlightState, dt: number, random = Math.random)
   state.boost = Math.max(0, state.boost - dt);
   state.invincible = Math.max(0, state.invincible - dt);
   state.messageTime = Math.max(0, state.messageTime - dt);
-  const speed = Math.min(42, 24 + state.sector * 2 + state.distance / 180) *
+  const speed = cruiseSpeed(state.sector, state.distance) *
     (state.boost > 0 ? 1.55 : 1);
   state.distance += speed * dt;
   state.total += speed * dt;
@@ -139,7 +147,7 @@ export function stepFlight(state: FlightState, dt: number, random = Math.random)
   for (const row of state.rows)
     if (row.distance < -16) {
       const last = state.rows.reduce((a, b) => a.distance > b.distance ? a : b);
-      Object.assign(row, makeRow(last.index + 1, last.distance + 21, nextLane(last.safeLane, random)));
+      Object.assign(row, makeRow(last.index + 1, last.distance + rowSpacing(state.sector, state.distance), nextLane(last.safeLane, random)));
     }
   if (state.distance >= SECTOR_LENGTH) {
     // The flight never lands: the sector mark opens the next sector and keeps going.
@@ -182,7 +190,7 @@ export class SkyRun {
       !integer(state.score, 0, 1e12) || !integer(state.rings, 0, 1e10) || !integer(state.combo, 0, state.rings) || !integer(state.maxCombo, state.combo, state.rings) ||
       !finite(state.charge, 0, 100) || !finite(state.boost, 0, 3) || !integer(state.shield, 0, 1) || !finite(state.invincible, 0, 1.7) || !integer(state.sector, 1, 1e6) ||
       !Array.isArray(state.rows) || state.rows.length !== 14 || !state.rows.every(row => row && typeof row === 'object' &&
-        finite(row.distance, -20, 400) && integer(row.safeLane, 0, 2) && integer(row.index, 0, 1e9) && typeof row.passed === 'boolean' &&
+        finite(row.distance, -20, 5000) && integer(row.safeLane, 0, 2) && integer(row.index, 0, 1e9) && typeof row.passed === 'boolean' &&
         Array.isArray(row.obstacles) && row.obstacles.length <= 3 && new Set(row.obstacles).size === row.obstacles.length && row.obstacles.every(lane => integer(lane, 0, 2))))
       return false;
     // Older endless saves predate the running total; their flown distance is still known.
