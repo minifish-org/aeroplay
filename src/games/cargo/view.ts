@@ -1,55 +1,87 @@
-import { Group, type Mesh } from 'three';
+import { CylinderGeometry, Group, Mesh } from 'three';
 import type { Stage } from '../../core/stage';
 import { disposePrintBackdrop, INK, printBackdrop } from '../../core/print';
 import { cargoCorner, type CargoRun } from './model';
 
-type Parcel = { root: Group; shell: Group; stamp: Group; body: Mesh };
-type Dock = { cell: number; brackets: Mesh[]; stamp: Group };
+type Parcel = {
+  root: Group; shell: Group; stamp: Group; body: Mesh;
+  fromX: number; fromZ: number; toX: number; toZ: number;
+  moved: boolean; docked: boolean; arriving: boolean;
+};
+type Dock = { cell: number; brackets: Mesh[] };
+const clamp = (value: number) => Math.max(0, Math.min(1, value));
+const settle = (value: number) => { const t = clamp(value); return t * t * (3 - 2 * t); };
+const directions: Record<string, readonly [number, number]> = { up: [0, -1], right: [1, 0], down: [0, 1], left: [-1, 0] };
 
 export class CargoView {
   private world = new Group();
   private backdrop: Group | null = null;
   private courier = new Group();
-  private courierBody = new Group();
-  private legs: Mesh[] = [];
+  private body = new Group();
+  private legs: Group[] = [];
+  private arms: Group[] = [];
   private crates: Parcel[] = [];
   private docks: Dock[] = [];
   private hint = new Group();
   private crane = new Group();
   private boat = new Group();
+  private result = new Group();
+  private cylinders = new Map<string, CylinderGeometry>();
+  private state: CargoRun['state'] | null = null;
   private level = -1;
-  private signature = '';
+  private epoch = -1;
   private moves = -1;
-  private crateCells: number[] = [];
   private playerCell = -1;
+  private cells: number[] = [];
+  private elapsed = 1;
+  private duration = .22;
+  private lifetime = .22;
+  private fromX = 0;
+  private fromZ = 0;
+  private toX = 0;
+  private toZ = 0;
+  private pushing = false;
+  private reversing = false;
+  private rejection = .16;
+  private rejectX = 0;
+  private rejectZ = 0;
 
   constructor(private stage: Stage) {
     stage.content.add(this.world, this.hint);
-    const left = this.box(.36, .035, .065, INK.red, this.hint, -.11, 0, 0);
-    const right = this.box(.36, .035, .065, INK.red, this.hint, .11, 0, 0);
-    left.rotation.y = -.65;
-    right.rotation.y = .65;
+    this.box(.35, .04, .065, INK.red, this.hint, -.11).rotation.y = -.65;
+    this.box(.35, .04, .065, INK.red, this.hint, .11).rotation.y = .65;
     this.hint.visible = false;
   }
 
-  private box(w: number, h: number, d: number, color: number, parent: Group, x = 0, y = 0, z = 0) {
-    const mesh = this.stage.box(w, h, d, color, .008);
+  private box(w: number, h: number, d: number, color: number, parent: Group, x = 0, y = 0, z = 0, finish: 'paper' | 'paint' | 'metal' = 'paint') {
+    const mesh = this.stage.box(w, h, d, color, Math.min(.022, w / 5, h / 5, d / 5));
+    mesh.material = this.stage.material(color, 0, finish);
     mesh.position.set(x, y, z);
     parent.add(mesh);
     return mesh;
   }
 
-  private position(cell: number, model: CargoRun) {
-    return { x: cell % model.board.width - (model.board.width - 1) / 2, z: Math.floor(cell / model.board.width) - (model.board.height - 1) / 2 };
+  private cylinder(radius: number, height: number, color: number, parent: Group, x: number, y: number, z: number) {
+    const key = radius + ':' + height;
+    let geometry = this.cylinders.get(key);
+    if (!geometry) {
+      geometry = new CylinderGeometry(radius, radius, height, 28);
+      this.cylinders.set(key, geometry);
+    }
+    const mesh = new Mesh(geometry, this.stage.material(color));
+    mesh.position.set(x, y, z);
+    mesh.castShadow = mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
   }
 
-  private deliveredStamp(parent: Group, x: number, y: number, z: number, size: number) {
+  private x(cell: number, model: CargoRun) { return cell % model.board.width - (model.board.width - 1) / 2; }
+  private z(cell: number, model: CargoRun) { return Math.floor(cell / model.board.width) - (model.board.height - 1) / 2; }
+
+  private receipt(parent: Group) {
     const stamp = new Group();
-    stamp.position.set(x, y, z);
-    const short = this.box(size * .45, .018, size * .12, INK.red, stamp, -size * .23, 0, size * .05);
-    short.rotation.y = -.7;
-    const long = this.box(size * .85, .018, size * .12, INK.red, stamp, size * .13, 0, -size * .06);
-    long.rotation.y = .72;
+    this.box(.13, .024, .04, INK.red, stamp, -.045, 0, .025).rotation.y = -.7;
+    this.box(.25, .024, .04, INK.red, stamp, .055, 0, -.015).rotation.y = .75;
     parent.add(stamp);
     return stamp;
   }
@@ -59,185 +91,215 @@ export class CargoView {
     this.crates = [];
     this.docks = [];
     this.level = model.level;
-    this.signature = '';
-    this.moves = -1;
+    this.state = null;
     const { width, height, floor, goals } = model.board;
     this.stage.framing('island', width + .9, height + 1.1);
-    if (this.backdrop)
-      disposePrintBackdrop(this.backdrop);
+    if (this.backdrop) disposePrintBackdrop(this.backdrop);
     this.backdrop = printBackdrop(this.stage, 'harbor');
-
-    const underMap = this.box(width + .23, .035, height + .3, 0xd3be93, this.world, .02, -.25, .035);
-    underMap.rotation.y = -.012;
-    this.box(width + .12, .19, height + .12, INK.black, this.world, 0, -.15);
-    this.box(width + .06, .04, height + .06, INK.paper, this.world, 0, -.035);
+    this.box(width + .18, .53, height + .18, INK.black, this.world, 0, -.415);
+    this.box(width + .09, .15, height + .09, INK.paper, this.world, 0, -.075, 0, 'paper');
     for (let cell = 0; cell < width * height; cell++) {
-      const p = this.position(cell, model), open = floor.includes(cell);
-      if (open) {
-        this.box(.955, .05, .955, cell % 5 === 0 ? 0xe4d6b9 : INK.paper, this.world, p.x, -.006, p.z);
-        if (cell % 7 === 2)
-          this.box(.36, .006, .018, 0xc8b695, this.world, p.x + .12, .022, p.z + .3);
-      }
-      else {
-        this.box(.96, .27, .96, INK.black, this.world, p.x, .12, p.z).castShadow = false;
-        this.box(.89, .018, .89, 0x363830, this.world, p.x - .02, .264, p.z - .02).castShadow = false;
-        this.box(.018, .026, .8, 0x8b8974, this.world, p.x - .455, .268, p.z).castShadow = false;
+      const x = this.x(cell, model), z = this.z(cell, model);
+      if (floor.includes(cell)) {
+        this.box(.973, .035, .973, cell % 5 ? INK.paper : 0xdfd1b3, this.world, x, .0175, z, 'paper');
+      } else {
+        this.box(.965, .35, .965, INK.black, this.world, x, .21, z);
+        this.box(.91, .035, .91, 0x454944, this.world, x, .402, z);
       }
       if (goals.includes(cell)) {
         const brackets: Mesh[] = [];
-        for (const x of [-1, 1])
-          for (const z of [-1, 1]) {
-            brackets.push(this.box(.19, .026, .045, INK.red, this.world, p.x + x * .355, .035, p.z + z * .43));
-            brackets.push(this.box(.045, .026, .19, INK.red, this.world, p.x + x * .43, .035, p.z + z * .355));
-          }
-        const stamp = this.deliveredStamp(this.world, p.x, .037, p.z, .33);
-        stamp.visible = false;
-        this.docks.push({ cell, brackets, stamp });
+        for (const dx of [-1, 1]) for (const dz of [-1, 1]) {
+          brackets.push(this.box(.19, .025, .045, INK.red, this.world, x + dx * .36, .054, z + dz * .44));
+          brackets.push(this.box(.045, .025, .19, INK.red, this.world, x + dx * .44, .054, z + dz * .36));
+        }
+        this.docks.push({ cell, brackets });
       }
     }
-
-    // Harbor details stay outside the map; none of them can cover a playable cell.
     for (const side of [-1, 1]) {
-      for (let index = 0; index < 5; index++) {
-        const z = -height / 2 + .4 + index * (height - .8) / 4;
-        this.box(.19, .16, .19, INK.black, this.world, side * (width / 2 + .2), -.05, z);
-        this.box(.23, .028, .23, INK.paper, this.world, side * (width / 2 + .2), .045, z);
+      for (let index = 0; index < 4; index++) {
+        const z = -height / 2 + .5 + index * (height - 1) / 3;
+        this.cylinder(.13, .20, INK.black, this.world, side * (width / 2 + .22), -.02, z);
+        this.cylinder(.16, .035, INK.paper, this.world, side * (width / 2 + .22), .098, z);
       }
-      for (let index = 0; index < 13; index++) {
-        const x = side * (width / 2 + .22 + index % 3 * .17), z = -height / 2 - .5 + index * .67;
-        const wave = this.box(.27 + index % 3 * .12, .012, .025, INK.paper, this.world, x, -.32, z);
-        wave.rotation.y = index % 2 ? .15 : -.12;
-        const tip = this.box(.16, .012, .025, INK.paper, this.world, x + .24, -.32, z - .04);
-        tip.rotation.y = -.45;
+      for (let index = 0; index < 8; index++) {
+        const wave = new Group();
+        wave.position.set(side * (width / 2 + .55 + index % 2 * .22), -.61, -height / 2 + index * height / 7);
+        this.box(.35, .016, .025, INK.paper, wave, -.13).rotation.y = -.2;
+        this.box(.20, .016, .025, INK.paper, wave, .14, 0, .02).rotation.y = .3;
+        this.world.add(wave);
       }
     }
-    const crane = this.crane = new Group();
-    this.world.add(crane);
-    this.box(.16, 1.9, .18, INK.black, crane, 0, .95);
-    const boom = this.box(2.1, .15, .18, INK.black, crane, .7, 1.8);
-    boom.rotation.z = -.32;
-    this.box(.025, 1, .025, INK.black, crane, 1.5, 1.15);
-    this.box(.43, .4, .43, 0xbd8b43, crane, 1.5, .5);
-    const boat = this.boat = new Group();
-    this.world.add(boat);
-    this.box(.85, .13, 2.9, INK.black, boat);
-    this.box(.67, .15, 2.42, INK.paper, boat, 0, .08);
-    this.box(.55, .28, .67, INK.red, boat, 0, .25, .45);
-    this.box(.2, .6, .2, INK.black, boat, 0, .56, .5);
-    for (const detail of [boat, crane])
-      detail.traverse(object => { if ('castShadow' in object) object.castShadow = false; });
-
+    this.buildMargins();
     for (const _cell of model.state.crates) {
       const root = new Group(), shell = new Group();
       root.add(shell);
-      const body = this.box(.66, .57, .66, 0xc39c58, shell, 0, .3);
-      this.box(.6, .025, .6, 0xe1bf7e, shell, 0, .598);
+      const body = this.box(.72, .67, .72, 0xb28c4d, shell, 0, .37, 0, 'paper');
+      this.box(.69, .025, .69, 0xdbb678, shell, 0, .718, 0, 'paper');
       for (const side of [-1, 1]) {
-        this.box(.66, .025, .045, INK.black, shell, 0, .615, side * .29);
-        this.box(.045, .025, .66, INK.black, shell, side * .29, .615);
-        const cross = this.box(.72, .026, .045, INK.black, shell, 0, .62);
-        cross.rotation.y = side * Math.PI / 4;
-        const front = this.box(.055, .62, .018, 0x705b35, shell, 0, .3, .34);
-        front.rotation.z = side * Math.PI / 4;
+        this.box(.70, .033, .04, 0x715b37, shell, 0, .744, side * .31, 'paper');
+        this.box(.04, .033, .70, 0x715b37, shell, side * .31, .744, 0, 'paper');
+        this.box(.83, .022, .04, 0x715b37, shell, 0, .755, 0, 'paper').rotation.y = side * Math.PI / 4;
+        this.box(.58, .04, .024, 0x715b37, shell, 0, .37, .372, 'paper').rotation.z = side * Math.PI / 4;
       }
-      const stamp = this.deliveredStamp(shell, .17, .64, .18, .22);
-      stamp.visible = false;
+      const stamp = this.receipt(shell);
+      stamp.position.set(.17, .78, .17);
       this.world.add(root);
-      this.crates.push({ root, shell, stamp, body });
+      this.crates.push({ root, shell, stamp, body, fromX: 0, fromZ: 0, toX: 0, toZ: 0, moved: false, docked: false, arriving: false });
     }
+    this.buildCourier();
+    this.result = new Group();
+    for (const side of [-1, 1]) {
+      this.box(width + .1, .022, .035, INK.red, this.result, 0, .045, side * (height / 2 + .08));
+      this.box(.035, .022, height + .1, INK.red, this.result, side * (width / 2 + .08), .045);
+    }
+    this.world.add(this.result);
+  }
 
+  private buildMargins() {
+    this.crane = new Group();
+    this.world.add(this.crane);
+    this.box(.20, 2.2, .24, INK.black, this.crane, 0, .45);
+    this.box(2.0, .15, .20, INK.black, this.crane, .64, 1.52).rotation.z = -.19;
+    this.box(.023, .85, .023, INK.black, this.crane, 1.5, 1.0);
+    this.box(.34, .37, .34, 0xb28c4d, this.crane, 1.5, .45, 0, 'paper');
+    this.boat = new Group();
+    this.world.add(this.boat);
+    this.box(.76, .22, 2.55, INK.black, this.boat, 0, -.35);
+    this.box(.64, .12, 2.30, INK.paper, this.boat, 0, -.19);
+    this.box(.5, .32, .65, INK.red, this.boat, 0, .03, .38);
+    this.box(.18, .55, .18, INK.black, this.boat, 0, .45, .42);
+    // Margin silhouettes never cast across the puzzle cells.
+    this.crane.traverse(mesh => { mesh.castShadow = false; });
+    this.boat.traverse(mesh => { mesh.castShadow = false; });
+  }
+
+  private buildCourier() {
     this.courier = new Group();
-    this.courierBody = new Group();
-    this.courierBody.scale.y = .82;
-    this.courier.add(this.courierBody);
-    this.legs = [-1, 1].map(side => this.box(.1, .17, .13, INK.black, this.courierBody, side * .075, .11, .015));
-    this.box(.29, .31, .25, INK.red, this.courierBody, 0, .33);
-    this.box(.36, .085, .27, INK.red, this.courierBody, 0, .45);
-    const leftArm = this.box(.11, .25, .14, INK.red, this.courierBody, -.21, .31, .045);
-    const rightArm = this.box(.11, .25, .14, INK.red, this.courierBody, .21, .31, .045);
-    leftArm.rotation.z = -.15;
-    rightArm.rotation.z = .15;
-    this.box(.2, .16, .18, INK.paper, this.courierBody, 0, .565);
-    this.box(.25, .045, .25, INK.white, this.courierBody, 0, .665);
-    this.box(.25, .028, .11, INK.black, this.courierBody, 0, .644, .14);
-    this.box(.18, .07, .018, INK.paper, this.courierBody, 0, .39, .134);
+    this.body = new Group();
+    this.legs = [];
+    this.arms = [];
+    this.courier.add(this.body);
+    for (const x of [-.11, .11]) {
+      const hip = new Group();
+      hip.position.set(x, .30, 0);
+      this.box(.13, .26, .16, INK.black, hip, 0, -.12);
+      this.box(.15, .085, .23, INK.black, hip, 0, -.25, .035);
+      this.body.add(hip);
+      this.legs.push(hip);
+    }
+    this.box(.36, .40, .28, INK.red, this.body, 0, .49);
+    this.box(.50, .11, .31, INK.red, this.body, 0, .67);
+    for (const x of [-.24, .24]) {
+      const arm = new Group();
+      arm.position.set(x, .63, .09);
+      this.box(.11, .32, .13, INK.red, arm, 0, -.12);
+      this.box(.11, .10, .13, INK.paper, arm, 0, -.29, .11);
+      this.body.add(arm);
+      this.arms.push(arm);
+    }
+    this.cylinder(.135, .19, INK.paper, this.body, 0, .84, -.015);
+    this.box(.33, .055, .29, INK.white, this.body, 0, .975, -.015, 'paper');
+    this.box(.33, .023, .16, INK.black, this.body, 0, .947, .17);
+    this.box(.23, .018, .20, INK.red, this.body, 0, 1.009, -.015);
     this.world.add(this.courier);
   }
 
-  render(model: CargoRun) {
-    if (model.level !== this.level)
-      this.build(model);
-    // Fit graphic harbor margins to spare camera space, keeping the map unchanged.
-    const { width, height } = model.board;
-    const margin = Math.max(.16, this.stage.bounds().right - width / 2 - .1);
-    this.boat.scale.x = Math.min(1, margin * .62 / .85);
-    this.boat.rotation.y = -.22 * Math.min(1, Math.max(0, margin - 1));
-    this.boat.position.set(width / 2 + .1 + margin * .55, -.25, height / 2 - 1.5);
-    this.crane.scale.x = Math.min(1, margin / 2.5);
-    this.crane.position.set(width / 2 + .1 + margin * .45, -.2, -height / 2 + .5);
-    const signature = JSON.stringify(model.state);
-    if (signature !== this.signature) {
-      const first = !this.signature, forward = !first && model.moves > this.moves;
-      this.signature = signature;
-      const p = this.position(model.state.player, model), previous = first ? p : this.position(this.playerCell, model);
-      const dx = p.x - previous.x, dz = p.z - previous.z;
-      if (first)
-        this.courier.position.set(p.x, 0, p.z);
-      else {
-        this.stage.tween(this.courier, p, 'settle');
-        if (dx || dz)
-          this.courier.rotation.y = Math.atan2(dx, dz);
-        this.courierBody.rotation.x = .12;
-        this.stage.tween(this.courierBody, { rx: 0 }, 'settle');
-        this.legs.forEach((leg, index) => {
-          leg.rotation.x = (index ? -1 : 1) * .28 * (model.moves % 2 ? 1 : -1);
-          this.stage.tween(leg, { rx: 0 }, 'settle');
-        });
-      }
-      model.state.crates.forEach((cell, index) => {
-        const p = this.position(cell, model), parcel = this.crates[index], docked = model.board.goals.includes(cell);
-        if (first)
-          parcel.root.position.set(p.x, 0, p.z);
-        else {
-          this.stage.tween(parcel.root, p, 'settle');
-          if (cell !== this.crateCells[index]) {
-            const previous = this.position(this.crateCells[index], model);
-            parcel.shell.rotation.x = (p.z - previous.z) * -.035;
-            parcel.shell.rotation.z = (p.x - previous.x) * .035;
-            this.stage.tween(parcel.shell, { rx: 0, rz: 0 }, 'settle');
-            if (docked && forward) {
-              parcel.stamp.scale.setScalar(.65);
-              this.stage.tween(parcel.stamp, { scale: 1 }, 'score');
-            }
-          }
-        }
-        parcel.stamp.visible = docked;
-        parcel.body.material = this.stage.material(cargoCorner(model.board, cell) ? 0xb78149 : 0xc39c58);
-      });
-      this.docks.forEach(dock => {
-        const occupied = model.state.crates.includes(dock.cell);
-        dock.brackets.forEach(bracket => { bracket.material = this.stage.material(occupied ? INK.blue : INK.red); });
-        dock.stamp.visible = occupied;
-      });
-      this.crateCells = [...model.state.crates];
-      this.playerCell = model.state.player;
-      this.moves = model.moves;
-    }
-    this.hint.visible = !!model.hintDirection;
-    if (model.hintDirection) {
-      const d = { up: [0, -1], right: [1, 0], down: [0, 1], left: [-1, 0] }[model.hintDirection], p = this.position(model.state.player, model);
-      this.hint.position.set(p.x + d[0], .07, p.z + d[1]);
-      this.hint.rotation.y = Math.atan2(d[0], d[1]);
-    }
+  private sync(model: CargoRun) {
+    const first = !this.state;
+    const forward = !first && model.epoch === this.epoch && model.moves === this.moves + 1;
+    const reverse = !first && model.epoch !== this.epoch && model.moves === this.moves - 1;
+    const transition = forward || reverse;
+    this.pushing = forward && model.state.crates.some((cell, index) => cell !== this.cells[index]);
+    this.reversing = reverse;
+    this.duration = this.pushing ? .28 : reverse ? .24 : .22;
+    this.toX = this.x(model.state.player, model);
+    this.toZ = this.z(model.state.player, model);
+    // Rapid inputs finish the old step before starting the next grid-aligned step.
+    this.fromX = transition ? this.x(this.playerCell, model) : this.toX;
+    this.fromZ = transition ? this.z(this.playerCell, model) : this.toZ;
+    if (transition) {
+      const sign = reverse ? -1 : 1;
+      this.courier.rotation.y = Math.atan2((this.toX - this.fromX) * sign, (this.toZ - this.fromZ) * sign);
+    } else this.courier.rotation.y = 0;
+    let receipt = false;
+    model.state.crates.forEach((cell, index) => {
+      const parcel = this.crates[index];
+      parcel.toX = this.x(cell, model);
+      parcel.toZ = this.z(cell, model);
+      parcel.fromX = transition ? this.x(this.cells[index], model) : parcel.toX;
+      parcel.fromZ = transition ? this.z(this.cells[index], model) : parcel.toZ;
+      parcel.moved = transition && cell !== this.cells[index];
+      parcel.docked = model.board.goals.includes(cell);
+      parcel.arriving = forward && parcel.moved && parcel.docked;
+      parcel.body.material = this.stage.material(cargoCorner(model.board, cell) ? 0xb78149 : 0xb28c4d, 0, 'paper');
+      receipt ||= parcel.arriving;
+    });
+    this.lifetime = this.duration + (receipt ? .24 : this.pushing ? .08 : 0);
+    this.elapsed = transition && !this.stage.reducedMotion ? 0 : this.lifetime;
+    this.rejection = .16;
+    this.state = model.state;
+    this.epoch = model.epoch;
+    this.moves = model.moves;
+    this.playerCell = model.state.player;
+    this.cells = [...model.state.crates];
   }
 
-  bump(input: unknown, model: CargoRun) {
-    const d = ({ up: [0, -1], right: [1, 0], down: [0, 1], left: [-1, 0] } as Record<string, number[]>)[input as string];
-    if (!d || this.stage.reducedMotion)
-      return;
-    const angle = -this.courier.rotation.y;
-    this.courierBody.position.set((d[0] * Math.cos(angle) + d[1] * Math.sin(angle)) * .1, 0, (-d[0] * Math.sin(angle) + d[1] * Math.cos(angle)) * .1);
-    this.stage.tween(this.courierBody, { x: 0, z: 0, rx: 0 }, 'failure');
-    void model;
+  render(model: CargoRun, dt = 0) {
+    if (this.level !== model.level) this.build(model);
+    if (model.state !== this.state) this.sync(model);
+    if (model.mode !== 'paused') {
+      this.elapsed = Math.min(this.lifetime, this.elapsed + Math.max(0, dt));
+      this.rejection = Math.min(.16, this.rejection + Math.max(0, dt));
+    }
+    const brace = this.pushing ? .04 : 0;
+    const step = clamp((this.elapsed - brace) / (this.duration - brace));
+    const travel = settle(step), stride = Math.sin(step * Math.PI * 2) * (this.reversing ? -1 : 1);
+    const reach = this.pushing ? settle(this.elapsed / .04) * (1 - settle((this.elapsed - this.duration) / .08)) : 0;
+    this.courier.position.set(this.fromX + (this.toX - this.fromX) * travel, .035, this.fromZ + (this.toZ - this.fromZ) * travel);
+    this.body.rotation.x = this.pushing ? reach * .06 : Math.sin(step * Math.PI) * (this.reversing ? -.045 : .045);
+    const rejected = this.stage.reducedMotion ? 0 : Math.sin(this.rejection / .16 * Math.PI);
+    this.body.position.set(this.rejectX * rejected, 0, this.rejectZ * rejected);
+    this.legs[0].rotation.x = stride * .40;
+    this.legs[1].rotation.x = -stride * .40;
+    this.arms.forEach(arm => { arm.position.z = .09 + reach * .22; arm.rotation.x = -.18 - reach * .62; });
+    const receipt = settle((this.elapsed - this.duration) / .24);
+    this.crates.forEach(parcel => {
+      parcel.root.position.set(parcel.fromX + (parcel.toX - parcel.fromX) * travel, 0, parcel.fromZ + (parcel.toZ - parcel.fromZ) * travel);
+      const weight = parcel.moved ? Math.sin(step * Math.PI) * .018 : 0;
+      parcel.shell.rotation.x = -(parcel.toZ - parcel.fromZ) * weight;
+      parcel.shell.rotation.z = (parcel.toX - parcel.fromX) * weight;
+      parcel.stamp.visible = parcel.docked && (!parcel.arriving || receipt > 0);
+      parcel.stamp.scale.setScalar(parcel.arriving ? Math.max(.001, receipt) : 1);
+    });
+    this.docks.forEach(dock => {
+      const index = model.state.crates.indexOf(dock.cell), parcel = index >= 0 ? this.crates[index] : null;
+      const occupied = !!parcel && (!parcel.moved || step === 1);
+      dock.brackets.forEach(bracket => { bracket.material = this.stage.material(occupied ? INK.blue : INK.red); });
+    });
+    this.result.visible = model.mode === 'won';
+    this.result.position.y = model.mode === 'won' ? Math.sin(receipt * Math.PI) * .025 : 0;
+    this.hint.visible = !!model.hintDirection;
+    if (model.hintDirection) {
+      const d = directions[model.hintDirection];
+      this.hint.position.set(this.toX + d[0], .075, this.toZ + d[1]);
+      this.hint.rotation.y = Math.atan2(d[0], d[1]);
+    }
+    const margin = Math.max(.16, this.stage.bounds().right - model.board.width / 2 - .1);
+    this.boat.scale.x = Math.min(1, margin * .62 / .85);
+    this.boat.rotation.y = -.22 * Math.min(1, Math.max(0, margin - 1));
+    this.boat.position.set(model.board.width / 2 + .1 + margin * .55, 0, model.board.height / 2 - 1.5);
+    this.crane.scale.x = Math.min(1, margin / 2.5);
+    this.crane.position.set(model.board.width / 2 + .1 + margin * .45, 0, -model.board.height / 2 + .5);
+  }
+
+  get animating() { return this.elapsed < this.lifetime || this.rejection < .16; }
+
+  bump(input: unknown, _model: CargoRun) {
+    const d = directions[input as string];
+    if (!d || this.stage.reducedMotion) return;
+    const angle = this.courier.rotation.y;
+    this.rejectX = (d[0] * Math.cos(angle) - d[1] * Math.sin(angle)) * .075;
+    this.rejectZ = (d[0] * Math.sin(angle) + d[1] * Math.cos(angle)) * .075;
+    this.rejection = 0;
   }
 }
