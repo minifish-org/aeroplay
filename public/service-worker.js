@@ -1,7 +1,9 @@
 const CACHE = 'aeroplay-__VERSION__';
 const ASSETS = __PRECACHE__;
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // Stable artwork URLs must bypass fresh HTTP cache entries from the previous release.
+  const requests = ASSETS.map(asset => new Request(new URL(asset, self.location.origin), { cache: 'reload' }));
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(requests)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (event) => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('aeroplay-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
