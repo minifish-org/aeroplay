@@ -26,12 +26,16 @@ type Tween = {
 };
 const durations = { entry: .32, score: .24, failure: .28, settle: .36 };
 const ease = (t: number, type: Easing) => type === 'score' ? 1 + 2.1 * (t - 1) ** 3 + 1.1 * (t - 1) ** 2 : type === 'failure' ? t * t : type === 'settle' ? t * t * (3 - 2 * t) : 1 - (1 - t) ** 3;
+export function reducedMotionPreference() {
+  const preference = new URLSearchParams(location.search).get('motion');
+  return preference === 'reduce' || preference === 'system' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 export class Stage {
   readonly renderer: WebGLRenderer;
   readonly scene = new Scene();
   readonly content = new Group();
-  // The opt-in local review URL can show the complete motion study without changing OS preferences.
-  readonly reducedMotion = !(import.meta.env.DEV && new URLSearchParams(location.search).get('motion') === 'full') && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Full presentation is the approved default; explicit URLs can reduce motion or follow the OS.
+  readonly reducedMotion = reducedMotionPreference();
   private ortho = new OrthographicCamera(-5, 5, 5, -5, .1, 100);
   private perspective = new PerspectiveCamera(48, 1, .1, 180);
   private camera: OrthographicCamera | PerspectiveCamera = this.ortho;

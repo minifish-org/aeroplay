@@ -1,6 +1,6 @@
 import { games } from './games/registry';
 import { mountHub } from './hub/hub';
-import { getStage } from './core/stage';
+import { getStage, reducedMotionPreference } from './core/stage';
 import { HUD } from './core/hud';
 import { Player, HumanPlayer, TamevPlayer } from './ai/player';
 import { namespace, save, setPlayProfile, type PlayProfile } from './core/storage';
@@ -8,6 +8,7 @@ import '../styles/tokens.css';
 import '../styles/hub.css';
 import '../styles/game.css';
 const root = document.querySelector<HTMLElement>('#app')!;
+document.documentElement.dataset.motion = reducedMotionPreference() ? 'reduce' : 'full';
 let dispose = () => { }, version = 0;
 async function route(profile: PlayProfile = 'human') {
   const ticket = ++version;

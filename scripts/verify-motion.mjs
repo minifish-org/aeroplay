@@ -116,6 +116,7 @@ try {
         await ctx.addInitScript(() => {
           let seed = 314;
           Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+          window.__resetMotionSeed = () => { seed = 314; };
         });
         try {
           for (const target of targets) {
@@ -141,6 +142,8 @@ try {
               assert.equal(css.mode, sample.reduced ? 'reduce' : 'full', 'The DOM and Three scene share one motion policy');
               const cssDurations = css.transition.split(',').map(value => parseFloat(value));
               assert(sample.reduced ? cssDurations.every(value => value === 0) : cssDurations.some(value => value > 0), 'Computed hub transitions follow the explicit policy independently of OS preference');
+              // The model captures this generator; reset its original closure after UUID creation.
+              await h.page.evaluate(() => window.__resetMotionSeed());
               await h.key('ArrowRight');
               const early = await h.page.locator('canvas').evaluate(canvas => canvas.toDataURL()), start = await h.state();
               await h.page.waitForTimeout(65);
@@ -162,6 +165,7 @@ try {
               assert.equal(settled.grid[0][3], 64); assert.equal(settled.score, 64); assert.equal(settled.moves, 1);
               assert.equal(settled.visual.active, false, 'The native merge reaches its final pose');
               assert.equal(settled.motion.tweens, 0);
+              record.outcome = mechanics(settled);
               if (expected) assert.deepEqual(mechanics(settled), expected, 'All motion policies/builds preserve the same seeded logical outcome');
               else expected = mechanics(settled);
               await h.page.waitForTimeout(150);

@@ -70,10 +70,7 @@ button:disabled {
   cursor: default;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration:0s!important;
-    transition-duration:0s!important;
-  }
-
+html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-motion="reduce"] *::after {
+  animation-duration:0s!important;
+  transition-duration:0s!important;
 }
