@@ -2,10 +2,10 @@ import { CanvasTexture, CircleGeometry, Color, Group, Mesh, PlaneGeometry, Shape
 import type { Stage } from './stage';
 
 export const INK = {
-  paper: 0xeee0bf, white: 0xfaf0d8, black: 0x151a1b,
-  red: 0xda3726, blue: 0x174d91, yellow: 0xe9b340,
-  green: 0x287354, purple: 0x78528b, muted: 0xa29478,
-  night: 0x102d53,
+  paper: 0xe9ddc4, white: 0xf5f0e2, black: 0x172326,
+  red: 0xc43c2f, blue: 0x194d83, yellow: 0xd9a641,
+  green: 0x397866, purple: 0x775a7b, muted: 0xa29478,
+  night: 0x152d46,
 } as const;
 export type PrintKind = 'numbers' | 'night' | 'wind' | 'measure' | 'pattern' | 'harbor' | 'air' | 'sport';
 
@@ -46,9 +46,10 @@ export function printBackdrop(stage: Stage, kind: PrintKind) {
   if (kind === 'air') return group;
 
   const plane = new Mesh(new PlaneGeometry(160, 160), stage.material(background));
-  plane.position.z = -2.4;
+  plane.position.z = -.68;
+  plane.receiveShadow = true;
   group.add(plane);
-  function polygon(points: [number, number][], color: number, z = -1.8) {
+  function polygon(points: [number, number][], color: number, z = -.66) {
     const shape = new Shape();
     points.forEach(([x, y], i) => i ? shape.lineTo(x, y) : shape.moveTo(x, y));
     shape.closePath();
@@ -57,43 +58,24 @@ export function printBackdrop(stage: Stage, kind: PrintKind) {
     group.add(mesh);
     return mesh;
   }
-  function disk(x: number, y: number, radius: number, color: number, z = -1.9) {
+  function disk(x: number, y: number, radius: number, color: number, z = -.66) {
     const mesh = new Mesh(new CircleGeometry(radius, 72), stage.material(color));
     mesh.position.set(x, y, z);
     group.add(mesh);
   }
   function numeral(value: string, x: number, y: number, width: number, color = INK.black) {
     const label = stage.label(value, width, '#' + color.toString(16).padStart(6, '0'), width * 1.35);
-    label.position.set(x, y, -1.5);
+    label.position.set(x, y, -.64);
     group.add(label);
   }
   if (kind === 'numbers') {
-    disk(-3.5, 2.9, 5.8, INK.red);
-    disk(-3.5, 2.9, 4.65, INK.paper, -1.85);
-    polygon([[2.7, 7], [5.5, 7], [-5.5, -7], [-8, -7]], INK.black);
-    numeral('8', 6.1, -.9, 4.6);
-    numeral('2', -5.6, -2.8, 3.4);
-  } else if (kind === 'night') {
-    disk(5.3, 4.9, 3, INK.paper);
-    for (let i = 0; i < 18; i++) {
-      const x = -8 + (i * 3.37) % 16, y = -6 + (i * 2.17) % 12;
-      disk(x, y, .027 + i % 3 * .011, INK.paper, -1.7);
-    }
-    polygon([[3.4, -6], [3.4, -3.7], [4, -3.7], [4, -2.6], [4.4, -2.6], [4.4, -4], [5.3, -4], [5.3, -1.8], [5.7, -1.3], [6.1, -1.8], [6.1, -3], [8, -2.6], [10, -6]], INK.black);
+    disk(-4.0, 2.4, 1.7, INK.red);
+    numeral('8', 4.3, -1.7, 2.5);
   } else if (kind === 'measure') {
-    disk(8.5, 3.7, 4.7, INK.black);
-    disk(8.5, 3.7, 3.6, INK.paper, -1.85);
-    polygon([[-8, -5.7], [8, -5.7], [8, -5.65], [-8, -5.65]], INK.red);
-    for (const x of [-5.8, 5.8]) polygon([[x, -8], [x + .018, -8], [x + .018, 8], [x, 8]], INK.muted);
-  } else if (kind === 'pattern') {
-    disk(-5.1, 3, 3.8, INK.red);
-    disk(-5.1, 3, 2.8, INK.yellow, -1.85);
-    disk(-5.1, 3, 1.8, INK.blue, -1.8);
-    polygon([[4.2, 8], [8, 8], [4.2, 1], [8, -3], [8, -8], [3.7, -2]], INK.black);
-    polygon([[5.3, 4], [8, 1.5], [5.8, -1], [4.1, 1]], INK.red, -1.7);
-  } else if (kind === 'sport') {
-    polygon([[-20, -16], [-7, -16], [-7, 16], [-20, 16]], INK.blue);
-    polygon([[7, -16], [20, -16], [20, 16], [7, 16]], INK.red);
+    for (const x of [-4.8, 4.8]) {
+      polygon([[x - .16, 4.85], [x + .16, 4.85], [x + .16, 4.88], [x - .16, 4.88]], INK.red);
+      polygon([[x - .015, 4.7], [x + .015, 4.7], [x + .015, 5.02], [x - .015, 5.02]], INK.red);
+    }
   }
   if (kind === 'harbor' || kind === 'sport') group.rotation.x = -Math.PI / 2;
   return group;

@@ -152,7 +152,7 @@ try {
   const css = await readFile('styles/tokens.css', 'utf8'), stage = await readFile('src/core/stage.ts', 'utf8');
   for (const side of ['top', 'right', 'bottom', 'left']) assert(css.includes(`safe-area-inset-${side}`), `${side} safe-area inset is retained`);
   assert.equal((stage.match(/new WebGLRenderer\(/g) ?? []).length, 1);
-  assert(stage.includes('ACESFilmicToneMapping') && stage.includes('PCFSoftShadowMap'));
+  assert(stage.includes('ACESFilmicToneMapping') && stage.includes('PCFShadowMap'), 'ACES and the supported soft PCF shadow renderer are retained');
   for (const game of games) assert(!/\bfrom\s+['"]three/.test(await readFile(`src/games/${game}/model.ts`, 'utf8')), `${game}: pure model has zero three imports`);
   console.log('PASS shared GPU lifetime, allocation teardown, idle/pause, context recovery and reduced motion');
 } finally {

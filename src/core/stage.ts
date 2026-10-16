@@ -1,8 +1,9 @@
-import { ACESFilmicToneMapping, CanvasTexture, Color, DirectionalLight, Fog, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, OrthographicCamera, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, Raycaster, Scene, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector2, Vector3, WebGLRenderer, BufferGeometry, Material } from 'three';
+import { ACESFilmicToneMapping, CanvasTexture, Color, DirectionalLight, Fog, Group, HemisphereLight, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, OrthographicCamera, PCFShadowMap, PerspectiveCamera, PlaneGeometry, Raycaster, Scene, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector2, Vector3, WebGLRenderer, BufferGeometry, Material } from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { paperTexture } from './print';
 export type Preset = 'board' | 'island' | 'flight' | 'arena';
 export type Easing = 'entry' | 'score' | 'failure' | 'settle';
+export type Finish = 'paper' | 'paint' | 'ceramic' | 'metal';
 type Target = {
   x?: number;
   y?: number;
@@ -21,14 +22,16 @@ type Tween = {
   target: Target;
   time: number;
   easing: Easing;
+  duration: number;
 };
 const durations = { entry: .32, score: .24, failure: .28, settle: .36 };
-const ease = (t: number, type: Easing) => type === 'score' ? 1 + 2.1 * (t - 1) ** 3 + 1.1 * (t - 1) ** 2 : type === 'failure' ? t * t : 1 - (1 - t) ** 3;
+const ease = (t: number, type: Easing) => type === 'score' ? 1 + 2.1 * (t - 1) ** 3 + 1.1 * (t - 1) ** 2 : type === 'failure' ? t * t : type === 'settle' ? t * t * (3 - 2 * t) : 1 - (1 - t) ** 3;
 export class Stage {
   readonly renderer: WebGLRenderer;
   readonly scene = new Scene();
   readonly content = new Group();
-  readonly reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // The opt-in local review URL can show the complete motion study without changing OS preferences.
+  readonly reducedMotion = !(import.meta.env.DEV && new URLSearchParams(location.search).get('motion') === 'full') && matchMedia('(prefers-reduced-motion: reduce)').matches;
   private ortho = new OrthographicCamera(-5, 5, 5, -5, .1, 100);
   private perspective = new PerspectiveCamera(48, 1, .1, 180);
   private camera: OrthographicCamera | PerspectiveCamera = this.ortho;
@@ -50,6 +53,8 @@ export class Stage {
   private anchor?: { x: number; screen: number };
   private horizontal = false;
   private preset: Preset = 'board';
+  private boardTilt = 28;
+  private hemisphere = new HemisphereLight(0xcbd5df, 0x635640, .5);
   private frames = 0;
   private mounts = 0;
   private lost = false;
@@ -66,13 +71,13 @@ export class Stage {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = .94;
+    this.renderer.toneMappingExposure = 1.03;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = PCFSoftShadowMap;
+    this.renderer.shadowMap.type = PCFShadowMap;
     this.renderer.domElement.dataset.renderer = 'three';
     this.renderer.domElement.setAttribute('aria-label', 'Game scene');
     this.renderer.domElement.tabIndex = 0;
-    for (const [color, intensity, x, y, z] of [[0xfff5e2, 2.8, -6, 9, 12], [0xdce8ff, .7, 7, 4, 8], [0xffe7c6, .6, 0, -5, 6]]) {
+    for (const [color, intensity, x, y, z] of [[0xffebca, 4.4, -5, 11, 6], [0xb9d1f2, .65, 7, 4, -2], [0xf8e8c9, 1, 1, 5, -8]]) {
       const light = new DirectionalLight(color, intensity);
       light.position.set(x, y, z);
       if (!this.lights.children.length) {
@@ -83,10 +88,12 @@ export class Stage {
         light.shadow.camera.top = 20;
         light.shadow.camera.bottom = -20;
         light.shadow.bias = -.00015;
-        light.shadow.normalBias = .02;
+        light.shadow.normalBias = .025;
+        light.shadow.radius = 3;
       }
       this.lights.add(light);
     }
+    this.lights.add(this.hemisphere);
     this.scene.add(this.content, this.lights);
     this.observer = new ResizeObserver(() => { this.resize(); this.render(); });
     this.renderer.domElement.addEventListener('webglcontextlost', event => { event.preventDefault(); this.lost = true; this.releaseGPU(); this.host?.dispatchEvent(new Event('stage-lost')); });
@@ -97,6 +104,10 @@ export class Stage {
     this.host = host;
     this.play = play;
     this.preset = preset;
+    this.boardTilt = 28;
+    const positions = preset === 'board' ? [[-5, -6, 11], [7, 2, 4], [1, 8, 5]] : [[-5, 11, 6], [7, 4, -2], [1, 5, -8]];
+    positions.forEach((position, index) => this.lights.children[index].position.set(position[0], position[1], position[2]));
+    this.hemisphere.position.set(0, preset === 'board' ? 0 : 1, preset === 'board' ? 1 : 0);
     this.host.dataset.preset = preset;
     this.world = { width, height };
     this.anchor = undefined;
@@ -106,7 +117,7 @@ export class Stage {
     this.scene.fog = preset === 'flight' ? new Fog(background, 35, 120) : null;
     this.camera = preset === 'flight' ? this.perspective : this.ortho;
     this.camera.up.set(0, 1, 0);
-    this.camera.position.set(...(preset === 'board' ? [0, 0, 20] : preset === 'island' ? [0, 18, 8] : preset === 'arena' ? [0, 30, 7] : [0, 4.1, 9]) as [
+    this.camera.position.set(...(preset === 'board' ? [0, -10, 18] : preset === 'island' ? [0, 18, 8] : preset === 'arena' ? [0, 30, 7] : [0, 4.1, 9]) as [
       number,
       number,
       number
@@ -124,6 +135,11 @@ export class Stage {
     const span = preset === 'flight' ? 20 : Math.max(width, height) * .72 + 1.5;
     Object.assign(key.shadow.camera, { left: -span, right: span, top: span, bottom: -span });
     key.shadow.camera.updateProjectionMatrix();
+    this.resize();
+  }
+  /** Board relief keeps screen axes stable while exposing the front edge. */
+  relief(degrees: number) {
+    this.boardTilt = Math.max(0, Math.min(40, degrees));
     this.resize();
   }
   bounds() {
@@ -151,13 +167,18 @@ export class Stage {
     if (this.camera === this.ortho) {
       const arenaHorizontal = this.preset === 'arena' && this.horizontal;
       const width = arenaHorizontal ? this.world.height : this.world.width;
-      const height = Math.max(arenaHorizontal ? this.world.width : this.world.height, width / aspect);
+      const radians = this.boardTilt * Math.PI / 180;
+      const projectedHeight = this.preset === 'board' ? this.world.height * Math.cos(radians) + .75 * Math.sin(radians) : this.world.height;
+      const height = Math.max(arenaHorizontal ? this.world.width : projectedHeight, width / aspect);
       this.ortho.left = -height * aspect / 2;
       this.ortho.right = height * aspect / 2;
       this.ortho.top = height / 2;
       this.ortho.bottom = -height / 2;
-      if (this.preset === 'board')
-        this.ortho.position.x = this.anchor ? this.anchor.x + (.5 - this.anchor.screen) * height * aspect : 0;
+      if (this.preset === 'board') {
+        const x = this.anchor ? this.anchor.x + (.5 - this.anchor.screen) * height * aspect : 0;
+        this.ortho.position.set(x, -Math.sin(radians) * 20, Math.cos(radians) * 20);
+        this.ortho.lookAt(x, 0, 0);
+      }
       if (this.preset === 'arena') {
         this.ortho.up.set(arenaHorizontal ? -1 : 0, arenaHorizontal ? 0 : 1, 0);
         this.ortho.lookAt(0, 0, 0);
@@ -167,17 +188,22 @@ export class Stage {
       this.perspective.aspect = aspect;
       this.perspective.fov = aspect < 1 ? 58 : 48;
       const distance = Math.max(9, this.world.width / (2 * Math.tan(this.perspective.fov * Math.PI / 360) * aspect) + 2);
-      this.perspective.position.set(0, 4.1 + (distance - 9) * .65, distance);
-      this.perspective.lookAt(0, 1, -18);
+      this.perspective.position.set(0, 4.6 + (distance - 9) * .65, distance);
+      this.perspective.lookAt(0, 1.1, -7);
     }
     this.camera.updateProjectionMatrix();
   }
-  material(color: number | string, emissive = 0) {
-    const key = String(color) + ':' + emissive;
-    if (!this.materials.has(key))
-      this.materials.set(key, new MeshStandardMaterial({ color, map: this.paper ??= paperTexture(), roughness: .96, metalness: 0, emissive, emissiveIntensity: .55 }));
+  material(color: number | string, emissive = 0, finish: Finish = 'paint') {
+    const key = String(color) + ':' + emissive + ':' + finish;
+    if (!this.materials.has(key)) {
+      const roughness = { paper: .94, paint: .62, ceramic: .36, metal: .4 }[finish];
+      const metalness = finish === 'metal' ? .55 : finish === 'paper' ? 0 : .025;
+      const map = finish === 'paper' || finish === 'paint' ? this.paper ??= paperTexture() : null;
+      this.materials.set(key, new MeshStandardMaterial({ color, map, roughness, metalness, emissive, emissiveIntensity: .35 }));
+    }
     return this.materials.get(key)!;
   }
+
   box(width: number, height: number, depth: number, color: number | string, radius = Math.min(width, height, depth) * .04) {
     const key = [width, height, depth, radius].join(':');
     if (!this.geometry.has(key))
@@ -196,8 +222,8 @@ export class Stage {
     return mesh;
   }
   board(width: number, height: number, color: number | string = 0x243b50) {
-    const mesh = this.box(width, height, .26, color, .035);
-    mesh.position.z = -.32;
+    const mesh = this.box(width, height, .44, color, .035);
+    mesh.position.z = -.41;
     this.content.add(mesh);
     return mesh;
   }
@@ -237,7 +263,7 @@ export class Stage {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const lines = text.split('\n');
-    ctx.font = '700 ' + Math.min(canvas.height / (lines.length + 0.5), 512 / Math.max(1, ...lines.map(line => line.length)) * 1.5) + 'px system-ui';
+    ctx.font = '700 ' + Math.min(canvas.height / (lines.length + 0.5), 512 / Math.max(1, ...lines.map(line => line.length)) * 1.5) + 'px Georgia, serif';
     lines.forEach((line, i) => ctx.fillText(line, 256, canvas.height * (i + .5) / lines.length));
     const material = mesh.material as MeshBasicMaterial;
     material.map?.dispose();
@@ -261,7 +287,7 @@ export class Stage {
         return hit.object.userData.input;
     return undefined;
   }
-  tween(object: Object3D, target: Target, easing: Easing = 'settle') {
+  tween(object: Object3D, target: Target, easing: Easing = 'settle', duration = durations[easing]) {
     const { scale, ...channels } = target;
     const resolved: Target = scale === undefined ? channels : { sx: scale, sy: scale, sz: scale, ...channels };
     const keys = Object.keys(resolved) as (keyof Target)[];
@@ -272,7 +298,7 @@ export class Stage {
     this.tweens = this.tweens.filter(tween => Object.keys(tween.target).length > 0);
     const from: Target = {};
     for (const key of keys) from[key] = key === 'scale' ? object.scale.x : key[0] === 'r' ? object.rotation[key[1] as 'x' | 'y' | 'z'] : key[0] === 's' ? object.scale[key[1] as 'x' | 'y' | 'z'] : object.position[key as 'x' | 'y' | 'z'];
-    const tween = { object, from, target: resolved, time: 0, easing };
+    const tween = { object, from, target: resolved, time: 0, easing, duration: Math.max(.001, Math.min(.4, duration)) };
     if (this.reducedMotion)
       this.applyTween(tween, 1);
     else
@@ -299,7 +325,7 @@ export class Stage {
     }
   }
   advance(dt: number) {
-    this.tweens = this.tweens.filter(tween => { tween.time += dt; const t = Math.min(1, tween.time / durations[tween.easing]); this.applyTween(tween, t); return t < 1; });
+    this.tweens = this.tweens.filter(tween => { tween.time += dt; const t = Math.min(1, tween.time / tween.duration); this.applyTween(tween, t); return t < 1; });
     this.particles = this.particles.filter(p => { p.life -= dt; if (p.life <= 0) {
       p.mesh.removeFromParent();
       return false;
@@ -338,10 +364,12 @@ export class Stage {
     const grid = this.grid;
     let boardBounds = null;
     if (grid && this.preset === 'board') {
-      const a = this.project(-grid.width / 2, grid.height / 2), b = this.project(grid.width / 2, -grid.height / 2);
-      boardBounds = { x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y, cols: grid.cols, rows: grid.rows };
+      const corners = [-1, 1].flatMap(x => [-1, 1].map(y => this.project(x * grid.width / 2, y * grid.height / 2)));
+      const left = Math.min(...corners.map(point => point.x)), right = Math.max(...corners.map(point => point.x));
+      const top = Math.min(...corners.map(point => point.y)), bottom = Math.max(...corners.map(point => point.y));
+      boardBounds = { x: left, y: top, width: right - left, height: bottom - top, cols: grid.cols, rows: grid.rows };
     }
-    return { playBounds: bounds, boardBounds, picks, renderer: { mounts: this.mounts, frames: this.frames, geometries: this.renderer.info.memory.geometries, textures: this.renderer.info.memory.textures, drawCalls: this.renderer.info.render.calls, contexts: 1, pixelRatio: this.renderer.getPixelRatio(), available: this.available }, motion: { reduced: this.reducedMotion, tweens: this.tweens.length, particles: this.particles.length, maxParticles: 48 } };
+    return { playBounds: bounds, boardBounds, picks, presentation: { preset: this.preset, relief: this.preset === 'board' ? this.boardTilt : null, shadows: this.renderer.shadowMap.enabled }, renderer: { mounts: this.mounts, frames: this.frames, geometries: this.renderer.info.memory.geometries, textures: this.renderer.info.memory.textures, drawCalls: this.renderer.info.render.calls, contexts: 1, pixelRatio: this.renderer.getPixelRatio(), available: this.available }, motion: { reduced: this.reducedMotion, tweens: this.tweens.length, particles: this.particles.length, maxParticles: 48 } };
   }
   private releaseGPU() {
     // Release old context listeners before restoration; retain CPU shapes for upload.

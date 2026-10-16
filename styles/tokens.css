@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --mint: #174d91;
-  --cyan: #174d91;
-  --coral: #da3726;
-  --gold: #e9b340;
-  --lilac: #78528b;
-  --blue: #174d91;
-  --ink: #151a1b;
-  --panel: #e6d6b3;
+  --mint: #194d83;
+  --cyan: #194d83;
+  --coral: #c43c2f;
+  --gold: #d9a641;
+  --lilac: #775a7b;
+  --blue: #194d83;
+  --ink: #172326;
+  --panel: #e1d4b9;
   --muted: #6b624f;
-  --paper: #eee0bf;
+  --paper: #e9ddc4;
   --radius-sm: 2px;
   --radius-md: 3px;
   --radius-lg: 4px;
@@ -21,8 +21,8 @@
   --text-sm: 12px;
   --text-md: 15px;
   --text-lg: 24px;
-  --shadow-sm: 3px 4px 0 #151a1b25;
-  --shadow-lg: 6px 8px 0 #151a1b35;
+  --shadow-sm: 3px 4px 0 #17232625;
+  --shadow-lg: 6px 8px 0 #17232635;
   color: var(--ink);
   background: var(--paper);
   font-synthesis: none;
