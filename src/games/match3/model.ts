@@ -5,6 +5,9 @@ export type GemPoint = {
 export type GemGrid = number[][];
 export const GEM_SIZE = 8;
 export const GEM_COLORS = 5;
+/** The run never ends: a level only clears on its target, so moves are unlimited. */
+export const STARS_TIGHT = 22;
+export const STARS_LOOSE = 38;
 const copyGrid = (grid: GemGrid) => grid.map(row => [...row]);
 const same = (a: GemPoint, b: GemPoint) => a.x === b.x && a.y === b.y;
 const neighbors = (a: GemPoint, b: GemPoint) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1;
@@ -95,23 +98,23 @@ export function validMatchSave(value: unknown): value is MatchSave {
     return false;
   const save = value as MatchSave;
   return Array.isArray(save.grid) && save.grid.length === GEM_SIZE && save.grid.every(row => Array.isArray(row) && row.length === GEM_SIZE && row.every(cell => Number.isInteger(cell) && cell >= 0 && cell < GEM_COLORS)) &&
-    Number.isFinite(save.score) && save.score >= 0 && Number.isInteger(save.moves) && save.moves >= 0 && save.moves <= 30 &&
+    Number.isFinite(save.score) && save.score >= 0 && Number.isInteger(save.moves) && save.moves >= 0 && save.moves <= 1e6 &&
     Number.isInteger(save.level) && save.level >= 1 && !findMatches(save.grid).length;
 }
 export function createMatch3Model(saved: unknown = null, best = 0, random = Math.random) {
   const model = {
-    mode: 'playing' as 'playing' | 'paused' | 'won' | 'over',
-    phase: 'playing' as 'playing' | 'clearing' | 'falling' | 'won' | 'over',
+    mode: 'playing' as 'playing' | 'paused' | 'won',
+    phase: 'playing' as 'playing' | 'clearing' | 'falling' | 'won',
     grid: [] as GemGrid, selected: null as GemPoint | null, hinted: [] as GemPoint[], matching: [] as GemPoint[],
-    falls: [] as GemFall[], swap: null as { a: GemPoint; b: GemPoint; accepted: boolean; at: number } | null, score: 0, moves: 30, level: 1, best: Math.max(0, best),
-    chain: 0, timer: 0, clock: 0, epoch: 0, serial: 0, shuffled: false,
+    falls: [] as GemFall[], swap: null as { a: GemPoint; b: GemPoint; accepted: boolean; at: number } | null, score: 0, moves: 0, level: 1, best: Math.max(0, best),
+    chain: 0, timer: 0, clock: 0, epoch: 0, serial: 0, shuffled: false, reshuffles: 0,
     target() { return 1000 + (model.level - 1) * 350; },
     reset(advance?: boolean) {
       if (advance ?? model.phase === 'won')
         model.level++;
       model.grid = createMatchBoard(random);
       model.score = 0;
-      model.moves = 30;
+      model.moves = 0;
       model.mode = 'playing';
       model.phase = 'playing';
       model.selected = null;
@@ -125,25 +128,23 @@ export function createMatch3Model(saved: unknown = null, best = 0, random = Math
       model.epoch++;
       model.serial++;
       model.shuffled = false;
+      model.reshuffles = 0;
     },
+    /** Endless settlement: only the target clears a level, an exhausted board reshuffles. */
     finish() {
       model.shuffled = false;
       if (model.score >= model.target()) {
         model.mode = 'won';
         model.phase = 'won';
+        return;
       }
-      else if (!model.moves) {
-        model.mode = 'over';
-        model.phase = 'over';
-      }
-      else {
-        model.mode = 'playing';
-        model.phase = 'playing';
-        if (!match3Moves(model.grid).length) {
-          model.grid = createMatchBoard(random);
-          model.shuffled = true;
-          model.serial++;
-        }
+      model.mode = 'playing';
+      model.phase = 'playing';
+      if (!match3Moves(model.grid).length) {
+        model.grid = createMatchBoard(random);
+        model.shuffled = true;
+        model.reshuffles++;
+        model.serial++;
       }
     },
     hint() {
@@ -187,7 +188,7 @@ export function createMatch3Model(saved: unknown = null, best = 0, random = Math
         if (!model.matching.length)
           exchange(model.grid, previous, point);
         else {
-          model.moves--;
+          model.moves++;
           model.chain = 1;
           model.phase = 'clearing';
           model.timer = 0.28;
@@ -234,7 +235,8 @@ export function createMatch3Model(saved: unknown = null, best = 0, random = Math
     snapshot() {
       return { game: 'match3', mode: model.mode === 'paused' ? 'paused' : model.phase, ...model.saved(), best: model.best,
         selected: model.selected ? { ...model.selected } : null, hinted: model.hinted.map(point => ({ ...point })),
-        matching: model.matching.map(point => ({ ...point })), target: model.target(), chain: model.chain, epoch: model.epoch };
+        matching: model.matching.map(point => ({ ...point })), target: model.target(), chain: model.chain,
+        reshuffles: model.reshuffles, epoch: model.epoch };
     },
     planning() {
       return model.mode === 'playing' && model.phase === 'playing' ? { game: 'match3' as const, epoch: String(model.epoch),
@@ -242,8 +244,8 @@ export function createMatch3Model(saved: unknown = null, best = 0, random = Math
     },
     summary() {
       return { score: model.score, best: model.best, moves: model.moves, level: model.level,
-        target: model.target(), chain: model.chain, shuffled: model.shuffled,
-        stars: model.mode === 'won' ? model.moves >= 15 ? 3 : model.moves >= 6 ? 2 : 1 : 0 };
+        target: model.target(), chain: model.chain, shuffled: model.shuffled, reshuffles: model.reshuffles,
+        stars: model.mode === 'won' ? model.moves <= STARS_TIGHT ? 3 : model.moves <= STARS_LOOSE ? 2 : 1 : 0 };
     }
   };
   if (validMatchSave(saved)) {
