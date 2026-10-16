@@ -91,14 +91,14 @@ function cargoPlans(source: State<'cargo'>): InputPlan[] {
   return routes.map(route => cargoRoutePlan(source, route.route, route.label)).filter(plan => plan.steps.length);
 }
 function lightPlans(source: State<'lightsout'>): InputPlan[] {
-  const presses = solveLights(source.board);
+  const presses = solveLights(source.board, source.size);
   if (!presses.length)
     return [];
   return [presses, [...presses].reverse()].map(order => {
     const state = structuredClone(source), steps: PlannedInput[] = [];
     for (const index of order) {
       steps.push(input(state, index));
-      applyToggle(state.board, index % 5, Math.floor(index / 5));
+      applyToggle(state.board, index % source.size, Math.floor(index / source.size), source.size);
     }
     return { label: `Turn every light off with ${steps.length} ordinary taps.`, steps };
   });

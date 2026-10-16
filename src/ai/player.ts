@@ -22,6 +22,7 @@ export type PlanningState = Base & ({
 } | {
   game: 'lightsout';
   board: number[];
+  size: number;
 } | {
   game: 'sudoku';
   board: number[];

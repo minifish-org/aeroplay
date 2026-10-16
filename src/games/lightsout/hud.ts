@@ -4,10 +4,10 @@ export function createHUD({ hud, player }: GameContext, model: LightsModel) {
   const submit = (input: string) => { player.submitHumanInput(input); };
   const undo = hud.button('undo', 'Undo', 'undo', () => submit('undo')), hint = hud.button('hint', 'Hint', 'hint', () => submit('hint'));
   const retry = hud.button('restart', 'Retry', 'restart', () => submit('retry'));
-  hud.intro('lightsout', 'Turn every lamp off. Each tap flips that lamp and its four neighbors.');
+  hud.intro('lightsout', 'Turn every lamp off. Each tap flips that lamp and its four neighbors. Every puzzle adds boards and minimum taps.');
   return () => {
     const s = model.summary();
-    hud.stats({ Puzzle: s.level, Moves: s.moves + ' / ' + s.par });
+    hud.stats({ Puzzle: s.level + ' · ' + s.size + '×' + s.size, Moves: s.moves + ' / ' + s.par });
     undo.disabled = !s.undoCount || player.type === 'ai';
     hint.disabled = model.mode !== 'playing' || player.type === 'ai';
     retry.disabled = player.type === 'ai';
