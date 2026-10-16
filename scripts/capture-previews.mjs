@@ -28,14 +28,17 @@ try {
     }
     if (game === '2048') {
       await page.locator('canvas').focus();
-      for (const key of ['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft', 'ArrowDown']) await page.keyboard.press(key);
+      for (let move = 0; move < 48; move++) await page.keyboard.press(['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp'][move % 4]);
+    }
+    if (game === 'flappy') {
+      await page.locator('canvas').focus();
+      await page.keyboard.press('Space');
+      await page.waitForTimeout(520);
+      await page.keyboard.press('p');
     }
     await page.waitForTimeout(400);
     const clip = await page.evaluate(() => {
-      const { playBounds: p, boardBounds: b } = JSON.parse(window.render_game_to_text());
-      if (!b) return p;
-      const x = Math.max(p.x, b.x - 8), y = Math.max(p.y, b.y - 8);
-      return { x, y, width: Math.min(p.x + p.width, b.x + b.width + 8) - x, height: Math.min(p.y + p.height, b.y + b.height + 8) - y };
+      return JSON.parse(window.render_game_to_text()).playBounds;
     });
     if (errors.length) throw new Error(errors.join('\n'));
     const pixels = await page.evaluate(clip => {

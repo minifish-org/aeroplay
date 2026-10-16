@@ -22,7 +22,7 @@ export function mountHub(root: HTMLElement) {
     const best = store.load<number>('best', 0);
     return best ? 'Best ' + best.toLocaleString() : 'No record yet';
   }
-  for (const entry of games) {
+  for (const [index, entry] of games.entries()) {
     const card = document.createElement('button');
     card.className = 'hub-card';
     card.dataset.game = entry.id;
@@ -35,7 +35,15 @@ export function mountHub(root: HTMLElement) {
     title.textContent = entry.name;
     const value = document.createElement('span');
     value.textContent = record(entry.id);
-    card.append(image, title, value);
+    value.className = 'card-record';
+    const caption = document.createElement('div');
+    caption.className = 'card-caption';
+    const edition = document.createElement('span');
+    edition.className = 'card-edition';
+    edition.textContent = String(index + 1).padStart(2, '0');
+    edition.setAttribute('aria-hidden', 'true');
+    caption.append(title, value, edition);
+    card.append(image, caption);
     if (entry.id === last)
       card.dataset.last = 'true';
     card.addEventListener('click', () => { location.hash = entry.id; });
