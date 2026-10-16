@@ -1,5 +1,6 @@
 import { assert, games, engine, harness, browserName, fullMatch, until, touchStickDash } from './verify-lib.mjs';
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdtemp, mkdir, rm, readdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -22,7 +23,7 @@ const cache = {
 const request = new Request(moduleURL, { headers: { Origin: origin } }); assert.equal(await cache.match(request), undefined); assert(await cache.match(request, { ignoreVary: true }));
 let network = 0, available = false;
 vm.runInNewContext(template.replace('__VERSION__', 'test').replace('__PRECACHE__', JSON.stringify(['/', '/assets/game.js'])), {
-  self: { location: { origin }, addEventListener: (name, handler) => handlers.set(name, handler) }, caches: { open: async () => cache }, URL,
+  self: { location: { origin }, addEventListener: (name, handler) => handlers.set(name, handler) }, caches: { open: async () => cache }, URL, Request,
   fetch: async () => {
     network++;
     if (!available) throw new Error('Offline');
@@ -86,6 +87,7 @@ assert(!assets.includes('/_headers') && !assets.includes('/_redirects'), 'Unserv
 assert(assets.includes('/')); assert(assets.includes('/models/tamev-nano/model_int8.onnx')); assert(assets.some(file => file.endsWith('.wasm'))); assert(assets.some(file => file.includes('planner.worker')));
 for (const game of games) assert(assets.some(file => new RegExp(`/${game}[^/]*\\.(?:js|png|webp)$`).test(file) || file.includes(`/previews/${game}.`)), `${game} has local precached assets`);
 const files = await readdir(join(dist, 'assets')); assert(!files.some(file => /pixi|snake|tetris|maze/.test(file)), 'No deleted render/game bundles');
+const previewRequests = [];
 const overrides = new Map(), mime = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.jpg': 'image/jpeg', '.css': 'text/css', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.json': 'application/json', '.wasm': 'application/wasm', '.onnx': 'application/octet-stream' };
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url, 'http://localhost').pathname;
@@ -100,6 +102,10 @@ const server = createServer(async (request, response) => {
     const bytes = overrides.get(pathname) ?? await readFile(join(dist, file));
     response.setHeader('Content-Type', mime['.' + file.split('.').at(-1)] ?? 'application/octet-stream');
     if (pathname === '/service-worker.js') response.setHeader('Cache-Control', 'no-store');
+    if (pathname.startsWith('/assets/previews/')) {
+      response.setHeader('Cache-Control', 'public, max-age=14400');
+      previewRequests.push({ path: pathname, bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), requestCacheControl: request.headers['cache-control'] ?? null });
+    }
     response.end(bytes);
   } catch {
     response.writeHead(404);
@@ -114,8 +120,79 @@ const stop = () => new Promise((resolve, reject) => {
 await listen(0); const port = server.address().port, url = `http://127.0.0.1:${port}`;
 const profile = await mkdtemp(join(tmpdir(), 'aeroplay-offline-profile-')), type = await engine();
 const options = { headless: true, viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, serviceWorkers: 'allow' };
+async function verifyWarmPreviewUpdate() {
+  const path = '/assets/previews/lightsout.jpg', oldBytes = await readFile(join(dist, path)), newBytes = await readFile(join(dist, 'assets/previews/2048.jpg'));
+  const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+  assert.notEqual(hash(oldBytes), hash(newBytes), 'Warm update fixture changes actual JPEG bytes at the same URL');
+  const warmProfile = await mkdtemp(join(tmpdir(), 'aeroplay-warm-preview-'));
+  const warm = await type.launchPersistentContext(warmProfile, options), page = await warm.newPage();
+  const folder = `output/offline-${browserName}`; await mkdir(folder, { recursive: true });
+  const updatedCache = cacheName + '-warm-preview', report = { path, oldSHA256: hash(oldBytes), newSHA256: hash(newBytes), initialCache: cacheName, updatedCache };
+  const save = () => writeFile(join(folder, 'warm-preview-update.json'), JSON.stringify(report, null, 2));
+  const bodyHash = async name => page.evaluate(async ({ name, path }) => {
+    const response = await (await caches.open(name)).match(path);
+    if (!response) return null;
+    return [...new Uint8Array(await crypto.subtle.digest('SHA-256', await response.arrayBuffer()))].map(value => value.toString(16).padStart(2, '0')).join('');
+  }, { name, path });
+  const imageHash = async () => page.evaluate(async path => {
+    const image = [...document.images].find(image => new URL(image.src).pathname === path);
+    if (!image) return null;
+    await image.decode();
+    const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d'); context.drawImage(image, 0, 0);
+    return [...new Uint8Array(await crypto.subtle.digest('SHA-256', context.getImageData(0, 0, canvas.width, canvas.height).data))].map(value => value.toString(16).padStart(2, '0')).join('');
+  }, path);
+  try {
+    overrides.set('/warm-preview.html', Buffer.from(`<img src="${path}" alt="Warm HTTP preview">`));
+    overrides.set(path, oldBytes);
+    // Warm the browser HTTP cache before any service worker can intercept this image.
+    await page.goto(url + '/warm-preview.html'); await page.locator('img').evaluate(image => image.decode());
+    report.httpWarmRequests = previewRequests.filter(request => request.path === path);
+    assert(report.httpWarmRequests.length > 0, 'Same-path preview was fetched into the long-lived HTTP cache');
+    report.oldImagePixelsSHA256 = await imageHash();
+    await page.goto(url + '/#hub'); await page.waitForSelector('.hub-card');
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+      if (!navigator.serviceWorker.controller) await new Promise(resolve => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
+    });
+    await until(() => page.evaluate(async name => (await (await caches.open(name)).keys()).length, cacheName), () => page.waitForTimeout(50), count => count === assets.length, 300, 'First install precaches every resource after HTTP warming');
+    report.initialCachedSHA256 = await bodyHash(cacheName); assert.equal(report.initialCachedSHA256, report.oldSHA256);
+    const requestStart = previewRequests.length;
+    overrides.set(path, newBytes);
+    overrides.set('/service-worker.js', Buffer.from(sw.replace(cacheName, updatedCache)));
+    await page.evaluate(async () => { await (await navigator.serviceWorker.ready).update(); });
+    await until(() => page.evaluate(async name => {
+      const keys = await caches.keys();
+      return keys.includes(name) && keys.filter(key => key.startsWith('aeroplay-')).length === 1 && (await (await caches.open(name)).keys()).length;
+    }, updatedCache), () => page.waitForTimeout(50), count => count === assets.length, 300, 'Actual updated worker activates its complete cache and removes the old one');
+    report.updatedCachedSHA256 = await bodyHash(updatedCache);
+    report.updateNetworkRequests = previewRequests.slice(requestStart).filter(request => request.path === path);
+    report.activeCacheNames = await page.evaluate(() => caches.keys());
+    await save();
+    assert.equal(report.updatedCachedSHA256, report.newSHA256, 'Updated SW must not copy the stale same-path JPEG from the warm HTTP cache');
+    report.expectedNewPixelsSHA256 = await page.evaluate(async base64 => {
+      const bitmap = await createImageBitmap(new Blob([Uint8Array.from(atob(base64), value => value.charCodeAt(0))], { type: 'image/jpeg' }));
+      const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
+      const context = canvas.getContext('2d'); context.drawImage(bitmap, 0, 0); bitmap.close();
+      return [...new Uint8Array(await crypto.subtle.digest('SHA-256', context.getImageData(0, 0, canvas.width, canvas.height).data))].map(value => value.toString(16).padStart(2, '0')).join('');
+    }, newBytes.toString('base64'));
+    await stop(); await page.reload(); await page.waitForSelector('.hub-card');
+    report.offlineImagePixelsSHA256 = await imageHash();
+    assert.equal(report.offlineImagePixelsSHA256, report.expectedNewPixelsSHA256, 'Offline hub decodes the updated same-path preview after a warm upgrade');
+    assert.notEqual(report.offlineImagePixelsSHA256, report.oldImagePixelsSHA256, 'Offline hub no longer shows the previous preview artwork');
+    report.offlineCachedSHA256 = await bodyHash(updatedCache); assert.equal(report.offlineCachedSHA256, report.newSHA256);
+    await page.screenshot({ path: join(folder, 'warm-preview-updated-offline.png') });
+    report.passed = true; await save();
+    console.log('PASS warm HTTP-cache same-path JPEG update: actual SW upgrade replaces bytes and offline hub displays new artwork');
+  } finally {
+    await warm.close(); await rm(warmProfile, { recursive: true, force: true });
+    overrides.clear();
+    if (!server.listening) await listen(port);
+  }
+}
 let ctx, matchFailure;
 try {
+  await verifyWarmPreviewUpdate();
   ctx = await type.launchPersistentContext(profile, options);
   let h = await harness(ctx, url, `output/offline-${browserName}`);
   await h.open('hub');
