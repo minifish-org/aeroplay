@@ -69,10 +69,7 @@ for (let index = 0; index < solution.length; index++) if (!sudoku.board[index]) 
 }
 assert.equal(sudoku.mode, 'won', 'Sudoku fixture is the completed existing puzzle');
 const match = m.gmatch3.createMatch3Model();
-match.score = match.target();
-match.moves = 18;
-match.finish();
-assert.equal(match.mode, 'won', 'Match-3 fixture meets its existing score target');
+assert.equal(match.mode, 'playing', 'An endless Match-3 run has no finished state to restore');
 const completed = [
   { game: 'lightsout', key: 'state-v2', save: lights.saved(), title: 'Lights out', next: 'Next puzzle', verify(state) {
     assert.deepEqual(state.board, lights.board);
@@ -84,12 +81,7 @@ const completed = [
     assert.equal(state.elapsedSeconds, 123);
     assert.equal(state.bestSeconds, 123);
   } },
-  { game: 'match3', key: 'run', save: match.saved(), title: 'Level cleared', next: 'Next level', verify(state) {
-    assert.deepEqual(state.grid, match.grid);
-    assert.equal(state.score, match.target());
-    assert.equal(state.moves, 18);
-    assert.equal(state.target, match.target());
-  } },
+  // Match-3 is one endless run, so it has no completed result left to restore.
 ];
 
 const browser = await (await engine()).launch({ headless: true });

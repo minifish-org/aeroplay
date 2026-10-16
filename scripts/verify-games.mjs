@@ -387,30 +387,40 @@ try {
   await advance(500);
   assert.deepEqual((await state()).grid, s.grid);
   assert.equal((await state()).moves, s.moves);
-  await until(state, async (before, i) => {
+  for (let i = 0; i < 40; i++) {
+    const before = await state();
     await button('Hint').click();
     const hinted = (await state()).hinted;
     assert.equal(hinted.length, 2);
     assert.equal(Math.abs(hinted[0].x - hinted[1].x) + Math.abs(hinted[0].y - hinted[1].y), 1);
     for (const point of hinted) await h.pick(point);
     assert.equal((await state()).moves, before.moves + 1, 'Unlimited moves only ever count up');
-    await until(state, () => advance(1200), s => !['clearing', 'falling'].includes(s.mode), 40, 'Match cascades settle');
+    await until(state, () => advance(1200), settled => !['clearing', 'falling'].includes(settled.mode), 40, 'Match cascades settle');
     assert((await state()).score > before.score);
-    assert(['playing', 'won'].includes((await state()).mode), 'A level never falls into a failed settlement');
+    assert.equal((await state()).mode, 'playing', 'One endless run never settles into a finished state');
+    assert.equal((await state()).level, undefined, 'An endless run has no level to climb');
+    assert.equal((await state()).target, undefined, 'An endless run has no score target');
     if (i === 2) await h.shot('match3-cascades');
-  }, s => s.mode === 'won', 60, 'Match full played round');
+  }
   await h.shot('match3-result');
   s = await state();
-  assert.equal(s.mode, 'won', 'Only the score target clears a level');
+  assert(s.score > 0 && s.moves >= 40, 'Forty hinted swaps only ever add score');
+  assert(s.best >= s.score, 'The run reports the saved best');
   await h.action('restart').click();
-  assert.equal((await state()).level, s.level + 1, 'The next level takes over with a higher target');
-  assert.equal((await state()).moves, 0, 'The next level starts from a fresh move count');
-  assert((await state()).target > s.target);
+  assert.equal((await state()).score, 0, 'Restart begins a fresh endless run');
+  assert.equal((await state()).moves, 0);
+  assert((await state()).best >= s.score, 'The best score survives a restart');
+  await button('Hint').click();
+  const reopening = (await state()).hinted;
+  for (const point of reopening) await h.pick(point);
+  await until(state, () => advance(1200), settled => !['clearing', 'falling'].includes(settled.mode), 40, 'Match cascades settle');
+  assert((await state()).score > 0, 'The fresh run keeps scoring');
   s = await state();
   await page.reload();
   await page.waitForFunction(() => window.render_game_to_text);
   assert.deepEqual((await state()).grid, s.grid);
-  console.log('PASS Match valid/invalid native swaps, hints, counted-but-unlimited moves, cascades, full settlement, endless progression and save');
+  assert.equal((await state()).score, s.score, 'An endless run saves its score');
+  console.log('PASS Match valid/invalid native swaps, hints, unlimited moves, cascades, endless run, best score and save');
 
   await h.open('cargo');
   const cargoBeforeMove = await state();
