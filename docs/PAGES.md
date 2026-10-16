@@ -20,11 +20,13 @@ The approved shared decisions below apply to every game, with the documented Pus
 
 The reviewed checkout was local `main` at `2ee86c887447a3f495e8175adb9c4e9e91ae9688`, initially clean and one commit ahead of the local `origin/main` reference. The pre-existing commit, `Rebuild the 2D play panels and drop Tetris hold`, was unpublished when reviewed and is preserved. These screenshots describe that baseline checkout rather than a verified production deployment.
 
-| Metric | Baseline measurement at `2ee86c8` | Rewrite target |
+Code-line limits were removed on 2026-10-16; the baseline counts below remain historical measurements.
+
+| Metric | Baseline measurement at `2ee86c8` | Target / reporting status |
 | --- | ---: | ---: |
-| `src/**/*.ts` | 59 files; 10,016 lines | At most 6,000 lines |
-| `styles/**/*.css` | 6 files; 2,017 lines | At most 900 lines |
-| All `scripts/*.mjs` | 21 files; 3,476 lines | At most 2,000 lines, using the task's baseline denominator |
+| `src/**/*.ts` | 59 files; 10,016 lines | No line-count cap |
+| `styles/**/*.css` | 6 files; 2,017 lines | No line-count cap |
+| All `scripts/*.mjs` | 21 files; 3,476 lines | No line-count cap |
 | Verifier-only `scripts/verify-*.mjs` | 19 files; 3,203 lines | Report separately to avoid hiding authoring/model-preparation scripts |
 | Registry / candidate-planner games | 11 / 11 | 8 / 8 |
 | Optional Watch pages / fixed-opponent pages | 10 / 1 | 7 / 1 |

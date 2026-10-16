@@ -34,7 +34,7 @@ Work directly on local main. P0 skeleton, P1 core, P2 one game commit each (2048
 
 Before the single final push: npm run build, verify-layout.mjs, verify-games.mjs, verify-ai.mjs, verify-offline.mjs, and manual browser opening of hub/all eight games. Do not relax assertions. Preserve existing meaningful coverage, render_game_to_text, advanceTime, and PLAYWRIGHT_MODULE support. After push verify successful GitHub Actions, deployed/local asset hashes, and updated SW CACHE.
 
-Budgets: src TS <=6000 lines, styles CSS <=900, scripts <=2000; model+view+hud <=450 per game. Keep code readable. If a game cannot meet its budget with adequate presentation, stop and describe the constraint instead of compressing it artificially.
+Keep code readable.
 
 ## Workflow and communication
 

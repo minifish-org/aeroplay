@@ -46,17 +46,17 @@ One shared renderer owns the camera/light authority. Game models have no Three i
 
 ## Measurements
 
-Line counts include readable source formatting and every `.mjs` file in `scripts`, including model preparation and preview capture.
+Code-line limits were removed on 2026-10-16. The counts below remain historical measurements from 2026-10-15, not acceptance limits. They include readable source formatting and every `.mjs` file in `scripts`, including model preparation and preview capture.
 
-| Metric | Baseline | Current | Target |
+| Metric | Baseline | 2026-10-15 snapshot | Target |
 | --- | ---: | ---: | ---: |
-| TypeScript | 10,016 lines / 59 files | 5,586 lines / 44 files | ≤6,000 |
-| CSS | 2,017 lines / 6 files | 391 lines / 3 files | ≤900 |
-| Scripts | 3,476 lines / 21 files | 1,946 lines / 7 files | ≤2,000 |
+| TypeScript | 10,016 lines / 59 files | 5,586 lines / 44 files | No line-count cap |
+| CSS | 2,017 lines / 6 files | 391 lines / 3 files | No line-count cap |
+| Scripts | 3,476 lines / 21 files | 1,946 lines / 7 files | No line-count cap |
 | Games | 11 | 8 | 8 |
 | Rendering libraries | Pixi + Three | Three | Three |
 | Rendering chunks, raw decimal kB | 392.95 + 559.10 | 552.48 | One Three chain |
-| Largest model + view + HUD | 500–900 lines | 435 lines | ≤450 |
+| Largest model + view + HUD | 500–900 lines | 435 lines | No line-count cap |
 
 | Game | Model + view + HUD lines |
 | --- | ---: |
