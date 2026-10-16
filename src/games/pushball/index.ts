@@ -14,7 +14,8 @@ export default function mount(context: GameContext) {
   const model = new PushballRun(store.load('wins', 0), store.load('matches', 0)), view = new PushballView(stage), audio = new GameAudio(), opponent = new Player(new TamevPlayer());
   let disposed = false, loading = false, modelReady = false, error = '', selectedPlan = 'Waiting for kickoff', goal = 0, storedMatches = model.matches;
   const controls = pushballHUD(hud, model, () => { void startMatch(); }, togglePause, () => opponent.retry(), audio, () => stage.available, (x, y) => stage.groundDirection(x, y));
-  const render = (dt = 0) => { view.render(model.state, dt); controls.refresh(loading, error, opponent.error); hud.enforceGraphics(); stage.advance(dt); stage.render(); };
+  const render = (dt = 0) => { const elapsed = model.mode === 'paused' || hud.helpOpen || loading ? 0 : dt; view.render(model.state, elapsed); controls.refresh(loading, error, opponent.error); hud.enforceGraphics(); stage.advance(elapsed); stage.render(); };
+  const active = () => !disposed && !document.hidden && !hud.helpOpen && model.mode !== 'paused' && (model.mode === 'playing' || stage.animating);
   const loop = new GameLoop(dt => {
     if (hud.helpOpen || document.hidden || model.mode !== 'playing')
       return;
@@ -34,9 +35,9 @@ export default function mount(context: GameContext) {
       if (model.state.winner === 0)
         audio.play('win');
     }
-  }, render, () => !disposed && !document.hidden && model.mode === 'playing' && !hud.helpOpen || stage.animating);
+  }, render, active);
   const wake = () => { if (disposed)
-    return; render(); if (model.mode === 'playing' || stage.animating)
+    return; render(); if (active())
     loop.start(); };
   function port(side: Side): PlayerGame<Action> {
     const key = () => model.version + ':' + model.state.goalSerial + ':' + side + ':' + Math.floor(model.state.elapsed / .14);
