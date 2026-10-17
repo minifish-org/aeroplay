@@ -1,8 +1,7 @@
-import type { GameAudio } from '../../core/audio';
 import type { HUD } from '../../core/hud';
 import { joystick } from '../../core/input';
 import { DASH_COOLDOWN, idleAction, normalizeAction, type Action, type PushballRun } from './model';
-export function pushballHUD(hud: HUD, model: PushballRun, start: () => void, pause: () => void, retry: () => void, audio: GameAudio, available = () => true, direction = (x: number, y: number) => ({ x, y })) {
+export function pushballHUD(hud: HUD, model: PushballRun, start: () => void, pause: () => void, retry: () => void, available = () => true, direction = (x: number, y: number) => ({ x, y })) {
   let action = idleAction(), lastDirection = { x: 0, y: -1 };
   const held = new Set<string>();
   const bank = hud.bank('arena', 150), stick = document.createElement('div');
@@ -12,7 +11,6 @@ export function pushballHUD(hud: HUD, model: PushballRun, start: () => void, pau
   dash.addEventListener('pointerdown', event => { if (event.button === 0 && !dash.disabled) { event.preventDefault(); action.dash = true; } });
   dash.addEventListener('click', event => { if (event.detail > 0) event.stopImmediatePropagation(); }, true);
   dash.addEventListener('pointercancel', () => { action.dash = false; });
-  const sound = hud.button('sound', 'Sound', 'sound', () => audio.toggle());
   const charge = document.createElement('progress');
   charge.max = 1;
   charge.setAttribute('aria-label', 'Dash charge');
@@ -46,8 +44,6 @@ export function pushballHUD(hud: HUD, model: PushballRun, start: () => void, pau
     } action.dash = false; return next; }, reset,
     refresh: (loading: boolean, error: string, opponentError: string) => {
       const state = model.state, graphics = available();
-      hud.label(sound, audio.enabled ? 'Sound on' : 'Sound off');
-      sound.setAttribute('aria-pressed', String(audio.enabled));
       hud.stats({ You: state.score[0], TAMEV: state.score[1] });
       pauseButton.hidden = state.mode !== 'playing';
       pauseButton.disabled = !graphics || !['playing', 'paused'].includes(state.mode);

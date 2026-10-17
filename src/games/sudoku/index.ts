@@ -1,11 +1,14 @@
 import { mountRun, type GameContext } from '../../core/loop';
+import { GameAudio } from '../../core/audio';
 import { createSudokuModel } from './model';
 import { createSudokuView } from './view';
 import { createSudokuHUD } from './hud';
 export default function mount(context: GameContext) {
   const { stage, hud, store, player } = context;
   const model = createSudokuModel(store.load('state-v2', null), store.load<number | null>('bestSeconds', null));
-  const view = createSudokuView(stage, model);
+  const view = createSudokuView(stage, model), audio = new GameAudio('sudoku');
+  let board = model.board.join(''), notes = JSON.stringify(model.notes), mistakes = model.mistakes,
+    mode = model.mode, number = model.number, selected = model.selected;
   let saved = '', best = model.bestSeconds, autoNext = 0, lastMode = model.mode;
   // A puzzle solved in this session hands the next generated one over by itself.
   const autoAdvance = () => {
@@ -67,6 +70,17 @@ export default function mount(context: GameContext) {
     hud.selection(`Row ${Math.floor(index / 9) + 1}, column ${index % 9 + 1}. ${value ? 'Digit ' + value : 'Empty'}. ${model.givens.includes(index) ? 'Given; cannot edit' : 'Editable'}.${notes.length ? ' Pencil notes ' + notes.join(', ') + '.' : ''}${model.invalid(index) ? ' Incorrect digit.' : ''}`);
   };
   stage.renderer.domElement.setAttribute('aria-describedby', 'game-selection');
-  const dispose = mountRun(context, { model, timer: true, render: dt => view.draw(dt), active: view.active, inspect: () => ({ visual: view.inspect() }), refresh: () => { updateHUD(); selection(); persist(); autoAdvance(); }, persist, keys });
+  const dispose = mountRun(context, { model, audio, timer: true, render: dt => {
+    view.draw(dt);
+    const nextBoard = model.board.join(''), nextNotes = JSON.stringify(model.notes);
+    if (number === model.number) {
+      if (model.mode === 'won' && mode !== 'won') audio.play('win');
+      else if (model.mistakes > mistakes) audio.play('hit');
+      else if (nextBoard !== board) audio.play('move');
+      else if (nextNotes !== notes || selected !== model.selected) audio.play('select');
+    }
+    board = nextBoard; notes = nextNotes; mistakes = model.mistakes;
+    mode = model.mode; number = model.number; selected = model.selected;
+  }, active: view.active, inspect: () => ({ visual: view.inspect() }), refresh: () => { updateHUD(); selection(); persist(); autoAdvance(); }, persist, keys });
   return () => { window.clearTimeout(autoNext); dispose(); stage.renderer.domElement.removeAttribute('aria-describedby'); };
 }

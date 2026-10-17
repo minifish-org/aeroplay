@@ -5,9 +5,9 @@ import { createMatch3View } from './view';
 import { createMatch3HUD } from './hud';
 export default function mount(context: GameContext) {
   const { stage, hud, store, player } = context;
-  const model = createMatch3Model(store.load('run', null), store.load('best', 0)), audio = new GameAudio();
+  const model = createMatch3Model(store.load('run', null), store.load('best', 0)), audio = new GameAudio('match3');
   const view = createMatch3View(stage, model);
-  let saved = '', best = model.best, score = model.score;
+  let saved = '', best = model.best, score = model.score, serial = model.serial, reshuffles = model.reshuffles;
   const persist = () => {
     if (model.phase !== 'clearing' && model.phase !== 'falling') {
       const state = model.saved(), key = JSON.stringify(state);
@@ -29,7 +29,6 @@ export default function mount(context: GameContext) {
     return; model.act(input); if (input === 'resume')
     model.resume(); persist(); };
   const updateHUD = createMatch3HUD(hud, model, utility, () => player.type === 'human');
-  const sound = hud.button('sound', 'Sound', 'sound', () => audio.toggle());
   let drag: { x: number; y: number; id: number; from: GemPoint } | null = null;
   const cancelDrag = () => { drag = null; };
   const down = (event: PointerEvent) => {
@@ -57,13 +56,15 @@ export default function mount(context: GameContext) {
   hud.element.addEventListener('pointerdown', down);
   hud.element.addEventListener('pointerup', up);
   hud.element.addEventListener('pointercancel', cancelDrag);
-  const dispose = mountRun(context, { model, clearInput: cancelDrag, active: () => model.mode === 'playing' && ['clearing', 'falling'].includes(model.phase) || view.active(), inspect: () => ({ visual: view.inspect() }),
-    render: dt => { view.draw(dt); if (score !== model.score) {
-      score = model.score;
+  const dispose = mountRun(context, { model, audio, clearInput: cancelDrag, active: () => model.mode === 'playing' && ['clearing', 'falling'].includes(model.phase) || view.active(), inspect: () => ({ visual: view.inspect() }),
+    render: dt => { view.draw(dt); if (model.score > score) {
       audio.play('collect');
-    } },
-    refresh: () => { updateHUD(); sound.setAttribute('aria-pressed', String(audio.enabled)); persist(); }, persist,
-    pick: (x, y) => { audio.unlock(); return stage.pick(x, y); }, dispose: () => audio.dispose() });
+    } else if (model.reshuffles > reshuffles) audio.play('shuffle');
+    else if (serial !== model.serial && model.swap && !model.swap.accepted) audio.play('hit');
+    score = model.score; serial = model.serial; reshuffles = model.reshuffles;
+    },
+    refresh: () => { updateHUD(); persist(); }, persist,
+    pick: (x, y) => stage.pick(x, y) });
   return () => {
     dispose();
     hud.element.removeEventListener('pointerdown', down);

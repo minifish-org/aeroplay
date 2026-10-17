@@ -11,16 +11,20 @@ export function pushballContext(side: Side) {
 export default function mount(context: GameContext) {
   const { stage, hud, store, player: human } = context;
   stage.mount(hud.element, hud.playArea, 'arena', 14.6, 22.8, 0x203d50);
-  const model = new PushballRun(store.load('wins', 0), store.load('matches', 0)), view = new PushballView(stage), audio = new GameAudio(), opponent = new Player(new TamevPlayer());
+  const model = new PushballRun(store.load('wins', 0), store.load('matches', 0)), view = new PushballView(stage), audio = new GameAudio('pushball'), opponent = new Player(new TamevPlayer());
   let disposed = false, loading = false, modelReady = false, error = '', selectedPlan = 'Waiting for kickoff', goal = 0, storedMatches = model.matches;
-  const controls = pushballHUD(hud, model, () => { void startMatch(); }, togglePause, () => opponent.retry(), audio, () => stage.available, (x, y) => stage.groundDirection(x, y));
-  const render = (dt = 0) => { const elapsed = model.mode === 'paused' || hud.helpOpen || loading ? 0 : dt; view.render(model.state, elapsed); controls.refresh(loading, error, opponent.error); hud.enforceGraphics(); stage.advance(elapsed); stage.render(); };
+  const controls = pushballHUD(hud, model, () => { void startMatch(); }, togglePause, () => opponent.retry(), () => stage.available, (x, y) => stage.groundDirection(x, y));
+  const render = (dt = 0) => { audio.sync(); const elapsed = model.mode === 'paused' || hud.helpOpen || loading ? 0 : dt; view.render(model.state, elapsed); controls.refresh(loading, error, opponent.error); hud.enforceGraphics(); stage.advance(elapsed); stage.render(); };
   const active = () => !disposed && !document.hidden && !hud.helpOpen && !loading && model.mode !== 'paused' && (model.mode === 'playing' || stage.animating || view.animating);
   const loop = new GameLoop(dt => {
     if (hud.helpOpen || document.hidden || model.mode !== 'playing')
       return;
     humanPort.human(controls.read());
+    const dash = model.state.robots[0].cooldown, vx = model.state.ball.vx, vy = model.state.ball.vy;
     model.step(dt);
+    audio.sync();
+    if (model.state.robots[0].cooldown > dash) audio.play('boost');
+    if (model.state.goalSerial === goal && Math.hypot(model.state.ball.vx - vx, model.state.ball.vy - vy) > 3) audio.play('move');
     if (model.state.goalSerial !== goal) {
       goal = model.state.goalSerial;
       controls.reset();
@@ -32,8 +36,7 @@ export default function mount(context: GameContext) {
       store.save('matches', model.matches);
       store.save('wins', model.wins);
       void opponent.tick();
-      if (model.state.winner === 0)
-        audio.play('win');
+      audio.play(model.state.winner === 0 ? 'win' : 'lose');
     }
   }, render, active);
   const wake = () => { if (disposed)
@@ -62,7 +65,6 @@ export default function mount(context: GameContext) {
     selectedPlan = 'Waiting for kickoff';
     loading = true;
     const ticket = model.version;
-    audio.unlock();
     render();
     try {
       await prepareTamev();
@@ -121,6 +123,7 @@ export default function mount(context: GameContext) {
     pending: number;
   }; return JSON.stringify({ ...model.snapshot(), coordinates: 'Field center origin; x right, y down. Blue attacks top, coral bottom.', ...stage.inspect(), player: human.diagnostics(), ai: { ...local, provider: 'TAMEV + Planning', ...opponent.diagnostics(), plan: selectedPlan, modelReady, loading, modelInitializations: local.info?.initializations ?? 0, lastDecision: local.lastDecision, pending: local.pending, controllerPending: opponent.diagnostics().pending } }); };
   window.advanceTime = ms => { loop.advance(ms); };
+  audio.bind(hud, () => model.mode === 'playing' && !hud.helpOpen && !loading && stage.available);
   wake();
   return () => { disposed = true; model.version++; loop.stop(); off(); humanPort.dispose(); opponentPort.dispose(); opponent.dispose(); controls.dispose(); audio.dispose(); document.removeEventListener('visibilitychange', hidden); window.removeEventListener('blur', blur); hud.element.removeEventListener('stage-lost', blur); delete window.render_game_to_text; delete window.advanceTime; };
 }

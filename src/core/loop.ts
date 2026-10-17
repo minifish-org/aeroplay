@@ -1,5 +1,6 @@
 import { Player, planningSignature, getAIModelState, subscribeAIModel, getLocalDecisionDiagnostics, type PlanningState } from '../ai/player';
 import { bindInput } from './input';
+import type { GameAudio } from './audio';
 import { HUD } from './hud';
 import { Stage, type Preset } from './stage';
 import type { Store } from './storage';
@@ -33,6 +34,7 @@ export interface Model {
   planning: () => PlanningState | null;
 }
 export interface RunOptions {
+  audio?: GameAudio;
   model: Model;
   render: (dt: number) => void;
   refresh: () => void;
@@ -81,7 +83,7 @@ export function mountRun(context: GameContext, options: RunOptions) {
   const waitingForModel = () => player.type === 'ai' && ['loading', 'error'].includes(getAIModelState().status);
   const persist = () => options.persist?.();
   const visualTime = (dt: number) => model.mode === 'paused' || hud.helpOpen || waitingForModel() ? 0 : dt;
-  const draw = (dt = 0) => { const elapsed = visualTime(dt); options.render(elapsed); options.refresh();
+  const draw = (dt = 0) => { options.audio?.sync(); const elapsed = visualTime(dt); options.render(elapsed); options.refresh();
     if (model.mode === 'paused' && player.type === 'human' && !options.continuous)
       hud.panel('Paused', '', [{ label: 'Resume', press: () => player.resume() }]);
     resultControls(); hud.enforceGraphics(); stage.advance(elapsed); stage.render(); };
@@ -214,9 +216,10 @@ export function mountRun(context: GameContext, options: RunOptions) {
     model.step(1);
     options.refresh();
   } }, 1000) : 0;
+  options.audio?.bind(hud, () => model.mode === 'playing' && !hud.helpOpen && stage.available && !waitingForModel());
   syncPlayer();
   persist();
   wake();
   return () => { disposed = true; if (frame)
-    cancelAnimationFrame(frame); window.clearInterval(timer); persist(); unbind(); off(); offModel(); port.dispose(); options.dispose?.(); document.removeEventListener('visibilitychange', pauseHidden); window.removeEventListener('pagehide', persist); hud.element.removeEventListener('stage-lost', lost); delete window.render_game_to_text; delete window.advanceTime; };
+    cancelAnimationFrame(frame); window.clearInterval(timer); persist(); unbind(); off(); offModel(); port.dispose(); options.audio?.dispose(); options.dispose?.(); document.removeEventListener('visibilitychange', pauseHidden); window.removeEventListener('pagehide', persist); hud.element.removeEventListener('stage-lost', lost); delete window.render_game_to_text; delete window.advanceTime; };
 }

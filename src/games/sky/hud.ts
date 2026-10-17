@@ -1,9 +1,8 @@
-import type { GameAudio } from '../../core/audio';
 import type { GameContext } from '../../core/loop';
 import { SECTOR_LENGTH, type SkyRun } from './model';
-export function skyHUD(context: GameContext, model: SkyRun, audio: GameAudio) {
+export function skyHUD(context: GameContext, model: SkyRun) {
   const { hud, player } = context, send = (input: unknown) => player.submitHumanInput(input);
-  const pause = hud.button('pause', 'Pause', 'pause', () => send('pause')), restart = hud.button('restart', 'Restart', 'restart', () => send('restart')), sound = hud.button('sound', 'Sound', 'sound', () => audio.toggle());
+  const pause = hud.button('pause', 'Pause', 'pause', () => send('pause')), restart = hud.button('restart', 'Restart', 'restart', () => send('restart'));
   const distance = document.createElement('div'), meter = document.createElement('progress'), caption = document.createElement('span');
   distance.style.cssText = 'display:grid;gap:var(--space-xs);width:94px;font-size:var(--text-sm)';
   meter.style.cssText = 'width:94px;height:8px';
@@ -22,8 +21,6 @@ export function skyHUD(context: GameContext, model: SkyRun, audio: GameAudio) {
     meter.value = state.distance;
     meter.setAttribute('aria-valuetext', Math.round(state.distance) + ' of ' + SECTOR_LENGTH + ' meters into sector ' + state.sector);
     caption.textContent = Math.round(state.distance) + ' / ' + SECTOR_LENGTH + ' m';
-    hud.label(sound, audio.enabled ? 'Sound on' : 'Sound off');
-    sound.setAttribute('aria-pressed', String(audio.enabled));
     restart.hidden = state.mode !== 'paused';
     boost.disabled = state.charge < 100 || state.boost > 0 || state.mode !== 'playing' || player.type === 'ai';
     hud.label(boost, state.boost > 0 ? 'Boost ' + state.boost.toFixed(1) + 's' : state.charge < 100 ? 'Boost ' + Math.round(state.charge) + '%' : 'Boost', state.boost > 0 ? 'Boost active: ' + state.boost.toFixed(1) + ' seconds remaining' : state.charge < 100 ? 'Boost charge: ' + Math.round(state.charge) + ' percent' : 'Boost ready');

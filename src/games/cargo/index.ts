@@ -8,7 +8,7 @@ export default function mount(context: GameContext) {
   const { stage, hud, store, player } = context;
   stage.mount(hud.element, hud.playArea, 'island', 11, 10, 0x233f4b);
   const model = new CargoRun(store.load<CargoSave | null>('run', null), store.load('stars', {}));
-  const view = new CargoView(stage), audio = new GameAudio();
+  const view = new CargoView(stage), audio = new GameAudio('cargo');
   let thinking = false, message = '', job: AbortController | null = null, lastKey = '', lastMoves = model.moves, lastPushes = model.pushes;
   let autoNext = 0, lastMode = model.mode;
   // An island delivered in this session hands the next generated one over by itself.
@@ -54,17 +54,16 @@ export default function mount(context: GameContext) {
       refresh(thinking, message);
       hud.onChange();
     } });
-  }, audio);
+  });
   function persist() { store.save('run', model.save()); store.save('stars', model.stars); }
-  return mountRun(context, { model, render: dt => { const key = model.planning() ? planningSignature(model.planning()!) : model.mode; if (lastKey && lastKey !== key && thinking) {
+  return mountRun(context, { model, audio, render: dt => { const key = model.planning() ? planningSignature(model.planning()!) : model.mode; if (lastKey && lastKey !== key && thinking) {
       job?.abort();
       thinking = false;
       message = '';
     } lastKey = key; if (model.moves !== lastMoves) {
-      audio.unlock();
-      audio.play(model.mode === 'won' ? 'win' : model.pushes > lastPushes ? 'collect' : 'move');
+      audio.play(model.mode === 'won' ? 'win' : model.moves < lastMoves ? 'select' : model.pushes > lastPushes ? 'collect' : 'move');
       lastMoves = model.moves;
       lastPushes = model.pushes;
     } view.render(model, dt); }, active: () => view.animating, refresh: () => { refresh(thinking, message); autoAdvance(); }, persist, swipe: true,
-    keys: key => ({ ArrowUp: 'up', ArrowRight: 'right', ArrowDown: 'down', ArrowLeft: 'left', w: 'up', d: 'right', s: 'down', a: 'left', z: 'undo', Z: 'undo' } as Record<string, string>)[key], rejected: input => { view.bump(input, model); audio.play('hit'); }, dispose: () => { window.clearTimeout(autoNext); job?.abort(); audio.dispose(); } });
+    keys: key => ({ ArrowUp: 'up', ArrowRight: 'right', ArrowDown: 'down', ArrowLeft: 'left', w: 'up', d: 'right', s: 'down', a: 'left', z: 'undo', Z: 'undo' } as Record<string, string>)[key], rejected: input => { view.bump(input, model); audio.play('hit'); }, dispose: () => { window.clearTimeout(autoNext); job?.abort(); } });
 }
