@@ -24,7 +24,7 @@ Use three-point lighting, soft shadows, ACES tone mapping, consistent materials,
 
 One shared short-side threshold <=700px selects both iPhone orientations; no per-game media queries. Required viewports: 390x844, 844x390, 1512x982; MacBook lower bound 1440x900. No scrolling, horizontal overflow, clipped controls, or obstructed playfield. Only touch/in-stage controls on iPhone; keyboard/mouse on MacBook.
 
-The mode control combines Human/Watch/takeover. Remove settings/dialog/preload UI. Initialize TAMEV on first Watch; Pushball's mandatory opponent initializes on first Start match. Pause/retry/replay/return-to-personal-run remain contextual in-stage actions. Cancel queued plans on pause/takeover/navigation/hiding; never disable HUD recovery controls when locking AI-owned play input.
+The mode control combines Human/Watch/takeover. Remove settings/dialog/preload UI. Initialize TAMEV on first Watch; Pushball's mandatory opponent initializes on first Start match. Pause/retry/replay/return-to-personal-run remain contextual in-stage actions. A watched run keeps its controls in one reserved AI bar (pause while playing, next round plus personal run when finished) and never opens the bottom panel, so finishing cannot reflow the stage. Cancel queued plans on pause/takeover/navigation/hiding; never disable HUD recovery controls when locking AI-owned play input.
 
 ## Storage and offline
 

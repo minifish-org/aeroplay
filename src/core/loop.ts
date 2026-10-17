@@ -4,6 +4,16 @@ import { HUD } from './hud';
 import { Stage, type Preset } from './stage';
 import type { Store } from './storage';
 import type { GameEntry } from '../games/registry';
+/** Each game names its own way to open the next round for a watched run. */
+const NEXT_ROUND: Record<string, { label: string; input: string }> = {
+  lightsout: { label: 'Next puzzle', input: 'next' },
+  sudoku: { label: 'Next puzzle', input: 'next' },
+  cargo: { label: 'Next island', input: 'next' },
+  match3: { label: 'Next run', input: 'next' },
+  '2048': { label: 'Next run', input: 'restart' },
+  flappy: { label: 'Next run', input: 'restart' },
+  sky: { label: 'Next run', input: 'restart' }
+};
 export interface GameContext {
   entry: GameEntry;
   stage: Stage;
@@ -11,7 +21,6 @@ export interface GameContext {
   store: Store;
   player: Player;
   returnPersonal: () => void;
-  watchAgain: () => void;
 }
 export interface Model {
   mode: string;
@@ -128,14 +137,32 @@ export function mountRun(context: GameContext, options: RunOptions) {
   else
     player.pause(); });
   const retry = entry.id === 'pushball' ? null : hud.button('ai-retry', 'Retry AI', 'restart', () => player.retry());
-  const again = entry.id === 'pushball' ? null : hud.button('ai-again', 'Watch again', 'play', context.watchAgain);
+  // A watched run keeps going: the AI bar offers the next round under the same controller.
+  const nextRound = NEXT_ROUND[entry.id] ?? { label: 'Next run', input: 'restart' };
+  let nextButton: HTMLButtonElement | null = null;
+  const nextFor = () => nextButton ??= hud.button('ai-next', nextRound.label, 'next', () => {
+    if (hud.helpOpen || player.type !== 'ai')
+      return;
+    model.act(nextRound.input);
+    persist();
+    player.start();
+  });
+  const syncAiBar = () => {
+    hud.aiBar(player.type === 'ai');
+    if (player.type !== 'ai')
+      return;
+    const controls = finished()
+      ? [nextFor(), personal].filter((button): button is HTMLButtonElement => !!button && !button.hidden)
+      : pause && !pause.hidden ? [pause] : [];
+    hud.aiActions(controls);
+  };
   resultControls = () => {
     if (renderedMode !== model.mode) { renderedMode = model.mode; syncControls(); }
-    if (player.type === 'ai' && finished() && again && personal) hud.resultControls([again, personal]);
+    syncAiBar();
   };
   function syncControls() {
     if (mode) {
-      hud.primary(mode, player.type === 'ai' && !finished());
+      hud.primary(mode, true);
       hud.label(mode, player.type === 'ai' ? 'Take over' : 'Watch', player.type === 'ai' ? 'Take over' : 'Watch TAMEV');
       mode.setAttribute('aria-pressed', String(player.type === 'ai'));
     }
@@ -145,17 +172,18 @@ export function mountRun(context: GameContext, options: RunOptions) {
     }
     if (pause) {
       pause.hidden = finished() || player.type !== 'ai' && !!options.continuous;
-      hud.primary(pause, player.type === 'ai');
+      hud.primary(pause, false);
       hud.label(pause, player.status === 'paused' ? 'Resume' : 'Pause');
     }
     if (retry)
       retry.hidden = player.type !== 'ai' || !player.error || finished();
-    if (again)
-      again.hidden = player.type !== 'ai' || !finished();
+    if (nextButton)
+      nextButton.hidden = !finished();
     hud.element.dataset.player = player.type;
     hud.element.dataset.playerStatus = player.status;
     const state = getAIModelState();
     hud.controllerNotice(player.type === 'ai' ? (player.error || (state.status === 'loading' ? 'Loading TAMEV…' : '')) : '');
+    syncAiBar();
   }
   function syncPlayer() { syncControls(); wake(); }
   const off = player.subscribe(syncPlayer), offModel = subscribeAIModel(syncPlayer);

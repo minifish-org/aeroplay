@@ -153,6 +153,18 @@
   pointer-events:auto;
 }
 .hud-inputs:empty,.hud-inputs:not(:has([data-bank=digits])) { display:none; }
+/* The AI bar keeps one row reserved, so finishing a watched run never reflows the stage. */
+.hud-ai {
+  grid-row:3;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:var(--space-sm);
+  min-height:52px;
+  pointer-events:auto;
+}
+.hud-ai[hidden] { display:none; }
+.hud-ai-actions { display:flex; gap:var(--space-sm); margin-left:auto; }
 .input-bank { display:grid; gap:var(--space-xs); grid-template-columns:repeat(3,minmax(44px,1fr)); }
 .input-bank .hud-button { min-height:52px; }
 .input-bank[data-bank=cargo] { width:192px; }

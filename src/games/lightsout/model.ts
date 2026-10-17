@@ -137,9 +137,15 @@ export function createLightsOutModel(saved: unknown = null, random = Math.random
       model.board = [...puzzle.board];
       model.initial = [...model.board];
       model.par = puzzle.par;
-      model.reset();
+      model.reset(false);
     },
-    reset() {
+    /** Retry replays the puzzle; a solved puzzle opens the next generated one. */
+    reset(advance?: boolean) {
+      if (advance ?? model.mode === 'won') {
+        model.level++;
+        model.fresh();
+        return;
+      }
       model.board = [...model.initial];
       model.moves = 0;
       model.hintsUsed = 0;

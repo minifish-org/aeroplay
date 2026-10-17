@@ -41,7 +41,7 @@ async function route(profile: PlayProfile = 'human') {
     save('last-game', entry.id);
     document.title = entry.name + ' · AeroPlay';
     const teardown = module.default({ entry, stage, hud, store: namespace(entry.id === '2048' ? 'game2048' : entry.id), player,
-      returnPersonal: () => { void route('human'); }, watchAgain: () => { void route('ai'); } });
+      returnPersonal: () => { void route('human'); } });
     dispose = () => { teardown(); player.dispose(); hud.dispose(); stage.clear(); };
     if (profile === 'ai')
       player.start();

@@ -24,6 +24,8 @@ export class HUD {
   private status: HTMLElement;
   private panelArea: HTMLElement;
   private selectionArea: HTMLElement;
+  private aiBarArea: HTMLElement;
+  private aiArea: HTMLElement;
   private more: HTMLDetailsElement;
   private menu: HTMLElement;
   private fields = new Map<string, HTMLElement>();
@@ -39,7 +41,7 @@ export class HUD {
   onMenuChange = (_open: boolean) => { };
   private keyDown = (event: KeyboardEvent) => { this.dismissIntro(); if (event.key === 'Escape') this.more.open = false; };
   constructor(root: HTMLElement, name: string, back: () => void) {
-    root.innerHTML = '<section class="game-stage"><div class="hud"><div class="hud-top"><div class="hud-nav"></div><div class="hud-stats"></div><div class="hud-actions"><details class="hud-more"><summary aria-label="More options" title="More options"></summary><div class="hud-menu"></div></details></div></div><div class="play-area"><div class="hud-notice" role="status" aria-live="polite" hidden></div><div id="game-selection" class="hud-selection" role="status" aria-live="polite" aria-atomic="true"></div></div><div class="hud-inputs"></div><div class="hud-panel" hidden></div></div></section>';
+    root.innerHTML = '<section class="game-stage"><div class="hud"><div class="hud-top"><div class="hud-nav"></div><div class="hud-stats"></div><div class="hud-actions"><details class="hud-more"><summary aria-label="More options" title="More options"></summary><div class="hud-menu"></div></details></div></div><div class="play-area"><div class="hud-notice" role="status" aria-live="polite" hidden></div><div id="game-selection" class="hud-selection" role="status" aria-live="polite" aria-atomic="true"></div></div><div class="hud-inputs"></div><div class="hud-ai" role="group" aria-label="AI run controls" hidden><div class="hud-ai-actions"></div></div><div class="hud-panel" hidden></div></div></section>';
     this.element = root.querySelector('.game-stage')!;
     this.playArea = root.querySelector('.play-area')!;
     this.inputs = root.querySelector('.hud-inputs')!;
@@ -48,6 +50,8 @@ export class HUD {
     this.status = root.querySelector('.hud-notice')!;
     this.panelArea = root.querySelector('.hud-panel')!;
     this.selectionArea = root.querySelector('.hud-selection')!;
+    this.aiBarArea = root.querySelector('.hud-ai')!;
+    this.aiArea = root.querySelector('.hud-ai-actions')!;
     this.more = root.querySelector('.hud-more')!;
     this.menu = root.querySelector('.hud-menu')!;
     this.more.querySelector('summary')!.append(icon('more'));
@@ -110,6 +114,23 @@ export class HUD {
     const group = this.panelArea.querySelector('.panel-actions');
     if (!this.panelArea.hidden && group) for (const button of buttons) group.append(button);
   }
+  /** The AI bar reserves one row for its run controls, so a finished run never reflows. */
+  aiBar(visible: boolean) {
+    if (this.aiBarArea.hidden === !visible)
+      return;
+    this.aiBarArea.hidden = !visible;
+    // A hidden bar keeps no stale controls in the document, so labels stay unambiguous.
+    if (!visible)
+      this.aiArea.replaceChildren();
+  }
+  aiActions(buttons: HTMLButtonElement[]) {
+    for (const child of Array.from(this.aiArea.children))
+      if (!buttons.includes(child as HTMLButtonElement))
+        child.remove();
+    for (const button of buttons)
+      if (button.parentElement !== this.aiArea)
+        this.aiArea.append(button);
+  }
   stats(values: Record<string, string | number>) {
     for (const [key, field] of this.fields) field.hidden = !(key in values);
     for (const [key, value] of Object.entries(values)) {
@@ -171,6 +192,11 @@ export class HUD {
   }[] = []) {
     if (this.helpOpen)
       return;
+    // While the AI owns the run its controls live in the reserved AI bar, never in a panel.
+    if (this.element.dataset.player === 'ai') {
+      this.panelArea.hidden = true;
+      return;
+    }
     if (this.more.open) { this.lastPanel = ''; this.panelArea.hidden = true; return; }
     const key = JSON.stringify([title, detail, actions.map(action => action.label)]);
     if (key === this.lastPanel)
